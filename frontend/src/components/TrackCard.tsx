@@ -1,0 +1,43 @@
+import { Play } from 'lucide-react';
+import { usePlayerStore } from '@/stores/playerStore';
+import type { Track } from '@/types';
+import { Link } from 'react-router-dom';
+
+interface TrackCardProps {
+  track: Track;
+}
+
+const TrackCard = ({ track }: TrackCardProps) => {
+  const { setTrack, currentTrack, isPlaying } = usePlayerStore();
+  const isCurrentTrack = currentTrack?.id === track.id;
+
+  return (
+    <div className="group relative cursor-pointer rounded-md bg-gray-900 p-3 transition-colors hover:bg-gray-800">
+      <div className="relative mb-3">
+        <img
+          src={track.cover_url || track.album?.cover_url || '/placeholder-album.png'}
+          alt={track.title}
+          className="h-40 w-full rounded-md object-cover shadow-lg"
+        />
+        <button
+          onClick={() => setTrack(track)}
+          className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-black shadow-xl transition-all ${
+            isCurrentTrack && isPlaying
+              ? 'opacity-100 translate-y-0'
+              : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
+          }`}
+        >
+          <Play size={18} fill="currentColor" />
+        </button>
+      </div>
+      <Link to={`/track/${track.id}`} className="block truncate text-sm font-semibold text-white hover:underline">
+        {track.title}
+      </Link>
+      <Link to={`/artist/${track.artist_id}`} className="block truncate text-xs text-gray-400 hover:underline">
+        {track.artist?.name || 'Unknown Artist'}
+      </Link>
+    </div>
+  );
+};
+
+export default TrackCard;

@@ -1,0 +1,134 @@
+import { Play } from 'lucide-react';
+import { usePlayerStore } from '@/stores/playerStore';
+import type { Track } from '@/types';
+import { Link } from 'react-router-dom';
+import { useTranslation } from '@/hooks/useTranslation';
+
+interface TrackListProps {
+  tracks: Track[];
+  showAlbum?: boolean;
+  showIndex?: boolean;
+}
+
+const TrackList = ({ tracks, showAlbum = true, showIndex = true }: TrackListProps) => {
+  const { setTrack, currentTrack, isPlaying, addToQueue } = usePlayerStore();
+  const { t } = useTranslation();
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, track: Track) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setTrack(track);
+    }
+  };
+
+  return (
+    <div className="w-full">
+      {showIndex && (
+        <div className="mb-2 grid grid-cols-[16px_4fr_3fr_minmax(120px,1fr)] gap-4 border-b border-gray-700 px-4 py-2 text-xs uppercase tracking-wider text-gray-400 md:grid-cols-[16px_4fr_2fr_3fr_minmax(120px,1fr)]">
+          <span className="text-right">#</span>
+          <span>{t('player.next').includes('Next') ? 'Title' : 'Titre'}</span>
+          {showAlbum && <span className="hidden md:block">{t('nav.albums')}</span>}
+          <span className="hidden md:block">{t('playlist.track_added')}</span>
+          <span className="text-right">{t('player.now_playing').includes('Now') ? 'Duration' : 'Durée'}</span>
+        </div>
+      )}
+
+      <div className="space-y-0.5" role="list" aria-label={t('nav.playlists')}>
+        {tracks.map((track, index) => {
+          const isCurrentTrack = currentTrack?.id === track.id;
+
+          return (
+            <div
+              key={track.id}
+              role="listitem"
+              tabIndex={0}
+              onKeyDown={(e) => handleKeyDown(e, track)}
+              className={`group grid cursor-pointer items-center gap-4 rounded-md px-4 py-2 transition-colors hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-green-500 ${
+                isCurrentTrack ? 'bg-gray-800' : ''
+              } ${showIndex ? 'grid-cols-[16px_4fr_3fr_minmax(120px,1fr)] md:grid-cols-[16px_4fr_2fr_3fr_minmax(120px,1fr)]' : 'grid-cols-[4fr_3fr_minmax(120px,1fr)] md:grid-cols-[4fr_2fr_3fr_minmax(120px,1fr)]'}`}
+              onDoubleClick={() => setTrack(track)}
+            >
+              {showIndex && (
+                <div className="flex items-center justify-end">
+                  <span className={`text-sm ${isCurrentTrack ? 'text-green-500' : 'text-gray-400 group-hover:hidden'}`}>
+                    {isCurrentTrack && isPlaying ? '♪' : index + 1}
+                  </span>
+                  <button
+                    onClick={() => setTrack(track)}
+                    className="hidden text-white group-hover:block"
+                    aria-label={`${t('player.play')} ${track.title}`}
+                  >
+                    <Play size={14} fill="currentColor" />
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3">
+                {!showIndex && (
+                  <button
+                    onClick={() => setTrack(track)}
+                    className="hidden text-white group-hover:block"
+                    aria-label={`${t('player.play')} ${track.title}`}
+                  >
+                    <Play size={14} fill="currentColor" />
+                  </button>
+                )}
+                <img
+                  src={track.cover_url || track.album?.cover_url || '/placeholder-album.png'}
+                  alt={track.title}
+                  className="h-10 w-10 rounded object-cover"
+                />
+                <div className="min-w-0">
+                  <Link
+                    to={`/track/${track.id}`}
+                    className={`block truncate text-sm font-medium hover:underline ${
+                      isCurrentTrack ? 'text-green-500' : 'text-white'
+                    }`}
+                  >
+                    {track.title}
+                  </Link>
+                  <Link
+                    to={`/artist/${track.artist_id}`}
+                    className="block truncate text-xs text-gray-400 hover:underline"
+                  >
+                    {track.artist?.name || t('player.unknown_artist')}
+                  </Link>
+                </div>
+              </div>
+
+              {showAlbum && (
+                <span className="hidden truncate text-sm text-gray-400 md:block hover:underline">
+                  <Link to={`/album/${track.album_id}`}>{track.album?.title || t('player.unknown_album')}</Link>
+                </span>
+              )}
+
+              <span className="hidden text-sm text-gray-400 md:block">{t('playlist.track_added')}</span>
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addToQueue(track);
+                  }}
+                  className="text-gray-400 opacity-0 hover:text-white group-hover:opacity-100"
+                  aria-label={`${t('action.save')} ${track.title}`}
+                >
+                  +
+                </button>
+                <span className="text-sm text-gray-400">{formatDuration(track.duration)}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default TrackList;

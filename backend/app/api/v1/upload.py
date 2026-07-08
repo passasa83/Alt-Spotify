@@ -1,0 +1,162 @@
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from mutagen import File as MutagenFile
+import structlog
+
+from app.core.database import get_db
+from app.core.minio import upload_file
+from app.models.track import Track
+from app.models.user import User
+from app.utils.deps import require_admin
+
+logger = structlog.get_logger("app")
+
+router = APIRouter(prefix="/upload", tags=["upload"])
+
+ALLOWED_AUDIO_TYPES = {"audio/mpeg", "audio/wav", "audio/flac", "audio/ogg", "audio/mp4", "audio/x-m4a"}
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_AUDIO_SIZE = 100 * 1024 * 1024  # 100MB
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
+
+
+@router.post("/audio", status_code=status.HTTP_202_ACCEPTED)
+async def upload_audio(
+    request: Request,
+    file: UploadFile = File(...),
+    title: str | None = None,
+    artist_id: uuid.UUID | None = None,
+    album_id: uuid.UUID | None = None,
+    genre: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    if file.content_type not in ALLOWED_AUDIO_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported audio type: {file.content_type}",
+        )
+
+    file_data = await file.read()
+    if len(file_data) > MAX_AUDIO_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Audio file too large (max 100MB)",
+        )
+
+    track_id = uuid.uuid4()
+    ext = Path(file.filename or "audio.mp3").suffix or ".mp3"
+    object_name = f"audio/{track_id}{ext}"
+
+    upload_file(object_name, file_data, file.content_type or "audio/mpeg")
+
+    # Extract metadata with mutagen
+    metadata = {}
+    try:
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            tmp.write(file_data)
+            tmp_path = tmp.name
+        try:
+            audio = MutagenFile(tmp_path, easy=True)
+            if audio:
+                metadata = {
+                    "title": audio.get("title", [None])[0],
+                    "artist": audio.get("artist", [None])[0],
+                    "album": audio.get("album", [None])[0],
+                    "genre": audio.get("genre", [None])[0],
+                    "duration": audio.info.length if audio.info else 0,
+                }
+        finally:
+            os.unlink(tmp_path)
+    except Exception:
+        pass
+
+    final_title = title or metadata.get("title") or file.filename or "Untitled"
+    duration = int(metadata.get("duration", 0)) if metadata.get("duration") else 0
+
+    track = Track(
+        id=track_id,
+        title=final_title,
+        artist_id=artist_id,
+        album_id=album_id,
+        duration_seconds=duration,
+        file_url=object_name,
+        genre=genre or metadata.get("genre"),
+    )
+    db.add(track)
+    await db.flush()
+    await db.refresh(track)
+
+    logger.info(
+        "audio_uploaded",
+        track_id=str(track.id),
+        user_id=str(_admin.id),
+        file_size=len(file_data),
+        file_type=file.content_type,
+    )
+
+    # Trigger Celery transcoding task
+    try:
+        from worker.tasks import transcode_audio
+        transcode_audio.delay(object_name, f"hls/{track_id}", str(track_id))
+    except Exception:
+        pass
+
+    return {
+        "track_id": str(track.id),
+        "status": "processing",
+        "message": "Audio uploaded, transcoding started",
+    }
+
+
+@router.post("/cover", status_code=status.HTTP_201_CREATED)
+async def upload_cover(
+    file: UploadFile = File(...),
+    entity_type: str = "track",
+    entity_id: uuid.UUID | None = None,
+    _admin: User = Depends(require_admin),
+):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported image type: {file.content_type}",
+        )
+
+    file_data = await file.read()
+    if len(file_data) > MAX_IMAGE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Image file too large (max 10MB)",
+        )
+
+    ext = Path(file.filename or "cover.jpg").suffix or ".jpg"
+    object_name = f"covers/{entity_type}/{entity_id}{ext}"
+
+    upload_file(object_name, file_data, file.content_type or "image/jpeg")
+
+    return {
+        "url": object_name,
+        "entity_type": entity_type,
+        "entity_id": str(entity_id) if entity_id else None,
+    }
+
+
+@router.get("/status/{task_id}")
+async def get_upload_status(task_id: str):
+    try:
+        from worker.celery_app import app as celery_app
+        result = celery_app.AsyncResult(task_id)
+        return {
+            "task_id": task_id,
+            "status": result.state,
+            "result": str(result.result) if result.result else None,
+        }
+    except Exception:
+        return {
+            "task_id": task_id,
+            "status": "UNKNOWN",
+            "result": None,
+        }

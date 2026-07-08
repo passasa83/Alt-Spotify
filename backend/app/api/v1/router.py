@@ -1,0 +1,23 @@
+from fastapi import APIRouter
+
+from app.api.v1 import auth, users, artists, albums, tracks, playlists, search, upload, stream, lyrics, jam, social, notifications, podcasts, monitoring, import_export, push, admin
+
+api_router = APIRouter()
+api_router.include_router(auth.router)
+api_router.include_router(users.router)
+api_router.include_router(artists.router)
+api_router.include_router(albums.router)
+api_router.include_router(tracks.router)
+api_router.include_router(playlists.router)
+api_router.include_router(search.router)
+api_router.include_router(upload.router)
+api_router.include_router(stream.router)
+api_router.include_router(lyrics.router)
+api_router.include_router(jam.router)
+api_router.include_router(social.router)
+api_router.include_router(notifications.router)
+api_router.include_router(podcasts.router)
+api_router.include_router(monitoring.router)
+api_router.include_router(import_export.router)
+api_router.include_router(push.router)
+api_router.include_router(admin.router)
