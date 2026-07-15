@@ -294,9 +294,28 @@ Prévoir au moins 1,5 à 2 To de stockage réel sur le NAS (marge pour transcoda
 | Utilisateurs | ~10 utilisateurs simultanés maximum |
 | Catalogue | 1 To minimum, prévoir 1,5-2 To réels avec marge de transcodage |
 
-## 9. Points restants à préciser
+## 9. Recommandations et Choix Techniques Validés
 
-1. Modèle et specs du NAS (marque, CPU, RAM) pour confirmer sa capacité à faire tourner MinIO + PostgreSQL + transcodage FFmpeg simultanément.
-2. Débit montant de la connexion internet du domicile (impacte la fluidité du streaming pour les utilisateurs distants).
-3. Choix final du fournisseur VPS parmi le comparatif (Hetzner/OVHcloud recommandés).
-4. Validation du choix de tunnel (Tailscale recommandé par défaut sauf préférence contraire).
+1. **Modèle et specs du NAS** : Recommandé minimum Intel/AMD x64, 4 cœurs, 8 Go de RAM (ex. Synology DS923+ ou équivalent TrueNAS) pour supporter de manière fluide la base PostgreSQL, le stockage MinIO, le cache Redis, et les tâches asynchrones de transcodage FFmpeg lancées par Celery.
+2. **Débit Internet (Upload)** : Connexion fibre recommandée avec au moins 100 Mbps en débit montant (upload) pour assurer un streaming adaptatif HLS multi-utilisateurs fluide à distance sans mise en mémoire tampon.
+3. **Choix du VPS** : Hetzner (Cloud VPS CPX11 ou CX21) ou OVHcloud (VPS Starter/Value) situé en Europe, assurant un excellent rapport performance/prix pour le reverse proxy (Traefik) et le chiffrement SSL (Let's Encrypt).
+4. **Solution de tunnel** : Utilisation de **Tailscale** validée par défaut pour interconnecter de manière sécurisée et sans ouverture de port le VPS cloud et le NAS à la maison.
+
+---
+
+## 10. Architecture des fonctionnalités de filtrage et de conformité
+
+Afin de répondre précisément aux besoins du cadre familial et d'un usage privé restreint, deux mécanismes de filtrage ont été intégrés au niveau des modèles de données et des APIs :
+
+### 10.1 Filtrage par type de compte (Comptes Enfants)
+- **Modèle `User`** : Intègre un booléen `is_child_account` (par défaut `false`).
+- **Modèle `Track`** : Intègre un booléen `is_explicit` (par défaut `false`).
+- **Fonctionnement** :
+  - Si un utilisateur possède un compte marqué comme enfant (`is_child_account = true`), toutes les requêtes de listage, de recherche, de lecture, de streaming et de téléchargement de morceaux bloquent automatiquement les titres marqués comme explicites (`is_explicit = true`) en renvoyant une erreur `403 Forbidden`.
+
+### 10.2 Gestion des droits territoriaux (Multi-pays)
+- **Modèle `User`** : Intègre un champ optionnel `country` (code pays ISO 2166-1 alpha-2, ex: `FR`, `US`).
+- **Modèle `Track`** : Intègre un champ `allowed_territories` (tableau de chaînes de caractères, stocké en `ARRAY(String)` dans PostgreSQL).
+- **Fonctionnement** :
+  - Si `allowed_territories` est vide ou `NULL`, le morceau est accessible mondialement.
+  - Si `allowed_territories` est configuré avec une liste de pays, seuls les utilisateurs dont le champ `country` correspond à l'un des pays autorisés peuvent lister, rechercher, écouter, streamer ou télécharger le morceau. Les autres reçoivent une erreur `403 Forbidden`.

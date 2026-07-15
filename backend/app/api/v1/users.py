@@ -39,6 +39,12 @@ async def update_me(
         current_user.pseudo = body.pseudo
     if body.avatar_url is not None:
         current_user.avatar_url = body.avatar_url
+    if body.bio is not None:
+        current_user.bio = body.bio
+    if body.country is not None:
+        current_user.country = body.country.upper() if body.country else None
+    if body.is_child_account is not None:
+        current_user.is_child_account = body.is_child_account
     await db.flush()
     await db.refresh(current_user)
     return current_user

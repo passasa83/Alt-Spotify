@@ -16,7 +16,7 @@ logger = structlog.get_logger("app")
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
-ALLOWED_AUDIO_TYPES = {"audio/mpeg", "audio/wav", "audio/flac", "audio/ogg", "audio/mp4", "audio/x-m4a"}
+ALLOWED_AUDIO_TYPES = {"audio/mpeg", "audio/wav", "audio/flac", "audio/ogg", "audio/mp4", "audio/x-m4a", "audio/opus", "audio/x-ms-wma", "audio/alac", "audio/x-aac", "video/mp4"}
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_AUDIO_SIZE = 100 * 1024 * 1024  # 100MB
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -27,9 +27,12 @@ async def upload_audio(
     request: Request,
     file: UploadFile = File(...),
     title: str | None = None,
+    artist: str | None = None,
     artist_id: uuid.UUID | None = None,
     album_id: uuid.UUID | None = None,
     genre: str | None = None,
+    is_explicit: bool = False,
+    allowed_territories: str | None = None,
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -76,6 +79,29 @@ async def upload_audio(
 
     final_title = title or metadata.get("title") or file.filename or "Untitled"
     duration = int(metadata.get("duration", 0)) if metadata.get("duration") else 0
+    
+    territories_list = None
+    if allowed_territories:
+        territories_list = [t.strip().upper() for t in allowed_territories.split(",") if t.strip()]
+        
+    final_artist_name = artist or metadata.get("artist")
+    
+    if not artist_id and final_artist_name:
+        from app.models.artist import Artist
+        from sqlalchemy import select
+        result = await db.execute(select(Artist).where(Artist.name.ilike(final_artist_name)))
+        found_artist = result.scalars().first()
+        if not found_artist:
+            found_artist = Artist(name=final_artist_name)
+            db.add(found_artist)
+            await db.flush()
+        artist_id = found_artist.id
+
+    if not artist_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Artist ID or Artist Name is required",
+        )
 
     track = Track(
         id=track_id,
@@ -85,6 +111,8 @@ async def upload_audio(
         duration_seconds=duration,
         file_url=object_name,
         genre=genre or metadata.get("genre"),
+        is_explicit=is_explicit,
+        allowed_territories=territories_list,
     )
     db.add(track)
     await db.flush()

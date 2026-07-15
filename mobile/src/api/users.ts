@@ -6,7 +6,7 @@ export const getMe = async (): Promise<User> => {
   return response.data;
 };
 
-export const updateProfile = async (data: { pseudo?: string; avatar_url?: string }): Promise<User> => {
+export const updateProfile = async (data: { pseudo?: string; avatar_url?: string; bio?: string; country?: string; is_child_account?: boolean }): Promise<User> => {
   const response = await client.put('/users/me', data);
   return response.data;
 };

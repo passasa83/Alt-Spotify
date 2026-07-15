@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Search, Library, Plus, Heart, Radio, BarChart3, Upload, Headphones, Activity } from 'lucide-react';
+import { Home, Search, Library, Plus, Heart, Radio, BarChart3, Upload, Headphones, Activity, Sparkles } from 'lucide-react';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useEffect } from 'react';
@@ -48,6 +48,10 @@ const Sidebar = () => {
           <NavLink to="/stats" className={navLinkClass} aria-label={t('nav.stats')}>
             <BarChart3 size={24} aria-hidden="true" />
             {t('nav.stats')}
+          </NavLink>
+          <NavLink to="/discover" className={navLinkClass} aria-label="Discover">
+            <Sparkles size={24} aria-hidden="true" />
+            Discover
           </NavLink>
           <NavLink to="/podcasts" className={navLinkClass} aria-label={t('nav.podcasts')}>
             <Headphones size={24} aria-hidden="true" />

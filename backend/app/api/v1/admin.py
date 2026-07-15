@@ -30,7 +30,7 @@ async def get_dashboard(
     plays_today = (
         await db.execute(
             select(func.count(ListeningHistory.id)).where(
-                ListeningHistory.created_at >= today_start
+                ListeningHistory.played_at >= today_start
             )
         )
     ).scalar() or 0
@@ -241,10 +241,10 @@ async def plays_per_day(
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     result = await db.execute(
         text("""
-            SELECT DATE(created_at) as play_date, COUNT(*) as play_count
+            SELECT DATE(played_at) as play_date, COUNT(*) as play_count
             FROM listening_history
-            WHERE created_at >= :since
-            GROUP BY DATE(created_at)
+            WHERE played_at >= :since
+            GROUP BY DATE(played_at)
             ORDER BY play_date
         """),
         {"since": thirty_days_ago},
@@ -261,10 +261,10 @@ async def active_users_per_day(
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     result = await db.execute(
         text("""
-            SELECT DATE(created_at) as activity_date, COUNT(DISTINCT user_id) as active_count
+            SELECT DATE(played_at) as activity_date, COUNT(DISTINCT user_id) as active_count
             FROM listening_history
-            WHERE created_at >= :since
-            GROUP BY DATE(created_at)
+            WHERE played_at >= :since
+            GROUP BY DATE(played_at)
             ORDER BY activity_date
         """),
         {"since": thirty_days_ago},

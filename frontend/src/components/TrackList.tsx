@@ -1,18 +1,35 @@
-import { Play } from 'lucide-react';
+import { Play, Trash2, Edit } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useAuthStore } from '@/stores/authStore';
 import type { Track } from '@/types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
+import { deleteTrack } from '@/api/tracks';
 
 interface TrackListProps {
   tracks: Track[];
   showAlbum?: boolean;
   showIndex?: boolean;
+  onRefresh?: () => void;
 }
 
-const TrackList = ({ tracks, showAlbum = true, showIndex = true }: TrackListProps) => {
+const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: TrackListProps) => {
   const { setTrack, currentTrack, isPlaying, addToQueue } = usePlayerStore();
   const { t } = useTranslation();
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
+
+  const handleDelete = async (e: React.MouseEvent, trackId: string) => {
+    e.stopPropagation();
+    if (confirm("Are you sure you want to delete this track?")) {
+      try {
+        await deleteTrack(trackId);
+        if (onRefresh) onRefresh();
+      } catch (err) {
+        console.error("Delete failed", err);
+      }
+    }
+  };
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -111,6 +128,23 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true }: TrackListProp
               <span className="hidden text-sm text-gray-400 md:block">{t('playlist.track_added')}</span>
 
               <div className="flex items-center justify-end gap-2">
+                {isAdmin && (
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100">
+                    <Link 
+                      to={`/admin/tracks/${track.id}/edit`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      <Edit size={14} />
+                    </Link>
+                    <button
+                      onClick={(e) => handleDelete(e, track.id)}
+                      className="text-gray-400 hover:text-red-500"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                )}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

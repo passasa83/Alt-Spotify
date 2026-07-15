@@ -21,6 +21,8 @@ import Podcasts from '@/pages/Podcasts';
 import PodcastDetail from '@/pages/PodcastDetail';
 import EpisodeDetail from '@/pages/EpisodeDetail';
 import AdminMonitoring from '@/pages/AdminMonitoring';
+import EditTrack from '@/pages/EditTrack';
+import Recommendations from '@/pages/Recommendations';
 import NotFound from '@/pages/NotFound';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -77,6 +79,7 @@ const App = () => {
         <Route path="jam" element={<JamSession />} />
         <Route path="jam/:sessionId" element={<JamSession />} />
         <Route path="stats" element={<Stats />} />
+        <Route path="discover" element={<Recommendations />} />
         <Route path="podcasts" element={<Podcasts />} />
         <Route path="podcasts/:id" element={<PodcastDetail />} />
         <Route path="podcasts/episode/:id" element={<EpisodeDetail />} />
@@ -85,6 +88,7 @@ const App = () => {
         <Route path="admin/users" element={<AdminUsers />} />
         <Route path="admin/catalogue" element={<AdminCatalogue />} />
         <Route path="admin/monitoring" element={<AdminMonitoring />} />
+        <Route path="admin/tracks/:id/edit" element={<EditTrack />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

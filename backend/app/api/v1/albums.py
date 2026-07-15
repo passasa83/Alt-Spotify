@@ -13,6 +13,7 @@ from app.schemas.album import AlbumCreate, AlbumUpdate, AlbumResponse
 from app.schemas.track import TrackResponse
 from app.schemas.common import PaginatedResponse
 from app.utils.deps import get_current_user, require_admin
+from app.models.follow import Follow, FollowType
 
 router = APIRouter(prefix="/albums", tags=["albums"])
 
@@ -77,6 +78,24 @@ async def create_album(
     db.add(album)
     await db.flush()
     await db.refresh(album)
+
+    # Notify followers of the artist about the new release
+    try:
+        from app.services.notifications import notify_new_release
+        followers_result = await db.execute(
+            select(Follow.followed_id)
+            .where(Follow.followed_id == album.artist_id, Follow.follow_type == FollowType.ARTIST)
+        )
+        follower_ids = [row[0] for row in followers_result.all()]
+        if follower_ids:
+            from app.models.artist import Artist
+            artist_result = await db.execute(select(Artist).where(Artist.id == album.artist_id))
+            artist = artist_result.scalar_one_or_none()
+            if artist:
+                await notify_new_release(db, artist.name, album.artist_id, album.title, album.id, follower_ids)
+    except Exception:
+        pass
+
     return album
 
 

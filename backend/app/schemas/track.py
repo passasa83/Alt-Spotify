@@ -16,6 +16,8 @@ class TrackCreate(BaseModel):
     track_gain: float | None = None
     track_peak: float | None = None
     album_gain: float | None = None
+    allowed_territories: list[str] | None = None
+    is_explicit: bool = False
 
 
 class TrackUpdate(BaseModel):
@@ -29,6 +31,8 @@ class TrackUpdate(BaseModel):
     track_gain: float | None = None
     track_peak: float | None = None
     album_gain: float | None = None
+    allowed_territories: list[str] | None = None
+    is_explicit: bool | None = None
 
 
 class TrackResponse(BaseModel):
@@ -46,5 +50,7 @@ class TrackResponse(BaseModel):
     track_gain: float | None
     track_peak: float | None
     album_gain: float | None
+    allowed_territories: list[str] | None
+    is_explicit: bool
     play_count: int
     created_at: datetime

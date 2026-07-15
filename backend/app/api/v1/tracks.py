@@ -31,9 +31,26 @@ async def list_tracks(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     query = select(Track)
     count_query = select(func.count(Track.id))
+    
+    # Territory filter
+    if current_user.country:
+        territory_filter = (Track.allowed_territories.is_(None)) | (Track.allowed_territories.any(current_user.country))
+    else:
+        territory_filter = Track.allowed_territories.is_(None)
+    
+    # Explicit content filter
+    if current_user.is_child_account:
+        explicit_filter = Track.is_explicit == False
+    else:
+        explicit_filter = True # No filter
+    
+    query = query.where(territory_filter).where(explicit_filter)
+    count_query = count_query.where(territory_filter).where(explicit_filter)
+
     if q:
         query = query.where(Track.title.ilike(f"%{q}%"))
         count_query = count_query.where(Track.title.ilike(f"%{q}%"))
@@ -58,11 +75,25 @@ async def list_tracks(
 
 
 @router.get("/{track_id}", response_model=TrackResponse)
-async def get_track(track_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_track(
+    track_id: uuid.UUID, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     result = await db.execute(select(Track).where(Track.id == track_id))
     track = result.scalar_one_or_none()
     if not track:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+    
+    # Territory check
+    if track.allowed_territories:
+        if not current_user.country or current_user.country not in track.allowed_territories:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Track not available in your territory")
+            
+    # Explicit content check
+    if current_user.is_child_account and track.is_explicit:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Explicit content is restricted for child accounts")
+
     return track
 
 
@@ -120,6 +151,15 @@ async def play_track(
     track = result.scalar_one_or_none()
     if not track:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+    
+    # Territory check
+    if track.allowed_territories:
+        if not current_user.country or current_user.country not in track.allowed_territories:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Track not available in your territory")
+
+    # Explicit content check
+    if current_user.is_child_account and track.is_explicit:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Explicit content is restricted for child accounts")
 
     await db.execute(update(Track).where(Track.id == track_id).values(play_count=Track.play_count + 1))
 
@@ -137,11 +177,25 @@ async def play_track(
 
 
 @router.get("/{track_id}/stream")
-async def stream_track(track_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def stream_track(
+    track_id: uuid.UUID, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     result = await db.execute(select(Track).where(Track.id == track_id))
     track = result.scalar_one_or_none()
     if not track:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+    
+    # Territory check
+    if track.allowed_territories:
+        if not current_user.country or current_user.country not in track.allowed_territories:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Track not available in your territory")
+
+    # Explicit content check
+    if current_user.is_child_account and track.is_explicit:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Explicit content is restricted for child accounts")
+
     if not track.file_url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No audio file available")
     url = get_file_url(track.file_url)
@@ -159,6 +213,16 @@ async def download_track(
     track = result.scalar_one_or_none()
     if not track:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+    
+    # Territory check
+    if track.allowed_territories:
+        if not current_user.country or current_user.country not in track.allowed_territories:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Track not available in your territory")
+
+    # Explicit content check
+    if current_user.is_child_account and track.is_explicit:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Explicit content is restricted for child accounts")
+
     if not track.file_url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No audio file available")
 

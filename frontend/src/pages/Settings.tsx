@@ -8,6 +8,9 @@ const Settings = () => {
   const { t } = useTranslation();
   const [pseudo, setPseudo] = useState(user?.pseudo || '');
   const [email, setEmail] = useState(user?.email || '');
+  const [bio, setBio] = useState(user?.bio || '');
+  const [country, setCountry] = useState(user?.country || '');
+  const [isChildAccount, setIsChildAccount] = useState(user?.is_child_account || false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,7 +24,12 @@ const Settings = () => {
     setError('');
     setMessage('');
     try {
-      const updatedUser = await updateProfile({ pseudo });
+      const updatedUser = await updateProfile({ 
+        pseudo, 
+        bio: bio || undefined,
+        country: country || undefined, 
+        is_child_account: isChildAccount 
+      });
       setUser(updatedUser);
       setMessage(t('settings.profile_updated'));
     } catch {
@@ -102,6 +110,46 @@ const Settings = () => {
               aria-label={t('auth.email')}
               className="w-full rounded-md border border-gray-600 bg-gray-800 px-4 py-3 text-gray-400"
             />
+          </div>
+
+          <div>
+            <label htmlFor="settings-bio" className="mb-1 block text-sm font-medium text-gray-300">{t('settings.bio')}</label>
+            <textarea
+              id="settings-bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder={t('settings.bio_placeholder')}
+              rows={3}
+              aria-label={t('settings.bio')}
+              className="w-full rounded-md border border-gray-600 bg-gray-800 px-4 py-3 text-white outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 resize-none"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="settings-country" className="mb-1 block text-sm font-medium text-gray-300">{t('settings.country')}</label>
+            <input
+              id="settings-country"
+              type="text"
+              value={country}
+              onChange={(e) => setCountry(e.target.value.toUpperCase().slice(0, 2))}
+              placeholder="e.g. FR"
+              aria-label={t('settings.country')}
+              className="w-full rounded-md border border-gray-600 bg-gray-800 px-4 py-3 text-white outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 py-2">
+            <input
+              id="settings-child"
+              type="checkbox"
+              checked={isChildAccount}
+              onChange={(e) => setIsChildAccount(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500 focus:ring-offset-gray-900"
+            />
+            <div>
+              <label htmlFor="settings-child" className="block text-sm font-medium text-white">{t('settings.child_account')}</label>
+              <p className="text-xs text-gray-400">{t('settings.child_account_desc')}</p>
+            </div>
           </div>
 
           <button

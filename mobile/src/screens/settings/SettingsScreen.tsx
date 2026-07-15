@@ -16,6 +16,8 @@ export default function SettingsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { user, setUser } = useAuthStore();
   const [displayName, setDisplayName] = useState(user?.pseudo || '');
+  const [bio, setBio] = useState(user?.bio || '');
+  const [country, setCountry] = useState(user?.country || '');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -53,7 +55,7 @@ export default function SettingsScreen({ navigation }: Props) {
     }
     setSaving(true);
     try {
-      const updated = await updateProfile({ pseudo: displayName.trim() });
+      const updated = await updateProfile({ pseudo: displayName, bio: bio || undefined, country: country ? country.toUpperCase() : undefined });
       setUser(updated);
       Alert.alert('Success', 'Profile updated');
     } catch (error) {
@@ -102,6 +104,28 @@ export default function SettingsScreen({ navigation }: Props) {
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>Email</Text>
             <Text style={styles.fieldValue}>{user?.email}</Text>
+          </View>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Bio</Text>
+            <TextInput
+              style={[styles.fieldInput, { height: 80, textAlignVertical: 'top' }]}
+              value={bio}
+              onChangeText={setBio}
+              placeholder="Tell us about yourself..."
+              placeholderTextColor={colors.textMuted}
+              multiline
+            />
+          </View>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Country (e.g. FR)</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={country}
+              onChangeText={(t) => setCountry(t.toUpperCase().slice(0, 2))}
+              placeholder="FR"
+              placeholderTextColor={colors.textMuted}
+              maxLength={2}
+            />
           </View>
         </View>
 

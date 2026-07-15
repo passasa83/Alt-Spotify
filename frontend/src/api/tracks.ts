@@ -56,3 +56,12 @@ export const getTrackDownloadUrl = async (trackId: string, deviceId: string): Pr
   const response = await client.post(`/tracks/${trackId}/download`, { device_id: deviceId });
   return response.data.download_url;
 };
+
+export const updateTrack = async (id: string, data: Record<string, any>): Promise<Track> => {
+  const response = await client.put(`/tracks/${id}`, data);
+  return response.data;
+};
+
+export const deleteTrack = async (id: string): Promise<void> => {
+  await client.delete(`/tracks/${id}`);
+};

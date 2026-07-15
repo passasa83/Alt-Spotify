@@ -9,6 +9,8 @@ const AdminUpload = () => {
   const [artist, setArtist] = useState('');
   const [album, setAlbum] = useState('');
   const [genre, setGenre] = useState('');
+  const [isExplicit, setIsExplicit] = useState(false);
+  const [allowedTerritories, setAllowedTerritories] = useState('');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [success, setSuccess] = useState(false);
@@ -62,7 +64,14 @@ const AdminUpload = () => {
         });
       }, 200);
 
-      await uploadTrack(file, { title, artist, album, genre });
+      await uploadTrack(file, { 
+        title, 
+        artist, 
+        album, 
+        genre, 
+        is_explicit: isExplicit,
+        allowed_territories: allowedTerritories || undefined
+      });
 
       clearInterval(interval);
       setProgress(100);
@@ -162,6 +171,27 @@ const AdminUpload = () => {
                 onChange={(e) => setGenre(e.target.value)}
                 className="w-full rounded-lg bg-gray-800 px-4 py-3 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="Genre"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <div className="flex items-center gap-2 pt-6">
+              <input
+                type="checkbox"
+                id="explicit"
+                checked={isExplicit}
+                onChange={(e) => setIsExplicit(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500"
+              />
+              <label htmlFor="explicit" className="text-sm font-medium text-gray-300">Explicit Content</label>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-400">Allowed Territories</label>
+              <input
+                value={allowedTerritories}
+                onChange={(e) => setAllowedTerritories(e.target.value)}
+                className="w-full rounded-lg bg-gray-800 px-4 py-3 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="e.g. FR,US (blank for all)"
               />
             </div>
           </div>

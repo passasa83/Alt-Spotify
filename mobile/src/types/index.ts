@@ -3,6 +3,9 @@ export interface User {
   email: string;
   pseudo: string;
   avatar_url?: string;
+  bio?: string;
+  country?: string;
+  is_child_account: boolean;
   role: 'admin' | 'user';
   is_active: boolean;
   created_at: string;

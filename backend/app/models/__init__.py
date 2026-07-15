@@ -13,3 +13,4 @@ from app.models.podcast import Podcast, Episode  # noqa: E402, F401
 from app.models.jam import JamSession, JamParticipant  # noqa: E402, F401
 from app.models.notification import Notification  # noqa: E402, F401
 from app.models.push_token import PushToken  # noqa: E402, F401
+from app.models.favorite import Favorite  # noqa: E402, F401

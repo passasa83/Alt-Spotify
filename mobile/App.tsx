@@ -85,6 +85,11 @@ function MainApp() {
                 options={{ presentation: 'card', animation: 'slide_from_bottom' }}
               />
               <Stack.Screen
+                name="PodcastDetail"
+                component={require('./src/screens/detail/PodcastDetailScreen').default}
+                options={{ presentation: 'card', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
                 name="Settings"
                 component={require('./src/screens/settings/SettingsScreen').default}
                 options={{ presentation: 'card', animation: 'slide_from_right' }}

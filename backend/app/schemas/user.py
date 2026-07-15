@@ -18,6 +18,9 @@ class UserLogin(BaseModel):
 class UserUpdate(BaseModel):
     pseudo: str | None = None
     avatar_url: str | None = None
+    bio: str | None = None
+    country: str | None = None
+    is_child_account: bool | None = None
 
 
 class UserResponse(BaseModel):
@@ -27,6 +30,9 @@ class UserResponse(BaseModel):
     email: str
     pseudo: str
     avatar_url: str | None
+    bio: str | None
+    country: str | None
+    is_child_account: bool
     role: str
     is_active: bool
     created_at: datetime

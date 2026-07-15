@@ -3,6 +3,9 @@ export interface User {
   email: string;
   pseudo: string;
   avatar_url?: string;
+  bio?: string;
+  country?: string;
+  is_child_account: boolean;
   role: 'admin' | 'user';
   is_active: boolean;
   created_at: string;
@@ -40,6 +43,8 @@ export interface Track {
   cover_url?: string;
   genre?: string;
   lyrics_lrc?: string;
+  allowed_territories?: string[];
+  is_explicit: boolean;
   play_count: number;
   created_at: string;
 }

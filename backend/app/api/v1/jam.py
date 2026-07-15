@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi.responses import Response
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,6 +50,31 @@ async def create_session(
         "host_id": str(current_user.id),
         "status": session.status.value,
     }
+
+
+@router.get("/qr/{session_id}")
+async def get_session_qr(
+    session_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(JamSession).where(JamSession.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    try:
+        import qrcode
+        import io
+        qr = qrcode.QRCode(version=1, box_size=10, border=4)
+        qr.add_data(session.code)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        return Response(content=buf.getvalue(), media_type="image/png")
+    except ImportError:
+        return {"code": session.code, "message": "Install qrcode library for QR code generation"}
 
 
 @router.post("/join/{code}")
