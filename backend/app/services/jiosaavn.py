@@ -125,8 +125,8 @@ async def import_from_jiosaavn(song_data: dict, db) -> uuid.UUID | None:
         try:
             from worker.tasks import transcode_audio
             transcode_audio.delay(object_name, f"hls/{track_id}", str(track_id))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("celery_transcode_dispatch_failed", error=str(e))
 
         return track_id
 

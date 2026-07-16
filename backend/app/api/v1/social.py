@@ -6,6 +6,7 @@ from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.models.follow import Follow, FollowType
 from app.models.listening_history import ListeningHistory
 from app.models.track import Track
@@ -247,7 +248,7 @@ async def generate_share_link(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid entity type. Use: {valid_types}",
         )
-    share_url = f"https://altspotify.app/{entity_type}/{entity_id}"
+    share_url = f"{settings.BASE_URL}/{entity_type}/{entity_id}"
     return {"share_url": share_url, "entity_type": entity_type, "entity_id": str(entity_id)}
 
 
@@ -262,7 +263,7 @@ async def share_qr(
         import io
         from fastapi.responses import StreamingResponse
 
-        base_url = "https://altspot.jorys-personnel.fr"
+        base_url = settings.BASE_URL
         share_url = f"{base_url}/{entity_type}/{entity_id}"
 
         qr = qrcode.QRCode(version=1, box_size=10, border=5)

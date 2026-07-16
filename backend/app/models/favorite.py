@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from enum import Enum
 
 from sqlalchemy import String, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
 
-class FavoriteType(str):
+class FavoriteType(str, Enum):
     TRACK = "track"
     ALBUM = "album"
     ARTIST = "artist"

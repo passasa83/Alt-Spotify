@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.utils.deps import require_admin
 from app.models.user import User
 from app.models.admin_invite import AdminInviteToken
@@ -54,7 +55,7 @@ async def create_invite(
     await db.flush()
     await db.refresh(invite)
 
-    base_url = "https://altspot.jorys-personnel.fr"
+    base_url = settings.BASE_URL
     return InviteResponse(
         id=str(invite.id),
         token=invite.token,
@@ -77,7 +78,7 @@ async def list_invites(
         select(AdminInviteToken).order_by(AdminInviteToken.created_at.desc())
     )
     invites = result.scalars().all()
-    base_url = "https://altspot.jorys-personnel.fr"
+    base_url = settings.BASE_URL
     return [
         {
             "id": str(i.id),

@@ -36,6 +36,7 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
     ALLOWED_HOSTS: str = "*"
+    BASE_URL: str = "http://localhost:3000"
 
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_DEFAULT: str = "100/minute"

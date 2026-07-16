@@ -18,9 +18,6 @@ from app.utils.deps import get_current_user
 
 router = APIRouter(prefix="/jam", tags=["jam"])
 
-# Track votes per session (in-memory)
-vote_counts: dict[str, set[str]] = {}
-
 
 def generate_session_code() -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -318,8 +315,9 @@ async def jam_websocket(websocket: WebSocket, session_id: uuid.UUID):
                         json.dumps({**data, "user_id": user_id}),
                     )
                 elif msg_type == "vote_skip":
-                    session_votes = vote_counts.setdefault(str(session_id), set())
-                    session_votes.add(user_id)
+                    vote_key = f"jam:votes:{session_id}"
+                    await r.sadd(vote_key, user_id)
+                    vote_count = await r.scard(vote_key)
 
                     async with async_session() as db_session:
                         from sqlalchemy import select as sa_select, func
@@ -329,16 +327,16 @@ async def jam_websocket(websocket: WebSocket, session_id: uuid.UUID):
                         participant_count = count_result.scalar() or 0
 
                     threshold = (participant_count // 2) + 1
-                    if len(session_votes) >= threshold:
+                    if vote_count >= threshold:
                         await r.publish(
                             f"jam:{session_id}",
-                            json.dumps({"type": "track_skipped", "user_id": user_id, "votes": len(session_votes)}),
+                            json.dumps({"type": "track_skipped", "user_id": user_id, "votes": vote_count}),
                         )
-                        vote_counts.pop(str(session_id), None)
+                        await r.delete(vote_key)
                     else:
                         await r.publish(
                             f"jam:{session_id}",
-                            json.dumps({"type": "vote_update", "votes": len(session_votes), "threshold": threshold}),
+                            json.dumps({"type": "vote_update", "votes": vote_count, "threshold": threshold}),
                         )
                 elif msg_type in ("position_update", "playback_state", "chat"):
                     await r.publish(

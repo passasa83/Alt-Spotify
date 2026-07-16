@@ -3,6 +3,7 @@ from math import ceil
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import select, func, update, delete, and_, extract
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -228,8 +229,6 @@ async def reorder_playlist(
 # ──────────────────────────────────────────────
 # P.1 — Smart Playlists
 # ──────────────────────────────────────────────
-
-from pydantic import BaseModel
 
 
 class SmartPlaylistCreate(BaseModel):
