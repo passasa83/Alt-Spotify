@@ -1,14 +1,25 @@
 import { useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import Player from './Player';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useAuthStore } from '@/stores/authStore';
 import SkipToContent from './SkipToContent';
 
 const Layout = () => {
   const { showLyrics, lyrics, initDevice } = usePlayerStore();
+  const { user, refreshAuth } = useAuthStore();
+  const navigate = useNavigate();
   const lyricsHeight = showLyrics && lyrics.length > 0 ? 256 : 0;
+
+  useEffect(() => {
+    if (!user) {
+      refreshAuth().catch(() => {
+        navigate('/login', { replace: true });
+      });
+    }
+  }, [user, refreshAuth, navigate]);
 
   useEffect(() => {
     initDevice();

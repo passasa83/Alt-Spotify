@@ -26,9 +26,15 @@ async def get_user_top_tracks(
     rows = result.all()
     tracks = []
     for row in rows:
-        track_result = await db.execute(select(Track).where(Track.id == row.track_id))
+        track_result = await db.execute(
+            select(Track).where(Track.id == row.track_id)
+        )
         track = track_result.scalar_one_or_none()
         if track:
+            artist_result = await db.execute(
+                select(Artist).where(Artist.id == track.artist_id)
+            )
+            track.artist = artist_result.scalar_one_or_none()
             tracks.append({
                 "track": track,
                 "play_count": row.play_count,

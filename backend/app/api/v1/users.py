@@ -63,29 +63,41 @@ async def get_stats(
     hourly_dist = await get_listening_by_hour(current_user.id, db)
     streak = await get_listening_streak(current_user.id, db)
 
+    total_plays = sum(t["play_count"] for t in top_tracks)
+
     return {
+        "total_plays": total_plays,
+        "total_minutes": total_time // 60,
         "top_tracks": [
             {
-                "track_id": str(t["track"].id),
+                "id": str(t["track"].id),
                 "title": t["track"].title,
+                "cover_url": t["track"].cover_url,
+                "duration_seconds": t["track"].duration_seconds,
                 "play_count": t["play_count"],
-                "total_seconds": t["total_seconds"],
+                "artist": {
+                    "id": str(t["track"].artist.id),
+                    "name": t["track"].artist.name,
+                } if t["track"].artist else None,
             }
             for t in top_tracks
         ],
         "top_artists": [
             {
-                "artist_id": str(a["artist"].id),
+                "id": str(a["artist"].id),
                 "name": a["artist"].name,
+                "image_url": a["artist"].image_url,
                 "play_count": a["play_count"],
             }
             for a in top_artists
         ],
-        "total_listening_seconds": total_time,
         "monthly": monthly,
-        "genre_distribution": genre_dist,
-        "listening_by_hour": hourly_dist,
-        "listening_streak": streak,
+        "genre_distribution": [
+            {"genre": g["genre"], "count": g["play_count"]}
+            for g in genre_dist
+        ],
+        "listening_by_hour": [h["play_count"] for h in hourly_dist],
+        "streak": streak.get("current_streak", 0),
     }
 
 
