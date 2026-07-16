@@ -88,3 +88,17 @@ export const importPlaylistFromSpotify = async (url: string): Promise<SpotifyImp
   const response = await client.post('/playlists/import-export/spotify', { url });
   return response.data;
 };
+
+export interface DeezerImportResult {
+  playlist_id: string;
+  title: string;
+  matched: number;
+  unmatched: number;
+  unmatched_tracks: { title: string; artist: string; album: string }[];
+  total_deezer_tracks: number;
+}
+
+export const importPlaylistFromDeezer = async (url: string): Promise<DeezerImportResult> => {
+  const response = await client.post('/playlists/import-export/deezer', { url });
+  return response.data;
+};

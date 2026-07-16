@@ -341,6 +341,11 @@ const fr = {
   'import.spotify_success': 'Playlist importée avec succès !',
   'import.spotify_tracks_matched': 'titres correspondants trouvés',
   'import.spotify_unmatched': 'titres non trouvés dans le catalogue local',
+  'import.deezer_help': 'Collez l\'URL d\'une playlist Deezer pour l\'importer dans votre bibliothèque.',
+  'import.import_deezer': 'Importer depuis Deezer',
+  'import.deezer_success': 'Playlist importée avec succès !',
+  'import.deezer_tracks_matched': 'titres correspondants trouvés',
+  'import.deezer_unmatched': 'titres non trouvés dans le catalogue local',
 
   // Share
   'share.title': 'Partager',

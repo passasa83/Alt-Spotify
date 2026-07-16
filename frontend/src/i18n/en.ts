@@ -341,6 +341,11 @@ const en = {
   'import.spotify_success': 'Playlist imported successfully!',
   'import.spotify_tracks_matched': 'tracks matched',
   'import.spotify_unmatched': 'tracks not found in local catalog',
+  'import.deezer_help': 'Paste a Deezer playlist URL to import it into your library.',
+  'import.import_deezer': 'Import from Deezer',
+  'import.deezer_success': 'Playlist imported successfully!',
+  'import.deezer_tracks_matched': 'tracks matched',
+  'import.deezer_unmatched': 'tracks not found in local catalog',
 
   // Share
   'share.title': 'Share',

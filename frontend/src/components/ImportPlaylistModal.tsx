@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
 import { Upload, X, Check, AlertCircle, FileText } from 'lucide-react';
 import client from '@/api/client';
-import { importPlaylistFromSpotify } from '@/api/playlists';
-import type { SpotifyImportResult } from '@/api/playlists';
+import { importPlaylistFromSpotify, importPlaylistFromDeezer } from '@/api/playlists';
+import type { SpotifyImportResult, DeezerImportResult } from '@/api/playlists';
 import { useTranslation } from '@/hooks/useTranslation';
 
 interface ImportResult {
@@ -24,9 +24,12 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [spotifyUrl, setSpotifyUrl] = useState('');
-  const [importTab, setImportTab] = useState<'file' | 'spotify'>('file');
+  const [importTab, setImportTab] = useState<'file' | 'spotify' | 'deezer'>('file');
   const [spotifyLoading, setSpotifyLoading] = useState(false);
   const [spotifyResult, setSpotifyResult] = useState<SpotifyImportResult | null>(null);
+  const [deezerUrl, setDeezerUrl] = useState('');
+  const [deezerLoading, setDeezerLoading] = useState(false);
+  const [deezerResult, setDeezerResult] = useState<DeezerImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -82,8 +85,28 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
     setError(null);
     setSpotifyUrl('');
     setSpotifyResult(null);
+    setDeezerUrl('');
+    setDeezerLoading(false);
+    setDeezerResult(null);
     setImportTab('file');
     onClose();
+  };
+
+  const handleDeezerImport = async () => {
+    if (!deezerUrl.trim()) return;
+    setDeezerLoading(true);
+    setError(null);
+    try {
+      const result = await importPlaylistFromDeezer(deezerUrl);
+      setDeezerResult(result);
+      if (onImported) {
+        onImported(result.playlist_id);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to import from Deezer');
+    } finally {
+      setDeezerLoading(false);
+    }
   };
 
   const handleSpotifyImport = async () => {
@@ -129,6 +152,14 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
             }`}
           >
             Spotify
+          </button>
+          <button
+            onClick={() => setImportTab('deezer')}
+            className={`px-4 py-2 rounded-full text-sm font-medium ${
+              importTab === 'deezer' ? 'bg-blue-500 text-black' : 'bg-gray-800 text-gray-300'
+            }`}
+          >
+            Deezer
           </button>
         </div>
 
@@ -256,6 +287,48 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
                   className="w-full rounded-full bg-green-500 py-3 font-bold text-black hover:bg-green-400 disabled:opacity-50"
                 >
                   {spotifyLoading ? t('import.importing') : t('import.import_spotify')}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {importTab === 'deezer' && (
+          <div className="space-y-4">
+            {deezerResult ? (
+              <div className="rounded-lg bg-blue-500/10 p-4">
+                <p className="text-blue-400 font-medium">{t('import.deezer_success')}</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  {deezerResult.title} — {deezerResult.matched}/{deezerResult.total_deezer_tracks} {t('import.deezer_tracks_matched')}
+                </p>
+                {deezerResult.unmatched > 0 && (
+                  <p className="text-sm text-yellow-400 mt-1">
+                    {deezerResult.unmatched} {t('import.deezer_unmatched')}
+                  </p>
+                )}
+                <button
+                  onClick={handleClose}
+                  className="mt-3 rounded-full bg-blue-500 px-6 py-2 text-sm font-bold text-black hover:bg-blue-400"
+                >
+                  {t('action.close')}
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-gray-400">{t('import.deezer_help')}</p>
+                <input
+                  type="url"
+                  value={deezerUrl}
+                  onChange={(e) => setDeezerUrl(e.target.value)}
+                  placeholder="https://www.deezer.com/playlist/..."
+                  className="w-full rounded-md border border-gray-600 bg-gray-800 px-4 py-3 text-white placeholder-gray-400 outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={handleDeezerImport}
+                  disabled={deezerLoading || !deezerUrl.trim()}
+                  className="w-full rounded-full bg-blue-500 py-3 font-bold text-black hover:bg-blue-400 disabled:opacity-50"
+                >
+                  {deezerLoading ? t('import.importing') : t('import.import_deezer')}
                 </button>
               </>
             )}
