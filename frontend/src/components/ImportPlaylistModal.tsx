@@ -49,7 +49,7 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
 
     const ext = selected.name.split('.').pop()?.toLowerCase();
     if (ext !== 'csv' && ext !== 'json') {
-      setError('Please select a CSV or JSON file');
+      setError(t('import.invalid_file'));
       return;
     }
 
@@ -82,7 +82,7 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
         onImported(response.data.playlist_id);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Import failed');
+      setError(err.response?.data?.detail || t('import.failed'));
     } finally {
       setIsImporting(false);
     }
@@ -113,7 +113,7 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
         onImported(result.playlist_id);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to import from Deezer');
+      setError(err.response?.data?.detail || t('import.failed'));
     } finally {
       setDeezerLoading(false);
     }
@@ -130,7 +130,7 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
         onImported(result.playlist_id);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to import from Spotify');
+      setError(err.response?.data?.detail || t('import.failed'));
     } finally {
       setSpotifyLoading(false);
     }
@@ -140,7 +140,7 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
       <div className="w-full max-w-md rounded-lg bg-gray-900 p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Import Playlist</h2>
+          <h2 className="text-xl font-bold text-white">{t('import.title')}</h2>
           <button onClick={handleClose} className="text-gray-400 hover:text-white">
             <X size={20} />
           </button>

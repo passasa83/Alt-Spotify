@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import client from '@/api/client';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { MonitoringHealth, MonitoringStats } from '@/types';
 import { Activity, Database, HardDrive, Server, Users, Music, Headphones, RefreshCw } from 'lucide-react';
 
 const AdminMonitoring = () => {
+  const { t } = useTranslation();
   const [health, setHealth] = useState<MonitoringHealth | null>(null);
   const [stats, setStats] = useState<MonitoringStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,20 +79,20 @@ const AdminMonitoring = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Activity size={32} className="text-green-500" />
-          <h1 className="text-3xl font-bold text-white">System Monitoring</h1>
+          <h1 className="text-3xl font-bold text-white">{t('admin.system_monitoring')}</h1>
         </div>
         <button
           onClick={fetchData}
           className="flex items-center gap-2 rounded-md bg-gray-800 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700"
         >
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          Refresh
+          {t('admin.refresh')}
         </button>
       </div>
 
       {health && (
         <div className="rounded-lg bg-gray-800 p-6">
-          <h2 className="mb-4 text-lg font-semibold text-white">Service Health</h2>
+          <h2 className="mb-4 text-lg font-semibold text-white">{t('admin.service_health')}</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {Object.entries(health.services).map(([name, service]) => (
               <div key={name} className="flex items-center gap-3 rounded-md bg-gray-900 p-4">
@@ -113,9 +115,9 @@ const AdminMonitoring = () => {
           </div>
           <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
             <Activity size={14} />
-            <span>Overall: </span>
+            <span>{t('admin.overall')}: </span>
             <span className={getStatusColor(health.status).split(' ')[0]}>{health.status}</span>
-            <span className="ml-2">Uptime: {formatUptime(health.uptime_seconds)}</span>
+            <span className="ml-2">{t('admin.uptime')}: {formatUptime(health.uptime_seconds)}</span>
           </div>
         </div>
       )}
@@ -125,7 +127,7 @@ const AdminMonitoring = () => {
           <div className="rounded-lg bg-gray-800 p-6">
             <div className="mb-2 flex items-center gap-3">
               <Users size={24} className="text-green-500" />
-              <h3 className="text-sm font-semibold text-gray-400">Active Users</h3>
+              <h3 className="text-sm font-semibold text-gray-400">{t('admin.active_users')}</h3>
             </div>
             <p className="text-3xl font-bold text-white">{stats.active_users}</p>
           </div>
@@ -133,7 +135,7 @@ const AdminMonitoring = () => {
           <div className="rounded-lg bg-gray-800 p-6">
             <div className="mb-2 flex items-center gap-3">
               <Music size={24} className="text-green-500" />
-              <h3 className="text-sm font-semibold text-gray-400">Total Tracks</h3>
+              <h3 className="text-sm font-semibold text-gray-400">{t('admin.total_tracks')}</h3>
             </div>
             <p className="text-3xl font-bold text-white">{stats.total_tracks}</p>
           </div>
@@ -141,16 +143,16 @@ const AdminMonitoring = () => {
           <div className="rounded-lg bg-gray-800 p-6">
             <div className="mb-2 flex items-center gap-3">
               <Headphones size={24} className="text-green-500" />
-              <h3 className="text-sm font-semibold text-gray-400">Podcasts</h3>
+              <h3 className="text-sm font-semibold text-gray-400">{t('admin.podcasts')}</h3>
             </div>
             <p className="text-3xl font-bold text-white">{stats.total_podcasts}</p>
-            <p className="text-xs text-gray-500">{stats.total_episodes} episodes</p>
+            <p className="text-xs text-gray-500">{stats.total_episodes} {t('admin.episodes')}</p>
           </div>
 
           <div className="rounded-lg bg-gray-800 p-6">
             <div className="mb-2 flex items-center gap-3">
               <HardDrive size={24} className="text-green-500" />
-              <h3 className="text-sm font-semibold text-gray-400">Storage Used</h3>
+              <h3 className="text-sm font-semibold text-gray-400">{t('admin.storage_used')}</h3>
             </div>
             <p className="text-3xl font-bold text-white">
               {stats.disk_usage ? formatBytes(stats.disk_usage.used_bytes) : 'N/A'}

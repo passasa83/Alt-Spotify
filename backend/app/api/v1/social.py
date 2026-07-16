@@ -249,3 +249,31 @@ async def generate_share_link(
         )
     share_url = f"https://altspotify.app/{entity_type}/{entity_id}"
     return {"share_url": share_url, "entity_type": entity_type, "entity_id": str(entity_id)}
+
+
+@router.get("/share/qr/{entity_type}/{entity_id}")
+async def share_qr(
+    entity_type: str,
+    entity_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        import qrcode
+        import io
+        from fastapi.responses import StreamingResponse
+
+        base_url = "https://altspot.jorys-personnel.fr"
+        share_url = f"{base_url}/{entity_type}/{entity_id}"
+
+        qr = qrcode.QRCode(version=1, box_size=10, border=5)
+        qr.add_data(share_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+
+        return StreamingResponse(buffer, media_type="image/png")
+    except ImportError:
+        raise HTTPException(status_code=501, detail="QR code generation not available")

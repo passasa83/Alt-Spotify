@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { Podcast } from '@/types';
 import { Headphones } from 'lucide-react';
 
@@ -7,6 +8,7 @@ interface PodcastCardProps {
 }
 
 const PodcastCard = ({ podcast }: PodcastCardProps) => {
+  const { t } = useTranslation();
   return (
     <Link
       to={`/podcasts/${podcast.id}`}
@@ -26,10 +28,10 @@ const PodcastCard = ({ podcast }: PodcastCardProps) => {
         {podcast.title}
       </h3>
       <p className="block truncate text-xs text-gray-400">
-        {podcast.author || 'Unknown Author'}
+        {podcast.author || t('podcast.unknown_author')}
       </p>
       <p className="mt-1 text-xs text-gray-500">
-        {podcast.episode_count} {podcast.episode_count === 1 ? 'episode' : 'episodes'}
+        {podcast.episode_count} {t('podcast.episodes_count', { count: podcast.episode_count })}
       </p>
       {podcast.categories && podcast.categories.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">

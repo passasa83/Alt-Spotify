@@ -68,6 +68,8 @@ async def search(
             query = select(Track).where(Track.title.ilike(f"%{q}%"))
             if genre:
                 query = query.where(Track.genre.ilike(genre))
+            if year:
+                query = query.where(Track.created_at >= f"{year}-01-01", Track.created_at < f"{year+1}-01-01")
             if min_duration is not None:
                 query = query.where(Track.duration_seconds >= min_duration)
             if max_duration is not None:

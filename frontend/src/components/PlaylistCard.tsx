@@ -1,12 +1,14 @@
 import { Music } from 'lucide-react';
 import type { Playlist } from '@/types';
 import { Link } from 'react-router-dom';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface PlaylistCardProps {
   playlist: Playlist;
 }
 
 const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
+  const { t } = useTranslation();
   const colors = [
     'from-purple-700 to-blue-300',
     'from-green-700 to-cyan-300',
@@ -39,7 +41,7 @@ const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
       </div>
       <p className="block truncate text-sm font-semibold text-white">{playlist.name}</p>
       <p className="block truncate text-xs text-gray-400">
-        By {playlist.owner?.pseudo || 'Unknown'} • Playlist
+        By {playlist.owner?.pseudo || t('playlist.owner')} • {t('playlist.playlist')}
       </p>
     </Link>
   );

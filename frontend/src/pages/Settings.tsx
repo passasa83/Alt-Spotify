@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { updateProfile } from '@/api/users';
 import { useTranslation } from '@/hooks/useTranslation';
+import { getLocale, setLocale } from '@/i18n';
 
 const Settings = () => {
   const { user, setUser } = useAuthStore();
@@ -182,6 +183,24 @@ const Settings = () => {
               <div className="peer h-6 w-11 rounded-full bg-gray-600 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:bg-green-500 peer-checked:after:translate-x-full" />
             </label>
           </div>
+        </div>
+      </section>
+
+      <section className="mb-8 rounded-lg bg-gray-900 p-6">
+        <h2 className="mb-4 text-xl font-bold text-white">{t('settings.language')}</h2>
+        <div className="rounded-lg bg-gray-800 p-4">
+          <h3 className="mb-3 text-lg font-semibold text-white">{t('settings.language')}</h3>
+          <select
+            value={getLocale()}
+            onChange={(e) => {
+              setLocale(e.target.value as 'fr' | 'en');
+              window.location.reload();
+            }}
+            className="w-full rounded-md border border-gray-600 bg-gray-700 px-4 py-2 text-white outline-none focus:border-green-500"
+          >
+            <option value="fr">Français</option>
+            <option value="en">English</option>
+          </select>
         </div>
       </section>
 

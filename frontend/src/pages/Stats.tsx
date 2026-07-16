@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { getUserStats } from '@/api/users';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { UserStats } from '@/types';
 import { Clock, Music, Flame, BarChart3 } from 'lucide-react';
 
 const Stats = () => {
+  const { t } = useTranslation();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +28,7 @@ const Stats = () => {
   if (error || !stats) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-gray-500">{error || 'No stats available'}</p>
+        <p className="text-gray-500">{error || t('stats.no_stats')}</p>
       </div>
     );
   }
@@ -39,13 +41,13 @@ const Stats = () => {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold text-white">Your Stats</h1>
+      <h1 className="text-3xl font-bold text-white">{t('stats.your_stats')}</h1>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-lg bg-gray-800 p-6">
           <div className="mb-2 flex items-center gap-3">
             <Clock size={24} className="text-green-500" />
-            <h3 className="text-sm font-semibold text-gray-400">Total Listening Time</h3>
+            <h3 className="text-sm font-semibold text-gray-400">{t('stats.listening_time')}</h3>
           </div>
           <p className="text-3xl font-bold text-white">
             {totalHours}h {remainingMinutes}m
@@ -54,22 +56,22 @@ const Stats = () => {
         <div className="rounded-lg bg-gray-800 p-6">
           <div className="mb-2 flex items-center gap-3">
             <Music size={24} className="text-green-500" />
-            <h3 className="text-sm font-semibold text-gray-400">Total Plays</h3>
+            <h3 className="text-sm font-semibold text-gray-400">{t('stats.total_plays')}</h3>
           </div>
           <p className="text-3xl font-bold text-white">{stats.total_plays.toLocaleString()}</p>
         </div>
         <div className="rounded-lg bg-gray-800 p-6">
           <div className="mb-2 flex items-center gap-3">
             <Flame size={24} className="text-green-500" />
-            <h3 className="text-sm font-semibold text-gray-400">Listening Streak</h3>
+            <h3 className="text-sm font-semibold text-gray-400">{t('stats.streak')}</h3>
           </div>
-          <p className="text-3xl font-bold text-white">{stats.streak} days</p>
+          <p className="text-3xl font-bold text-white">{stats.streak} {t('stats.days')}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-lg bg-gray-800 p-6">
-          <h3 className="mb-4 text-lg font-semibold text-white">Top Tracks</h3>
+          <h3 className="mb-4 text-lg font-semibold text-white">{t('stats.top_tracks')}</h3>
           <div className="space-y-3">
             {stats.top_tracks.slice(0, 5).map((track, i) => (
               <div key={track.id} className="flex items-center gap-3">
@@ -82,7 +84,7 @@ const Stats = () => {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-white">{track.title}</p>
                   <p className="truncate text-xs text-gray-400">
-                    {track.artist?.name || 'Unknown'}
+                    {track.artist?.name || t('player.unknown_artist')}
                   </p>
                 </div>
               </div>
@@ -91,7 +93,7 @@ const Stats = () => {
         </div>
 
         <div className="rounded-lg bg-gray-800 p-6">
-          <h3 className="mb-4 text-lg font-semibold text-white">Top Artists</h3>
+          <h3 className="mb-4 text-lg font-semibold text-white">{t('stats.top_artists')}</h3>
           <div className="space-y-3">
             {stats.top_artists.slice(0, 5).map((artist, i) => (
               <div key={artist.id} className="flex items-center gap-3">
@@ -111,7 +113,7 @@ const Stats = () => {
       </div>
 
       <div className="rounded-lg bg-gray-800 p-6">
-        <h3 className="mb-4 text-lg font-semibold text-white">Genre Distribution</h3>
+        <h3 className="mb-4 text-lg font-semibold text-white">{t('stats.genres')}</h3>
         <div className="space-y-2">
           {stats.genre_distribution.map((genre) => (
             <div key={genre.genre} className="flex items-center gap-3">
@@ -130,7 +132,7 @@ const Stats = () => {
 
       <div className="rounded-lg bg-gray-800 p-6">
         <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
-          <BarChart3 size={20} /> Listening by Hour
+          <BarChart3 size={20} /> {t('stats.listening_by_hour')}
         </h3>
         <div className="flex items-end gap-1 h-40">
           {stats.listening_by_hour.map((count, hour) => (
@@ -149,23 +151,23 @@ const Stats = () => {
 
       <div className="rounded-lg bg-gradient-to-br from-green-500/20 to-green-500/5 p-8 text-center">
         <h3 className="mb-2 text-2xl font-bold text-white">
-          Your {new Date().getFullYear()} Wrapped
+          {t('stats.your_wrapped', { year: new Date().getFullYear() })}
         </h3>
         <p className="mb-4 text-gray-400">
-          You listened for {totalHours} hours across {stats.genre_distribution.length} genres
+          {t('stats.wrapped_desc', { hours: totalHours, genres: stats.genre_distribution.length })}
         </p>
         <div className="flex justify-center gap-8">
           <div>
             <p className="text-3xl font-bold text-green-400">
               {stats.top_artists[0]?.name || 'N/A'}
             </p>
-            <p className="text-sm text-gray-400">Top Artist</p>
+            <p className="text-sm text-gray-400">{t('stats.top_artist')}</p>
           </div>
           <div>
             <p className="text-3xl font-bold text-green-400">
               {stats.top_tracks[0]?.title || 'N/A'}
             </p>
-            <p className="text-sm text-gray-400">Top Track</p>
+            <p className="text-sm text-gray-400">{t('stats.top_track')}</p>
           </div>
         </div>
       </div>

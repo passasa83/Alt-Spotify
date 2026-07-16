@@ -1,8 +1,10 @@
 import { useState, useRef } from 'react';
 import { uploadTrack } from '@/api/tracks';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Upload, CheckCircle, AlertCircle, Music } from 'lucide-react';
 
 const AdminUpload = () => {
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
@@ -90,7 +92,7 @@ const AdminUpload = () => {
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
-      <h1 className="text-3xl font-bold text-white">Upload Track</h1>
+      <h1 className="text-3xl font-bold text-white">{t('upload.title')}</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div
@@ -127,50 +129,50 @@ const AdminUpload = () => {
           ) : (
             <>
               <Upload size={48} className="mb-4 text-gray-500" />
-              <p className="text-lg font-medium text-white">Drop your audio file here</p>
-              <p className="text-sm text-gray-400">or click to browse</p>
+              <p className="text-lg font-medium text-white">{t('upload.drop_file')}</p>
+              <p className="text-sm text-gray-400">{t('upload.or_browse')}</p>
             </>
           )}
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-400">Title *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-400">{t('upload.track_title')}</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
               className="w-full rounded-lg bg-gray-800 px-4 py-3 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Track title"
+              placeholder={t('upload.track_title_placeholder')}
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-400">Artist *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-400">{t('upload.artist_name')}</label>
             <input
               value={artist}
               onChange={(e) => setArtist(e.target.value)}
               required
               className="w-full rounded-lg bg-gray-800 px-4 py-3 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Artist name"
+              placeholder={t('upload.artist_placeholder')}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-400">Album</label>
+              <label className="mb-1 block text-sm font-medium text-gray-400">{t('upload.album_name')}</label>
               <input
                 value={album}
                 onChange={(e) => setAlbum(e.target.value)}
                 className="w-full rounded-lg bg-gray-800 px-4 py-3 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="Album name"
+                placeholder={t('upload.album_placeholder')}
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-400">Genre</label>
+              <label className="mb-1 block text-sm font-medium text-gray-400">{t('upload.genre')}</label>
               <input
                 value={genre}
                 onChange={(e) => setGenre(e.target.value)}
                 className="w-full rounded-lg bg-gray-800 px-4 py-3 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="Genre"
+                placeholder={t('upload.genre_placeholder')}
               />
             </div>
           </div>
@@ -183,15 +185,15 @@ const AdminUpload = () => {
                 onChange={(e) => setIsExplicit(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500"
               />
-              <label htmlFor="explicit" className="text-sm font-medium text-gray-300">Explicit Content</label>
+              <label htmlFor="explicit" className="text-sm font-medium text-gray-300">{t('upload.explicit_content')}</label>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-400">Allowed Territories</label>
+              <label className="mb-1 block text-sm font-medium text-gray-400">{t('upload.allowed_territories')}</label>
               <input
                 value={allowedTerritories}
                 onChange={(e) => setAllowedTerritories(e.target.value)}
                 className="w-full rounded-lg bg-gray-800 px-4 py-3 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="e.g. FR,US (blank for all)"
+                placeholder={t('upload.allowed_territories_placeholder')}
               />
             </div>
           </div>
@@ -212,7 +214,7 @@ const AdminUpload = () => {
         {success && (
           <div className="flex items-center gap-2 rounded-lg bg-green-500/10 p-4 text-green-400">
             <CheckCircle size={20} />
-            Track uploaded successfully!
+            {t('upload.success')}
           </div>
         )}
 
@@ -228,7 +230,7 @@ const AdminUpload = () => {
           disabled={!file || !title || !artist || uploading}
           className="w-full rounded-full bg-green-500 py-3 font-bold text-black hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {uploading ? 'Uploading...' : 'Upload Track'}
+          {uploading ? t('upload.uploading') : t('upload.upload_track')}
         </button>
       </form>
     </div>

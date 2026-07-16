@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getTrack, updateTrack } from '@/api/tracks';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { Track } from '@/types';
 
 const EditTrack = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   
@@ -59,7 +61,7 @@ const EditTrack = () => {
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 pb-24">
-      <h1 className="text-3xl font-bold text-white">Edit Track</h1>
+      <h1 className="text-3xl font-bold text-white">{t('upload.edit_track')}</h1>
       
       {error && <div className="rounded-lg bg-red-500/10 p-4 text-red-400">{error}</div>}
       
@@ -75,7 +77,7 @@ const EditTrack = () => {
         
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-300">Genre</label>
+            <label className="mb-1 block text-sm font-medium text-gray-300">{t('upload.genre')}</label>
             <input
               value={genre}
               onChange={(e) => setGenre(e.target.value)}
@@ -90,16 +92,16 @@ const EditTrack = () => {
               onChange={(e) => setIsExplicit(e.target.checked)}
               className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500"
             />
-            <label htmlFor="edit-explicit" className="ml-2 text-sm font-medium text-gray-300">Explicit Content</label>
+            <label htmlFor="edit-explicit" className="ml-2 text-sm font-medium text-gray-300">{t('upload.explicit_content')}</label>
           </div>
         </div>
         
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-300">Allowed Territories</label>
+          <label className="mb-1 block text-sm font-medium text-gray-300">{t('upload.allowed_territories')}</label>
           <input
             value={allowedTerritories}
             onChange={(e) => setAllowedTerritories(e.target.value)}
-            placeholder="e.g. FR,US (blank for all)"
+            placeholder={t('upload.allowed_territories_placeholder')}
             className="w-full rounded-md border border-gray-600 bg-gray-800 px-4 py-3 text-white outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
           />
         </div>
@@ -109,7 +111,7 @@ const EditTrack = () => {
           disabled={saving}
           className="w-full rounded-full bg-green-500 py-3 font-bold text-black hover:bg-green-400 disabled:opacity-50"
         >
-          {saving ? 'Saving...' : 'Update Track'}
+          {saving ? t('upload.saving') : t('upload.update_track')}
         </button>
       </form>
     </div>

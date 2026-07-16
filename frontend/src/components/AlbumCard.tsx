@@ -4,12 +4,14 @@ import type { Album } from '@/types';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { getAlbumTracks } from '@/api/albums';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface AlbumCardProps {
   album: Album;
 }
 
 const AlbumCard = ({ album }: AlbumCardProps) => {
+  const { t } = useTranslation();
   const { setTrack, currentTrack, isPlaying } = usePlayerStore();
   const [tracks, setTracks] = useState<[]>([]);
 
@@ -48,7 +50,7 @@ const AlbumCard = ({ album }: AlbumCardProps) => {
       </div>
       <p className="block truncate text-sm font-semibold text-white">{album.title}</p>
       <p className="block truncate text-xs text-gray-400">
-        {album.release_year} • {album.artist?.name || 'Unknown Artist'}
+        {album.release_year} • {album.artist?.name || t('player.unknown_artist')}
       </p>
     </Link>
   );

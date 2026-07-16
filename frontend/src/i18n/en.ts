@@ -234,6 +234,12 @@ const en = {
   'upload.upload_track': 'Upload Track',
   'upload.success': 'Track uploaded successfully!',
   'upload.failed': 'Upload failed. Please try again.',
+  'upload.explicit_content': 'Explicit Content',
+  'upload.allowed_territories': 'Allowed Territories',
+  'upload.allowed_territories_placeholder': 'e.g. FR,US (blank for all)',
+  'upload.saving': 'Saving...',
+  'upload.update_track': 'Update Track',
+  'upload.edit_track': 'Edit Track',
 
   // Library
   'library.title': 'Your Library',
@@ -254,6 +260,14 @@ const en = {
   'browse.trending': 'Trending',
   'browse.genres': 'Genres',
   'browse.select_genre': 'Select a genre',
+
+  // Recommendations
+  'recommendations.discover_weekly': 'Discover Weekly',
+  'recommendations.daily_mixes': 'Daily Mixes',
+  'recommendations.more_tracks': '+ {count} more tracks',
+
+  // Common (additional)
+  'common.unknown_author': 'Unknown Author',
 
   // Search
   'search.placeholder': 'What do you want to listen to?',
@@ -303,6 +317,8 @@ const en = {
   'podcast.no_episodes': 'No episodes available',
   'podcast.about_episode': 'About this episode',
   'podcast.not_found': 'Podcast not found',
+  'podcast.unknown_author': 'Unknown Author',
+  'podcast.no_podcasts': 'No podcasts found',
 
   // Episode
   'episode.play': 'Play',
@@ -320,6 +336,10 @@ const en = {
   'common.empty': 'Nothing here yet',
   'common.go_home': 'Go Home',
   'common.page_not_found': 'Page not found',
+  'common.all': 'All',
+  'common.previous': 'Previous',
+  'common.next': 'Next',
+  'common.page_of': 'Page {current} of {total}',
 
   // Import
   'import.title': 'Import Playlist',
@@ -360,6 +380,8 @@ const en = {
 
   // Notifications
   'notifications.title': 'Notifications',
+  'notifications.mark_all_read': 'Mark all read',
+  'notifications.no_notifications': 'No notifications yet',
 
   // User
   'user.profile': 'Profile',

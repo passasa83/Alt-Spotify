@@ -18,6 +18,9 @@ from app.utils.deps import get_current_user
 
 router = APIRouter(prefix="/jam", tags=["jam"])
 
+# Track votes per session (in-memory)
+vote_counts: dict[str, set[str]] = {}
+
 
 def generate_session_code() -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -233,7 +236,7 @@ async def jam_websocket(websocket: WebSocket, session_id: uuid.UUID):
                 data = json.loads(message)
                 msg_type = data.get("type")
 
-                if msg_type in ("track_changed", "queue_updated", "vote_skip"):
+                if msg_type in ("track_changed", "queue_updated"):
                     # Permission check
                     async with async_session_factory() as db_session:
                         from sqlalchemy import select as sa_select
@@ -252,6 +255,29 @@ async def jam_websocket(websocket: WebSocket, session_id: uuid.UUID):
                         f"jam:{session_id}",
                         json.dumps({**data, "user_id": user_id}),
                     )
+                elif msg_type == "vote_skip":
+                    session_votes = vote_counts.setdefault(str(session_id), set())
+                    session_votes.add(user_id)
+
+                    async with async_session_factory() as db_session:
+                        from sqlalchemy import select as sa_select, func
+                        count_result = await db_session.execute(
+                            sa_select(func.count(JamParticipant.id)).where(JamParticipant.session_id == session_id)
+                        )
+                        participant_count = count_result.scalar() or 0
+
+                    threshold = (participant_count // 2) + 1
+                    if len(session_votes) >= threshold:
+                        await r.publish(
+                            f"jam:{session_id}",
+                            json.dumps({"type": "track_skipped", "user_id": user_id, "votes": len(session_votes)}),
+                        )
+                        vote_counts.pop(str(session_id), None)
+                    else:
+                        await r.publish(
+                            f"jam:{session_id}",
+                            json.dumps({"type": "vote_update", "votes": len(session_votes), "threshold": threshold}),
+                        )
                 elif msg_type in ("position_update", "playback_state", "chat"):
                     await r.publish(
                         f"jam:{session_id}",

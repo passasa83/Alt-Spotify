@@ -114,7 +114,7 @@ const Browse = () => {
                   {track.title}
                 </Link>
                 <p className="truncate text-sm text-gray-400">
-                  {track.artist?.name || 'Unknown'}
+                  {track.artist?.name || t('player.unknown_artist')}
                 </p>
               </div>
               <span className="text-sm text-gray-500">

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getPodcasts } from '@/api/podcasts';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { Podcast, PaginatedResponse } from '@/types';
 import PodcastCard from '@/components/PodcastCard';
 import { Headphones } from 'lucide-react';
@@ -10,6 +11,7 @@ const CATEGORIES = [
 ];
 
 const Podcasts = () => {
+  const { t } = useTranslation();
   const [podcasts, setPodcasts] = useState<Podcast[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -37,7 +39,7 @@ const Podcasts = () => {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Headphones size={32} className="text-green-500" />
-        <h1 className="text-3xl font-bold text-white">Podcasts</h1>
+        <h1 className="text-3xl font-bold text-white">{t('podcast.podcast')}</h1>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -49,7 +51,7 @@ const Podcasts = () => {
               : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
           }`}
         >
-          All
+          {t('common.all')}
         </button>
         {CATEGORIES.map((cat) => (
           <button
@@ -73,7 +75,7 @@ const Podcasts = () => {
       ) : podcasts.length === 0 ? (
         <div className="flex h-64 flex-col items-center justify-center text-gray-500">
           <Headphones size={48} className="mb-4" />
-          <p>No podcasts found</p>
+          <p>{t('podcast.no_podcasts')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -90,17 +92,17 @@ const Podcasts = () => {
             disabled={page === 1}
             className="rounded-md bg-gray-800 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-50"
           >
-            Previous
+            {t('common.previous')}
           </button>
           <span className="text-sm text-gray-400">
-            Page {page} of {totalPages}
+            {t('common.page_of', { current: page, total: totalPages })}
           </span>
           <button
             onClick={() => setPage(Math.min(totalPages, page + 1))}
             disabled={page === totalPages}
             className="rounded-md bg-gray-800 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-50"
           >
-            Next
+            {t('common.next')}
           </button>
         </div>
       )}

@@ -2,12 +2,14 @@ import { Play } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import type { Track } from '@/types';
 import { Link } from 'react-router-dom';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface TrackCardProps {
   track: Track;
 }
 
 const TrackCard = ({ track }: TrackCardProps) => {
+  const { t } = useTranslation();
   const { setTrack, currentTrack, isPlaying } = usePlayerStore();
   const isCurrentTrack = currentTrack?.id === track.id;
 
@@ -34,7 +36,7 @@ const TrackCard = ({ track }: TrackCardProps) => {
         {track.title}
       </Link>
       <Link to={`/artist/${track.artist_id}`} className="block truncate text-xs text-gray-400 hover:underline">
-        {track.artist?.name || 'Unknown Artist'}
+        {track.artist?.name || t('player.unknown_artist')}
       </Link>
     </div>
   );

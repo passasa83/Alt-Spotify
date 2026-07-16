@@ -5,8 +5,10 @@ import { usePlayerStore } from '@/stores/playerStore';
 import TrackList from '@/components/TrackList';
 import { Play, Heart, MoreHorizontal, Shuffle } from 'lucide-react';
 import type { Album, Track } from '@/types';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const AlbumDetail = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [album, setAlbum] = useState<Album | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -43,7 +45,7 @@ const AlbumDetail = () => {
   if (!album) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-gray-400">Album not found</p>
+        <p className="text-gray-400">{t('album.not_found')}</p>
       </div>
     );
   }
@@ -66,16 +68,16 @@ const AlbumDetail = () => {
           className="h-48 w-48 rounded-md object-cover shadow-2xl md:h-56 md:w-56"
         />
         <div>
-          <p className="text-sm font-medium uppercase text-white">Album</p>
+          <p className="text-sm font-medium uppercase text-white">{t('album.album')}</p>
           <h1 className="mt-2 text-4xl font-bold text-white md:text-6xl">{album.title}</h1>
           <div className="mt-2 flex items-center gap-1 text-sm text-gray-400">
             <Link to={`/artist/${album.artist_id}`} className="font-medium text-white hover:underline">
-              {album.artist?.name || 'Unknown Artist'}
+              {album.artist?.name || t('player.unknown_artist')}
             </Link>
             <span>•</span>
             <span>{album.release_year || new Date(album.created_at).getFullYear()}</span>
             <span>•</span>
-            <span>{tracks.length} songs, about {minutes} min</span>
+            <span>{t('album.songs_about_min', { count: tracks.length, minutes })}</span>
           </div>
         </div>
       </div>

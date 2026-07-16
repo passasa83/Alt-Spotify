@@ -5,8 +5,10 @@ import { usePlayerStore } from '@/stores/playerStore';
 import TrackList from '@/components/TrackList';
 import { Play, Shuffle, MoreHorizontal, Clock } from 'lucide-react';
 import type { Playlist, PlaylistTrack } from '@/types';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const PlaylistDetail = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [tracks, setTracks] = useState<PlaylistTrack[]>([]);
@@ -57,7 +59,7 @@ const PlaylistDetail = () => {
   if (!playlist) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-gray-400">Playlist not found</p>
+        <p className="text-gray-400">{t('playlist.not_found')}</p>
       </div>
     );
   }
@@ -81,13 +83,13 @@ const PlaylistDetail = () => {
           </div>
         )}
         <div>
-          <p className="text-sm font-medium uppercase text-white">Playlist</p>
+          <p className="text-sm font-medium uppercase text-white">{t('playlist.playlist')}</p>
           <h1 className="mt-2 text-4xl font-bold text-white md:text-6xl">{playlist.name}</h1>
           {playlist.description && (
             <p className="mt-2 text-sm text-gray-400">{playlist.description}</p>
           )}
           <p className="mt-2 text-sm text-gray-400">
-            {playlist.owner?.pseudo || 'Unknown'} • {tracks.length} songs
+            {playlist.owner?.pseudo || 'Unknown'} • {tracks.length} {t('playlist.songs')}
             {hours > 0 && `, ${hours} hr`}
             {minutes > 0 && ` ${minutes} min`}
           </p>

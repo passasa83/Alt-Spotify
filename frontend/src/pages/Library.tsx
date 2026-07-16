@@ -4,8 +4,10 @@ import PlaylistCard from '@/components/PlaylistCard';
 import ImportPlaylistModal from '@/components/ImportPlaylistModal';
 import { Link } from 'react-router-dom';
 import { Plus, Upload } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const Library = () => {
+  const { t } = useTranslation();
   const { playlists, favorites, loadPlaylists, isLoading } = useLibraryStore();
   const [activeTab, setActiveTab] = useState<'playlists' | 'favorites'>('playlists');
   const [showImportModal, setShowImportModal] = useState(false);
@@ -24,11 +26,11 @@ const Library = () => {
             className="flex items-center gap-2 rounded-full bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           >
             <Upload size={16} />
-            Import Playlist
+            {t('library.import_playlist')}
           </button>
           <button className="flex items-center gap-2 rounded-full bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700">
             <Plus size={16} />
-            Create Playlist
+            {t('library.create_playlist')}
           </button>
         </div>
       </div>
@@ -47,7 +49,7 @@ const Library = () => {
               : 'bg-gray-800 text-white hover:bg-gray-700'
           }`}
         >
-          Playlists
+          {t('library.playlists')}
         </button>
         <button
           onClick={() => setActiveTab('favorites')}
@@ -72,7 +74,7 @@ const Library = () => {
               <p className="text-xl font-bold text-white">Create your first playlist</p>
               <p className="mt-2 text-gray-400">It's easy, we'll help you</p>
               <button className="mt-4 rounded-full bg-white px-6 py-3 font-bold text-black hover:scale-105">
-                Create Playlist
+                {t('library.create_button')}
               </button>
             </div>
           ) : (
@@ -88,12 +90,12 @@ const Library = () => {
           {favorites.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <p className="text-xl font-bold text-white">Songs you like will appear here</p>
-              <p className="mt-2 text-gray-400">Save songs by tapping the heart icon</p>
+              <p className="mt-2 text-gray-400">{t('library.save_songs')}</p>
               <Link
                 to="/search"
                 className="mt-4 rounded-full bg-white px-6 py-3 font-bold text-black hover:scale-105"
               >
-                Find Songs
+                {t('library.find_songs')}
               </Link>
             </div>
           ) : (

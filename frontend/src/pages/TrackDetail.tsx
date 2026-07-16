@@ -4,8 +4,10 @@ import { getTrack } from '@/api/tracks';
 import { usePlayerStore } from '@/stores/playerStore';
 import { Play, Pause, Heart, MoreHorizontal } from 'lucide-react';
 import type { Track } from '@/types';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const TrackDetail = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [track, setTrackData] = useState<Track | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,11 +67,11 @@ const TrackDetail = () => {
           <h1 className="mt-2 text-4xl font-bold text-white md:text-6xl">{track.title}</h1>
           <div className="mt-2 flex items-center gap-1 text-sm text-gray-400">
             <Link to={`/artist/${track.artist_id}`} className="font-medium text-white hover:underline">
-              {track.artist?.name || 'Unknown Artist'}
+              {track.artist?.name || t('player.unknown_artist')}
             </Link>
             <span>•</span>
             <Link to={`/album/${track.album_id}`} className="hover:underline">
-              {track.album?.title || 'Unknown Album'}
+              {track.album?.title || t('player.unknown_album')}
             </Link>
             <span>•</span>
             <span>{track.release_year || new Date(track.created_at).getFullYear()}</span>
@@ -104,7 +106,7 @@ const TrackDetail = () => {
       <div className="mt-8 rounded-lg bg-gray-900 p-6">
         <h2 className="mb-4 text-xl font-bold text-white">About the artist</h2>
         <Link to={`/artist/${track.artist_id}`} className="text-green-500 hover:underline">
-          {track.artist?.name || 'Unknown Artist'}
+          {track.artist?.name || t('player.unknown_artist')}
         </Link>
         <p className="mt-2 text-sm text-gray-400">
           Artist information not available.

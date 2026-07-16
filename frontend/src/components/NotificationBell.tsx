@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { Bell } from 'lucide-react';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { useTranslation } from '@/hooks/useTranslation';
 import NotificationItem from './NotificationItem';
 
 const NotificationBell = () => {
+  const { t } = useTranslation();
   const {
     notifications,
     unreadCount,
@@ -62,13 +64,13 @@ const NotificationBell = () => {
           className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-hidden rounded-lg bg-gray-800 shadow-xl border border-gray-700"
         >
           <div className="flex items-center justify-between border-b border-gray-700 px-4 py-3">
-            <h3 className="text-sm font-semibold text-white">Notifications</h3>
+            <h3 className="text-sm font-semibold text-white">{t('notifications.title')}</h3>
             {unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
                 className="text-xs text-green-500 hover:text-green-400"
               >
-                Mark all read
+                {t('notifications.mark_all_read')}
               </button>
             )}
           </div>
@@ -80,7 +82,7 @@ const NotificationBell = () => {
               </div>
             ) : notifications.length === 0 ? (
               <div className="py-8 text-center text-sm text-gray-500">
-                No notifications yet
+                {t('notifications.no_notifications')}
               </div>
             ) : (
               notifications.map((notification) => (

@@ -234,6 +234,12 @@ const fr = {
   'upload.upload_track': 'Télécharger le titre',
   'upload.success': 'Titre téléchargé avec succès !',
   'upload.failed': 'Échec du téléchargement. Veuillez réessayer.',
+  'upload.explicit_content': 'Contenu explicite',
+  'upload.allowed_territories': 'Territoires autorisés',
+  'upload.allowed_territories_placeholder': 'ex. FR,US (vide pour tous)',
+  'upload.saving': 'Enregistrement...',
+  'upload.update_track': 'Mettre à jour le titre',
+  'upload.edit_track': 'Modifier le titre',
 
   // Library
   'library.title': 'Votre bibliothèque',
@@ -254,6 +260,14 @@ const fr = {
   'browse.trending': 'Tendances',
   'browse.genres': 'Genres',
   'browse.select_genre': 'Sélectionnez un genre',
+
+  // Recommendations
+  'recommendations.discover_weekly': 'Découvertes de la semaine',
+  'recommendations.daily_mixes': 'Mix quotidiens',
+  'recommendations.more_tracks': '+ {count} autres titres',
+
+  // Common (additional)
+  'common.unknown_author': 'Auteur inconnu',
 
   // Search
   'search.placeholder': 'Que souhaitez-vous écouter ?',
@@ -303,6 +317,8 @@ const fr = {
   'podcast.no_episodes': 'Aucun épisode disponible',
   'podcast.about_episode': 'À propos de cet épisode',
   'podcast.not_found': 'Podcast introuvable',
+  'podcast.unknown_author': 'Auteur inconnu',
+  'podcast.no_podcasts': 'Aucun podcast trouvé',
 
   // Episode
   'episode.play': 'Lire',
@@ -320,6 +336,10 @@ const fr = {
   'common.empty': 'Rien ici pour l\'instant',
   'common.go_home': 'Aller à l\'accueil',
   'common.page_not_found': 'Page introuvable',
+  'common.all': 'Tout',
+  'common.previous': 'Précédent',
+  'common.next': 'Suivant',
+  'common.page_of': 'Page {current} sur {total}',
 
   // Import
   'import.title': 'Importer une playlist',
@@ -360,6 +380,8 @@ const fr = {
 
   // Notifications
   'notifications.title': 'Notifications',
+  'notifications.mark_all_read': 'Tout marquer comme lu',
+  'notifications.no_notifications': 'Aucune notification',
 
   // User
   'user.profile': 'Profil',
