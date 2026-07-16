@@ -8,7 +8,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${POSTGRES_DATA_DIR:-./data/postgres}:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U altspotify -d altspotify"]
       interval: 5s
@@ -22,7 +22,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - ${REDIS_DATA_DIR:-./data/redis}:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -40,7 +40,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - minio_data:/data
+      - ${MINIO_DATA_DIR:-./data/minio}:/data
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -58,7 +58,7 @@ services:
     ports:
       - "7700:7700"
     volumes:
-      - meilisearch_data:/meili_data
+      - ${MEILISEARCH_DATA_DIR:-./data/meilisearch}:/meili_data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
       interval: 10s
@@ -116,6 +116,11 @@ services:
     build: ./frontend
     ports:
       - "3000:80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
     depends_on:
       - backend
     networks:
