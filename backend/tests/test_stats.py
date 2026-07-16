@@ -98,8 +98,8 @@ async def test_stats_endpoint(client: AsyncClient, auth_headers, test_user):
     data = response.json()
     assert "top_tracks" in data
     assert "top_artists" in data
-    assert "total_listening_seconds" in data
+    assert "total_minutes" in data
     assert "monthly" in data
     assert "genre_distribution" in data
     assert "listening_by_hour" in data
-    assert "listening_streak" in data
+    assert "streak" in data

@@ -146,8 +146,8 @@ async def test_enriched_search_no_download_url(mock_httpx, client: AsyncClient, 
 
 
 @pytest.mark.asyncio
-@patch("app.services.jiosaavn.search_jiosaavn")
-async def test_search_local_results_prioritized(client: AsyncClient, admin_headers):
+@patch("app.api.v1.search.search_jiosaavn")
+async def test_search_local_results_prioritized(mock_search, client: AsyncClient, admin_headers):
     artist_resp = await client.post(
         "/api/v1/artists",
         headers=admin_headers,
@@ -165,12 +165,11 @@ async def test_search_local_results_prioritized(client: AsyncClient, admin_heade
         },
     )
 
-    with patch("app.services.jiosaavn.search_jiosaavn") as mock_search:
-        mock_search.return_value = []
+    mock_search.return_value = []
 
-        response = await client.get("/api/v1/search?q=Local+Priority&type=tracks")
-        assert response.status_code == 200
-        data = response.json()
-        assert "tracks" in data
-        assert len(data["tracks"]) >= 1
-        assert data["tracks"][0]["title"] == "Local Priority Track"
+    response = await client.get("/api/v1/search?q=Local+Priority&type=tracks")
+    assert response.status_code == 200
+    data = response.json()
+    assert "tracks" in data
+    assert len(data["tracks"]) >= 1
+    assert data["tracks"][0]["title"] == "Local Priority Track"

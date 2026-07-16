@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import patch, AsyncMock
 
 import pytest
 from httpx import AsyncClient
@@ -21,7 +22,10 @@ async def _create_other_user(db_session):
     return other
 
 
-async def test_follow_user(client: AsyncClient, auth_headers, db_session, test_user):
+@pytest.mark.asyncio
+@patch("app.api.v1.social.notify_follow_push", new_callable=AsyncMock)
+@patch("app.api.v1.social.notify_follow", new_callable=AsyncMock)
+async def test_follow_user(mock_notify_follow, mock_notify_push, client: AsyncClient, auth_headers, db_session, test_user):
     other = await _create_other_user(db_session)
 
     response = await client.post(
@@ -49,7 +53,10 @@ async def test_follow_user_not_found(client: AsyncClient, auth_headers):
     assert response.status_code == 404
 
 
-async def test_follow_user_duplicate(client: AsyncClient, auth_headers, db_session):
+@pytest.mark.asyncio
+@patch("app.api.v1.social.notify_follow_push", new_callable=AsyncMock)
+@patch("app.api.v1.social.notify_follow", new_callable=AsyncMock)
+async def test_follow_user_duplicate(mock_notify_follow, mock_notify_push, client: AsyncClient, auth_headers, db_session):
     other = await _create_other_user(db_session)
 
     await client.post(
@@ -115,7 +122,10 @@ async def test_follow_artist_duplicate(client: AsyncClient, auth_headers, admin_
     assert response.status_code == 409
 
 
-async def test_get_followers(client: AsyncClient, auth_headers, db_session, test_user):
+@pytest.mark.asyncio
+@patch("app.api.v1.social.notify_follow_push", new_callable=AsyncMock)
+@patch("app.api.v1.social.notify_follow", new_callable=AsyncMock)
+async def test_get_followers(mock_notify_follow, mock_notify_push, client: AsyncClient, auth_headers, db_session, test_user):
     other = await _create_other_user(db_session)
 
     other_token = create_access_token(str(other.id))
@@ -134,7 +144,10 @@ async def test_get_followers(client: AsyncClient, auth_headers, db_session, test
     assert data["count"] >= 1
 
 
-async def test_get_following(client: AsyncClient, auth_headers, db_session):
+@pytest.mark.asyncio
+@patch("app.api.v1.social.notify_follow_push", new_callable=AsyncMock)
+@patch("app.api.v1.social.notify_follow", new_callable=AsyncMock)
+async def test_get_following(mock_notify_follow, mock_notify_push, client: AsyncClient, auth_headers, db_session):
     other = await _create_other_user(db_session)
 
     await client.post(

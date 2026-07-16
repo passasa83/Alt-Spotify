@@ -229,22 +229,34 @@ async def reorder_playlist(
 # P.1 — Smart Playlists
 # ──────────────────────────────────────────────
 
+from pydantic import BaseModel
+
+
+class SmartPlaylistCreate(BaseModel):
+    title: str
+    rules: dict
+    max_tracks: int = 50
+    auto_refresh: bool = False
+
+
+class SmartPlaylistRulesUpdate(BaseModel):
+    rules: dict
+    max_tracks: int = 50
+
+
 @router.post("/smart", response_model=PlaylistResponse, status_code=status.HTTP_201_CREATED)
 async def create_smart_playlist(
-    title: str = Query(...),
-    rules: dict = Query(...),
-    max_tracks: int = Query(50, ge=1, le=500),
-    auto_refresh: bool = Query(False),
+    body: SmartPlaylistCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     playlist = Playlist(
-        title=title,
+        title=body.title,
         owner_id=current_user.id,
         is_smart=True,
-        smart_rules=rules,
-        max_tracks=max_tracks,
-        auto_refresh=auto_refresh,
+        smart_rules=body.rules,
+        max_tracks=body.max_tracks,
+        auto_refresh=body.auto_refresh,
         is_public=False,
     )
     db.add(playlist)
@@ -284,8 +296,7 @@ async def refresh_smart_playlist(
 @router.put("/{playlist_id}/rules")
 async def update_smart_playlist_rules(
     playlist_id: uuid.UUID,
-    rules: dict = Query(...),
-    max_tracks: int = Query(50, ge=1, le=500),
+    body: SmartPlaylistRulesUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -298,8 +309,8 @@ async def update_smart_playlist_rules(
     if not playlist.is_smart:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not a smart playlist")
 
-    playlist.smart_rules = rules
-    playlist.max_tracks = max_tracks
+    playlist.smart_rules = body.rules
+    playlist.max_tracks = body.max_tracks
 
     from app.services.smart_playlist import evaluate_smart_playlist
     count = await evaluate_smart_playlist(playlist, db)
@@ -384,7 +395,7 @@ async def get_user_history(
 
 @router.post("/generate-top")
 async def generate_top_playlist(
-    period: str = Query(..., regex="^(month|year)$"),
+    period: str = Query(..., pattern="^(month|year)$"),
     year: int = Query(..., ge=2000, le=2100),
     month: int | None = Query(None, ge=1, le=12),
     limit: int = Query(25, ge=1, le=100),
@@ -527,7 +538,7 @@ async def find_duplicates(
 @router.post("/{playlist_id}/remove-duplicates")
 async def remove_duplicates(
     playlist_id: uuid.UUID,
-    keep: str = Query("first", regex="^(first|last)$"),
+    keep: str = Query("first", pattern="^(first|last)$"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

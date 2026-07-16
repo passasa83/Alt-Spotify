@@ -14,7 +14,7 @@ async def test_create_session(client: AsyncClient, auth_headers):
     )
     assert response.status_code == 201
     data = response.json()
-    assert "session_id" in data
+    assert "id" in data
     assert "code" in data
     assert data["status"] == "ACTIVE"
 
@@ -47,7 +47,7 @@ async def test_join_session(client: AsyncClient, auth_headers, test_user, db_ses
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["session_id"] == session_data["session_id"]
+    assert data["id"] == session_data["id"]
     assert data["code"] == code
 
 
@@ -64,7 +64,7 @@ async def test_leave_session(client: AsyncClient, auth_headers, test_user):
         "/api/v1/jam/create",
         headers=auth_headers,
     )
-    session_id = create_resp.json()["session_id"]
+    session_id = create_resp.json()["id"]
 
     response = await client.post(
         f"/api/v1/jam/leave/{session_id}",
@@ -79,12 +79,12 @@ async def test_get_session(client: AsyncClient, auth_headers):
         "/api/v1/jam/create",
         headers=auth_headers,
     )
-    session_id = create_resp.json()["session_id"]
+    session_id = create_resp.json()["id"]
 
     response = await client.get(f"/api/v1/jam/{session_id}")
     assert response.status_code == 200
     data = response.json()
-    assert data["session_id"] == session_id
+    assert data["id"] == session_id
     assert "participants" in data
     assert len(data["participants"]) >= 1
 

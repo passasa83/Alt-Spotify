@@ -33,6 +33,8 @@ def _patch_postgres_types():
                 column.type = sa.String(36)
             elif isinstance(column.type, JSONB):
                 column.type = sa.JSON()
+            elif isinstance(column.type, sa.ARRAY):
+                column.type = sa.JSON()
 
 
 @pytest.fixture(scope="session")
