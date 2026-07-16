@@ -346,6 +346,8 @@ const en = {
   'import.deezer_success': 'Playlist imported successfully!',
   'import.deezer_tracks_matched': 'tracks matched',
   'import.deezer_unmatched': 'tracks not found in local catalog',
+  'import.spotify_not_configured': 'Spotify not configured',
+  'import.spotify_not_configured_help': 'Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in your .env file. Get credentials at https://developer.spotify.com/dashboard',
 
   // Share
   'share.title': 'Share',

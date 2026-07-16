@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, X, Check, AlertCircle, FileText } from 'lucide-react';
 import client from '@/api/client';
 import { importPlaylistFromSpotify, importPlaylistFromDeezer } from '@/api/playlists';
@@ -30,7 +30,16 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
   const [deezerUrl, setDeezerUrl] = useState('');
   const [deezerLoading, setDeezerLoading] = useState(false);
   const [deezerResult, setDeezerResult] = useState<DeezerImportResult | null>(null);
+  const [spotifyConfigured, setSpotifyConfigured] = useState<boolean | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      client.get('/playlists/import-export/status')
+        .then((res) => setSpotifyConfigured(res.data.spotify_configured))
+        .catch(() => setSpotifyConfigured(null));
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -84,6 +93,7 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
     setResult(null);
     setError(null);
     setSpotifyUrl('');
+    setSpotifyLoading(false);
     setSpotifyResult(null);
     setDeezerUrl('');
     setDeezerLoading(false);
@@ -253,6 +263,12 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
 
         {importTab === 'spotify' && (
           <div className="space-y-4">
+            {spotifyConfigured === false && (
+              <div className="rounded-lg bg-yellow-500/10 p-4 border border-yellow-500/30">
+                <p className="text-yellow-400 font-medium text-sm">{t('import.spotify_not_configured')}</p>
+                <p className="text-xs text-gray-400 mt-1">{t('import.spotify_not_configured_help')}</p>
+              </div>
+            )}
             {spotifyResult ? (
               <div className="rounded-lg bg-green-500/10 p-4">
                 <p className="text-green-400 font-medium">{t('import.spotify_success')}</p>

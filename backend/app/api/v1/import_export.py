@@ -17,10 +17,20 @@ from app.models.album import Album
 from app.schemas.common import MessageResponse
 from app.utils.deps import get_current_user
 from app.models.user import User
-from app.services.spotify import extract_playlist_id as extract_spotify_id, fetch_spotify_playlist
+from app.services.spotify import extract_playlist_id as extract_spotify_id, fetch_spotify_playlist, is_configured as spotify_configured
 from app.services.deezer import extract_playlist_id as extract_deezer_id, fetch_deezer_playlist
 
 router = APIRouter(prefix="/playlists/import-export", tags=["import-export"])
+
+
+@router.get("/import-export/status")
+async def import_status(
+    _current_user: User = Depends(get_current_user),
+):
+    return {
+        "spotify_configured": spotify_configured(),
+        "deezer_available": True,
+    }
 
 
 async def _match_tracks(rows: list[dict], db: AsyncSession) -> tuple[list[Track], list[dict]]:
@@ -235,13 +245,19 @@ async def import_from_spotify(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if not spotify_configured():
+        raise HTTPException(
+            status_code=501,
+            detail="Spotify import not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in your .env file. Get credentials at https://developer.spotify.com/dashboard",
+        )
+
     playlist_id = extract_spotify_id(body.url)
     if not playlist_id:
         raise HTTPException(status_code=400, detail="Invalid Spotify playlist URL")
 
     spotify_data = await fetch_spotify_playlist(playlist_id)
     if not spotify_data:
-        raise HTTPException(status_code=502, detail="Failed to fetch Spotify playlist. Check that SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET are configured.")
+        raise HTTPException(status_code=502, detail="Failed to fetch Spotify playlist. Check your credentials and that the playlist is public.")
 
     playlist = Playlist(
         title=spotify_data["title"],
