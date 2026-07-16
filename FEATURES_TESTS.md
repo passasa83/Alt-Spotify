@@ -86,6 +86,34 @@
 
 ---
 
+## J.1 — Import automatique via JioSaavn API
+
+| # | Test | Résultat |
+|---|------|----------|
+| **Backend** | | |
+| 1 | Rechercher un morceau absent de la BDD → il est trouvé sur JioSaavn | ☐ |
+| 2 | Le morceau JioSaavn est automatiquement importé dans la BDD | ☐ |
+| 3 | Le fichier audio est uploadé sur MinIO | ☐ |
+| 4 | Le track est créé avec le bon titre, artiste, durée | ☐ |
+| 5 | L'artiste est créé s'il n'existe pas déjà | ☐ |
+| 6 | La tâche Celery de transcodation HLS est déclenchée | ☐ |
+| 7 | Un 2ème搜 pour le même morceau ne le réimporte pas (déjà en BDD) | ☐ |
+| 8 | Endpoint `/search/jiosaavn?q=...&auto_import=true` retourne les résultats + imported | ☐ |
+| 9 | Endpoint `/search/jiosaavn?q=...&auto_import=false` retourne les résultats sans import | ☐ |
+| 10 | Recherche locale prioritaire : si le morceau existe en local, pas d'appel JioSaavn | ☐ |
+| **Frontend** | | |
+| 11 | Rechercher un morceau non présent → les résultats JioSaavn apparaissent | ☐ |
+| 12 | Les morceaux importés sont jouables immédiatement | ☐ |
+| 13 | Les cover arts JioSaavn s'affichent correctement | ☐ |
+| 14 | En cas d'erreur JioSaavn (API down), la recherche locale fonctionne toujours | ☐ |
+| **Edge cases** | | |
+| 15 | Recherche avec caractères spéciaux (accents, emojis) → pas de crash | ☐ |
+| 16 | JioSaavn retourne un fichier trop petit (< 10KB) → rejeté | ☐ |
+| 17 | Timeout JioSaavn (> 15s search, > 60s download) → erreur gérée proprement | ☐ |
+| 18 | Plusieurs résultats JioSaavn → tous sont importés si auto_import=true | ☐ |
+
+---
+
 ## Tests transversaux
 
 | # | Test | Résultat |

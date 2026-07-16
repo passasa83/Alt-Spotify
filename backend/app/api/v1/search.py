@@ -13,6 +13,7 @@ from app.schemas.album import AlbumResponse
 from app.schemas.track import TrackResponse
 from app.schemas.playlist import PlaylistResponse
 from app.services.meilisearch import search_meili
+from app.services.jiosaavn import search_jiosaavn, import_from_jiosaavn
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -75,7 +76,21 @@ async def search(
             if max_duration is not None:
                 query = query.where(Track.duration_seconds <= max_duration)
             result = await db.execute(query.offset(offset).limit(page_size))
-            results["tracks"] = [TrackResponse.model_validate(t) for t in result.scalars().all()]
+            local_tracks = [TrackResponse.model_validate(t) for t in result.scalars().all()]
+            results["tracks"] = local_tracks
+
+            if len(local_tracks) < page_size:
+                jio_results = await search_jiosaavn(q, limit=page_size - len(local_tracks))
+                imported_tracks = []
+                for jio_song in jio_results:
+                    track_id = await import_from_jiosaavn(jio_song, db)
+                    if track_id:
+                        track_result = await db.execute(select(Track).where(Track.id == track_id))
+                        track = track_result.scalar_one_or_none()
+                        if track:
+                            imported_tracks.append(TrackResponse.model_validate(track))
+
+                results["tracks"] = list(results["tracks"]) + imported_tracks
 
     if "playlists" in types:
         meili_hits = await _try_meilisearch(q, "playlists", page_size, offset)
@@ -99,3 +114,32 @@ async def search(
             results["podcasts"] = [PodcastResponse.model_validate(p) for p in result.scalars().all()]
 
     return results
+
+
+@router.get("/jiosaavn")
+async def search_jiosaavn_only(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(10, ge=1, le=50),
+    auto_import: bool = Query(True),
+    db: AsyncSession = Depends(get_db),
+):
+    """Search JioSaavn directly and optionally auto-import tracks into the database."""
+    jio_results = await search_jiosaavn(q, limit=limit)
+
+    if not auto_import:
+        return {"results": jio_results, "imported": []}
+
+    imported = []
+    for song in jio_results:
+        track_id = await import_from_jiosaavn(song, db)
+        if track_id:
+            imported.append({
+                "track_id": str(track_id),
+                "title": song.get("title"),
+                "artist": song.get("artist"),
+            })
+
+    return {
+        "results": jio_results,
+        "imported": imported,
+    }
