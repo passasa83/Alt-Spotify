@@ -11,16 +11,16 @@ export const joinJamSession = async (code: string): Promise<JamSession> => {
   return response.data;
 };
 
-export const leaveJamSession = async (sessionId: number): Promise<void> => {
+export const leaveJamSession = async (sessionId: string): Promise<void> => {
   await client.post(`/jam/leave/${sessionId}`);
 };
 
-export const getJamSession = async (sessionId: number): Promise<JamSession> => {
+export const getJamSession = async (sessionId: string): Promise<JamSession> => {
   const response = await client.get(`/jam/${sessionId}`);
   return response.data;
 };
 
-export const connectJamWebSocket = (sessionId: number): WebSocket => {
+export const connectJamWebSocket = (sessionId: string): WebSocket => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const token = localStorage.getItem('access_token');
   return new WebSocket(`${protocol}//${window.location.host}/api/v1/jam/${sessionId}/ws?token=${token}`);

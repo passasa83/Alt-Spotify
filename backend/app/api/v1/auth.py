@@ -42,7 +42,7 @@ async def register(
     invite = result.scalar_one_or_none()
     if not invite or invite.is_revoked:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid invitation token")
-    if invite.expires_at and invite.expires_at < datetime.now(timezone.utc):
+    if invite.expires_at and invite.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token expired")
     if invite.use_count >= invite.max_uses:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token already used")

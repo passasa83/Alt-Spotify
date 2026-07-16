@@ -16,7 +16,7 @@ class Album(Base):
     artist_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("artists.id"), nullable=False)
     release_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cover_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     artist: Mapped["Artist"] = relationship("Artist", back_populates="albums")
     tracks: Mapped[list["Track"]] = relationship("Track", back_populates="album", lazy="selectin")

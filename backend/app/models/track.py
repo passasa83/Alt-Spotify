@@ -26,7 +26,7 @@ class Track(Base):
     allowed_territories: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     is_explicit: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     play_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     album: Mapped["Album | None"] = relationship("Album", back_populates="tracks")
     artist: Mapped["Artist"] = relationship("Artist", back_populates="tracks")

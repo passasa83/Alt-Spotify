@@ -30,8 +30,8 @@ class JamSession(Base):
     position_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     status: Mapped[JamSessionStatus] = mapped_column(Enum(JamSessionStatus), default=JamSessionStatus.ACTIVE, nullable=False)
     is_paused: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     host: Mapped["User"] = relationship("User")
     participants: Mapped[list["JamParticipant"]] = relationship("JamParticipant", back_populates="session")
@@ -45,7 +45,7 @@ class JamParticipant(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     role: Mapped[str] = mapped_column(String(20), default="MEMBER", nullable=False)
     device_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    joined_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    joined_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     session: Mapped["JamSession"] = relationship("JamSession", back_populates="participants")
     user: Mapped["User"] = relationship("User")

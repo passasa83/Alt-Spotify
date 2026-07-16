@@ -27,7 +27,7 @@ async def register_push_token(
         if token.user_id != user_id:
             token.user_id = user_id
         token.platform = platform
-        token.last_used_at = datetime.now(timezone.utc)
+        token.last_used_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await db.flush()
         await db.refresh(token)
         return token

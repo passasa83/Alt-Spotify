@@ -71,7 +71,7 @@ async def get_total_listening_time(user_id: uuid.UUID, db: AsyncSession) -> int:
 
 
 async def get_monthly_stats(user_id: uuid.UUID, db: AsyncSession) -> dict:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     result = await db.execute(

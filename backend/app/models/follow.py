@@ -23,4 +23,4 @@ class Follow(Base):
     )
     followed_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     follow_type: Mapped[FollowType] = mapped_column(Enum(FollowType), primary_key=True)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))

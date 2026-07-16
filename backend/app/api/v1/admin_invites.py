@@ -41,7 +41,7 @@ async def create_invite(
     token = secrets.token_urlsafe(32)
     expires_at = None
     if body.expires_in_days:
-        expires_at = datetime.now(timezone.utc) + timedelta(days=body.expires_in_days)
+        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=body.expires_in_days)
 
     invite = AdminInviteToken(
         token=token,

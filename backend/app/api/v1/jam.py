@@ -47,11 +47,34 @@ async def create_session(
     db.add(participant)
     await db.flush()
 
+    participants_result = await db.execute(
+        select(JamParticipant).where(JamParticipant.session_id == session.id)
+    )
+    all_participants = participants_result.scalars().all()
+
+    user_ids = [p.user_id for p in all_participants]
+    users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
+    users_map = {u.id: u for u in users_result.scalars().all()}
+
     return {
-        "session_id": str(session.id),
+        "id": str(session.id),
         "code": session.code,
         "host_id": str(current_user.id),
+        "current_track_id": None,
+        "position_ms": 0,
         "status": session.status.value,
+        "queue": [],
+        "participants": [
+            {
+                "user_id": str(p.user_id),
+                "username": users_map[p.user_id].pseudo if p.user_id in users_map else "Unknown",
+                "avatar_url": users_map[p.user_id].avatar_url if p.user_id in users_map else None,
+                "role": p.role.lower(),
+                "joined_at": p.joined_at.isoformat(),
+            }
+            for p in all_participants
+        ],
+        "created_at": session.created_at.isoformat(),
     }
 
 
@@ -137,7 +160,35 @@ async def join_session(
     except Exception:
         pass
 
-    return {"session_id": str(session.id), "code": session.code}
+    participants_result = await db.execute(
+        select(JamParticipant).where(JamParticipant.session_id == session.id)
+    )
+    all_participants = participants_result.scalars().all()
+
+    user_ids = [p.user_id for p in all_participants]
+    users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
+    users_map = {u.id: u for u in users_result.scalars().all()}
+
+    return {
+        "id": str(session.id),
+        "code": session.code,
+        "host_id": str(session.host_id),
+        "current_track_id": str(session.current_track_id) if session.current_track_id else None,
+        "position_ms": session.position_ms,
+        "status": session.status.value,
+        "queue": [],
+        "participants": [
+            {
+                "user_id": str(p.user_id),
+                "username": users_map[p.user_id].pseudo if p.user_id in users_map else "Unknown",
+                "avatar_url": users_map[p.user_id].avatar_url if p.user_id in users_map else None,
+                "role": p.role.lower(),
+                "joined_at": p.joined_at.isoformat(),
+            }
+            for p in all_participants
+        ],
+        "created_at": session.created_at.isoformat(),
+    }
 
 
 @router.post("/leave/{session_id}")
@@ -189,18 +240,29 @@ async def get_session(
     )
     participants = participants_result.scalars().all()
 
+    user_ids = [p.user_id for p in participants]
+    users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
+    users_map = {u.id: u for u in users_result.scalars().all()}
+
     return {
-        "session_id": str(session.id),
+        "id": str(session.id),
         "code": session.code,
         "host_id": str(session.host_id),
         "current_track_id": str(session.current_track_id) if session.current_track_id else None,
         "position_ms": session.position_ms,
         "status": session.status.value,
-        "created_at": session.created_at.isoformat(),
+        "queue": [],
         "participants": [
-            {"user_id": str(p.user_id), "joined_at": p.joined_at.isoformat()}
+            {
+                "user_id": str(p.user_id),
+                "username": users_map[p.user_id].pseudo if p.user_id in users_map else "Unknown",
+                "avatar_url": users_map[p.user_id].avatar_url if p.user_id in users_map else None,
+                "role": p.role.lower(),
+                "joined_at": p.joined_at.isoformat(),
+            }
             for p in participants
         ],
+        "created_at": session.created_at.isoformat(),
     }
 
 

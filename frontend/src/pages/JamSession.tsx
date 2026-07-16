@@ -42,8 +42,8 @@ const JamSession = () => {
 
   useEffect(() => {
     if (sessionId) {
-      loadSession(Number(sessionId)).then(() => {
-        connectWebSocket(Number(sessionId));
+      loadSession(sessionId).then(() => {
+        connectWebSocket(sessionId);
       });
     }
     return () => {

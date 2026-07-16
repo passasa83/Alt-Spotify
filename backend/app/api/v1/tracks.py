@@ -168,7 +168,7 @@ async def play_track(
     history = ListeningHistory(
         user_id=current_user.id,
         track_id=track_id,
-        played_at=datetime.now(timezone.utc),
+        played_at=datetime.now(timezone.utc).replace(tzinfo=None),
         duration_listened_seconds=0,
     )
     db.add(history)

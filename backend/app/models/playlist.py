@@ -17,10 +17,10 @@ class Playlist(Base):
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     is_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_collaborative: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     updated_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
     )
 
     owner: Mapped["User"] = relationship("User", back_populates="playlists")

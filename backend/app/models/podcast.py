@@ -18,7 +18,7 @@ class Podcast(Base):
     author: Mapped[str | None] = mapped_column(String(255), nullable=True)
     feed_url: Mapped[str | None] = mapped_column(String(500), nullable=True, index=True)
     categories: Mapped[list | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     episodes: Mapped[list["Episode"]] = relationship("Episode", back_populates="podcast", lazy="selectin")
 
@@ -36,6 +36,6 @@ class Episode(Base):
     season_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_played: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     podcast: Mapped["Podcast"] = relationship("Podcast", back_populates="episodes")

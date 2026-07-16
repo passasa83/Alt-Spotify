@@ -48,7 +48,7 @@ async def register_device(
         device.device_name = body.device_name
         device.device_type = body.device_type
         device.is_active = True
-        device.last_active_at = datetime.now(timezone.utc)
+        device.last_active_at = datetime.now(timezone.utc).replace(tzinfo=None)
     else:
         device = DeviceSession(
             user_id=current_user.id,
@@ -117,7 +117,7 @@ async def device_heartbeat(
     )
     device = result.scalar_one_or_none()
     if device:
-        device.last_active_at = datetime.now(timezone.utc)
+        device.last_active_at = datetime.now(timezone.utc).replace(tzinfo=None)
         device.is_active = True
         await db.flush()
 
@@ -140,7 +140,7 @@ async def transfer_playback(
     if not target:
         raise HTTPException(status_code=404, detail="Device not found")
 
-    target.last_active_at = datetime.now(timezone.utc)
+    target.last_active_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     try:
         import redis.asyncio as aioredis

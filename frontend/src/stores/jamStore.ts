@@ -12,11 +12,11 @@ interface JamState {
   createSession: () => Promise<void>;
   joinSession: (code: string) => Promise<void>;
   leaveSession: () => Promise<void>;
-  loadSession: (sessionId: number) => Promise<void>;
+  loadSession: (sessionId: string) => Promise<void>;
   sendTrackChange: (track: Track) => void;
   sendVoteSkip: (trackId: number) => void;
   sendChat: (message: string) => void;
-  connectWebSocket: (sessionId: number) => void;
+  connectWebSocket: (sessionId: string) => void;
   disconnectWebSocket: () => void;
 }
 
@@ -47,7 +47,7 @@ export const useJamStore = create<JamState>((set, get) => ({
     }
   },
 
-  loadSession: async (sessionId: number) => {
+  loadSession: async (sessionId: string) => {
     const session = await getJamSession(sessionId);
     set({ currentSession: session, participants: session.participants });
   },
@@ -73,7 +73,7 @@ export const useJamStore = create<JamState>((set, get) => ({
     }
   },
 
-  connectWebSocket: (sessionId: number) => {
+  connectWebSocket: (sessionId: string) => {
     const { ws: existingWs } = get();
     if (existingWs) {
       existingWs.close();

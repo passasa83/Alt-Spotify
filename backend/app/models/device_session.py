@@ -14,7 +14,7 @@ class DeviceSession(Base):
     device_name: Mapped[str] = mapped_column(String(100), nullable=False)
     device_type: Mapped[str] = mapped_column(String(50), nullable=False)  # web, mobile, desktop
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    last_active_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    last_active_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     user: Mapped["User"] = relationship("User")

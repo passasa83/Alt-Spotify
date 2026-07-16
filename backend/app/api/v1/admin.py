@@ -26,7 +26,7 @@ async def get_dashboard(
     total_users = (await db.execute(text("SELECT COUNT(*) FROM users"))).scalar() or 0
     total_tracks = (await db.execute(select(func.count(Track.id)))).scalar() or 0
 
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = datetime.now(timezone.utc).replace(tzinfo=None).replace(hour=0, minute=0, second=0, microsecond=0)
     plays_today = (
         await db.execute(
             select(func.count(ListeningHistory.id)).where(
@@ -238,7 +238,7 @@ async def plays_per_day(
     _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
     result = await db.execute(
         text("""
             SELECT DATE(played_at) as play_date, COUNT(*) as play_count
@@ -258,7 +258,7 @@ async def active_users_per_day(
     _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
     result = await db.execute(
         text("""
             SELECT DATE(played_at) as activity_date, COUNT(DISTINCT user_id) as active_count
