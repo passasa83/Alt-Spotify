@@ -34,6 +34,11 @@ async def search(
     year: int | None = None,
     min_duration: int | None = None,
     max_duration: int | None = None,
+    min_bpm: float | None = None,
+    max_bpm: float | None = None,
+    key: str | None = None,
+    mood: str | None = None,
+    lyrics: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -64,7 +69,7 @@ async def search(
 
     if "tracks" in types:
         meili_hits = await _try_meilisearch(q, "tracks", page_size, offset)
-        if meili_hits:
+        if meili_hits and not any([genre, year, min_duration, max_duration, min_bpm, max_bpm, key, mood]):
             results["tracks"] = [TrackResponse(**t) for t in meili_hits]
         else:
             query = select(Track).where(Track.title.ilike(f"%{q}%"))
@@ -76,6 +81,16 @@ async def search(
                 query = query.where(Track.duration_seconds >= min_duration)
             if max_duration is not None:
                 query = query.where(Track.duration_seconds <= max_duration)
+            if min_bpm is not None:
+                query = query.where(Track.bpm >= min_bpm)
+            if max_bpm is not None:
+                query = query.where(Track.bpm <= max_bpm)
+            if key:
+                query = query.where(Track.key.ilike(key))
+            if mood:
+                query = query.where(Track.mood.ilike(f"%{mood}%"))
+            if lyrics:
+                query = query.where(Track.lyrics_lrc.ilike(f"%{lyrics}%"))
             result = await db.execute(query.offset(offset).limit(page_size))
             local_tracks = [TrackResponse.model_validate(t) for t in result.scalars().all()]
             results["tracks"] = local_tracks

@@ -12,6 +12,9 @@ class TrackCreate(BaseModel):
     file_url: str | None = None
     hls_path: str | None = None
     genre: str | None = None
+    bpm: float | None = None
+    key: str | None = None
+    mood: str | None = None
     lyrics_lrc: str | None = None
     track_gain: float | None = None
     track_peak: float | None = None
@@ -27,6 +30,9 @@ class TrackUpdate(BaseModel):
     file_url: str | None = None
     hls_path: str | None = None
     genre: str | None = None
+    bpm: float | None = None
+    key: str | None = None
+    mood: str | None = None
     lyrics_lrc: str | None = None
     track_gain: float | None = None
     track_peak: float | None = None
@@ -46,6 +52,9 @@ class TrackResponse(BaseModel):
     file_url: str | None
     hls_path: str | None
     genre: str | None
+    bpm: float | None
+    key: str | None
+    mood: str | None
     lyrics_lrc: str | None
     track_gain: float | None
     track_peak: float | None

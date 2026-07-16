@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSearch } from '@/hooks/useSearch';
 import SearchBar from '@/components/SearchBar';
+import SearchFiltersPanel from '@/components/SearchFiltersPanel';
 import TrackCard from '@/components/TrackCard';
 import ArtistCard from '@/components/ArtistCard';
 import AlbumCard from '@/components/AlbumCard';
 import PlaylistCard from '@/components/PlaylistCard';
+import type { SearchFilters } from '@/types';
 
 const GENRES = [
   'Pop', 'Hip-Hop', 'Rock', 'R&B', 'Jazz', 'Classical', 'Electronic',
@@ -14,7 +16,7 @@ const GENRES = [
 
 const SearchPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { query, setQuery, results, isLoading } = useSearch();
+  const { query, setQuery, filters, setFilters, results, isLoading } = useSearch();
   const hasResults =
     results.tracks.length > 0 ||
     results.artists.length > 0 ||
@@ -24,15 +26,43 @@ const SearchPage = () => {
   useEffect(() => {
     const q = searchParams.get('q');
     if (q) setQuery(q);
-  }, [searchParams, setQuery]);
+    const urlFilters: SearchFilters = {};
+    if (searchParams.get('genre')) urlFilters.genre = searchParams.get('genre')!;
+    if (searchParams.get('year')) urlFilters.year = Number(searchParams.get('year'));
+    if (searchParams.get('min_bpm')) urlFilters.min_bpm = Number(searchParams.get('min_bpm'));
+    if (searchParams.get('max_bpm')) urlFilters.max_bpm = Number(searchParams.get('max_bpm'));
+    if (searchParams.get('key')) urlFilters.key = searchParams.get('key')!;
+    if (searchParams.get('mood')) urlFilters.mood = searchParams.get('mood')!;
+    if (searchParams.get('lyrics')) urlFilters.lyrics = searchParams.get('lyrics')!;
+    if (Object.keys(urlFilters).length > 0) setFilters(urlFilters);
+  }, [searchParams, setQuery, setFilters]);
 
   const handleSearch = (value: string) => {
     setQuery(value);
-    if (value) {
-      setSearchParams({ q: value });
-    } else {
-      setSearchParams({});
-    }
+    const params: Record<string, string> = {};
+    if (value) params.q = value;
+    if (filters.genre) params.genre = filters.genre;
+    if (filters.year) params.year = String(filters.year);
+    if (filters.min_bpm) params.min_bpm = String(filters.min_bpm);
+    if (filters.max_bpm) params.max_bpm = String(filters.max_bpm);
+    if (filters.key) params.key = filters.key;
+    if (filters.mood) params.mood = filters.mood;
+    if (filters.lyrics) params.lyrics = filters.lyrics;
+    setSearchParams(params);
+  };
+
+  const handleFiltersChange = (newFilters: SearchFilters) => {
+    setFilters(newFilters);
+    const params: Record<string, string> = {};
+    if (query) params.q = query;
+    if (newFilters.genre) params.genre = newFilters.genre;
+    if (newFilters.year) params.year = String(newFilters.year);
+    if (newFilters.min_bpm) params.min_bpm = String(newFilters.min_bpm);
+    if (newFilters.max_bpm) params.max_bpm = String(newFilters.max_bpm);
+    if (newFilters.key) params.key = newFilters.key;
+    if (newFilters.mood) params.mood = newFilters.mood;
+    if (newFilters.lyrics) params.lyrics = newFilters.lyrics;
+    setSearchParams(params);
   };
 
   return (
@@ -40,6 +70,10 @@ const SearchPage = () => {
       <div className="mb-8 max-w-xl">
         <SearchBar value={query} onChange={handleSearch} placeholder="What do you want to listen to?" />
       </div>
+
+      {query && (
+        <SearchFiltersPanel filters={filters} onChange={handleFiltersChange} />
+      )}
 
       {isLoading && (
         <div className="flex h-32 items-center justify-center">
@@ -54,6 +88,7 @@ const SearchPage = () => {
             {GENRES.map((genre) => (
               <div
                 key={genre}
+                onClick={() => handleFiltersChange({ genre })}
                 className="relative cursor-pointer overflow-hidden rounded-lg bg-gradient-to-br from-purple-600 to-blue-400 p-4 transition-transform hover:scale-105"
               >
                 <span className="text-lg font-bold text-white">{genre}</span>

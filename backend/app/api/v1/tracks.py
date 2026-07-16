@@ -28,6 +28,12 @@ async def list_tracks(
     artist_id: uuid.UUID | None = None,
     album_id: uuid.UUID | None = None,
     genre: str | None = None,
+    min_duration: int | None = None,
+    max_duration: int | None = None,
+    min_bpm: float | None = None,
+    max_bpm: float | None = None,
+    key: str | None = None,
+    mood: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -60,6 +66,24 @@ async def list_tracks(
     if genre:
         query = query.where(Track.genre.ilike(genre))
         count_query = count_query.where(Track.genre.ilike(genre))
+    if min_duration is not None:
+        query = query.where(Track.duration_seconds >= min_duration)
+        count_query = count_query.where(Track.duration_seconds >= min_duration)
+    if max_duration is not None:
+        query = query.where(Track.duration_seconds <= max_duration)
+        count_query = count_query.where(Track.duration_seconds <= max_duration)
+    if min_bpm is not None:
+        query = query.where(Track.bpm >= min_bpm)
+        count_query = count_query.where(Track.bpm >= min_bpm)
+    if max_bpm is not None:
+        query = query.where(Track.bpm <= max_bpm)
+        count_query = count_query.where(Track.bpm <= max_bpm)
+    if key:
+        query = query.where(Track.key.ilike(key))
+        count_query = count_query.where(Track.key.ilike(key))
+    if mood:
+        query = query.where(Track.mood.ilike(f"%{mood}%"))
+        count_query = count_query.where(Track.mood.ilike(f"%{mood}%"))
 
     total = (await db.execute(count_query)).scalar() or 0
     result = await db.execute(

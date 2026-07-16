@@ -42,6 +42,9 @@ export interface Track {
   hls_path?: string;
   cover_url?: string;
   genre?: string;
+  bpm?: number;
+  key?: string;
+  mood?: string;
   lyrics_lrc?: string;
   allowed_territories?: string[];
   is_explicit: boolean;
@@ -83,6 +86,18 @@ export interface SearchResults {
   artists: Artist[];
   albums: Album[];
   playlists: Playlist[];
+}
+
+export interface SearchFilters {
+  genre?: string;
+  year?: number;
+  min_duration?: number;
+  max_duration?: number;
+  min_bpm?: number;
+  max_bpm?: number;
+  key?: string;
+  mood?: string;
+  lyrics?: string;
 }
 
 export interface PaginatedResponse<T> {

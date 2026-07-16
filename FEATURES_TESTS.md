@@ -174,6 +174,64 @@
 
 ---
 
+## R.1 — Recherche par BPM
+
+| # | Test | Résultat |
+|---|------|----------|
+| 1 | Rechercher avec filtre BPM 120-140 → seuls morceaux dans cette plage s'affichent | ☐ |
+| 2 | Rechercher avec BPM min seul (ex: 100) → morceaux ≥ 100 BPM | ☐ |
+| 3 | Rechercher avec BPM max seul (ex: 120) → morceaux ≤ 120 BPM | ☐ |
+| 4 | Aucun morceau ne correspond → "No results found" | ☐ |
+| 5 | Combiner BPM + genre → filtres fonctionnent ensemble | ☐ |
+
+---
+
+## R.2 — Recherche par tonalité
+
+| # | Test | Résultat |
+|---|------|----------|
+| 1 | Sélectionner tonalité "C" → seuls morceaux en Do majeur | ☐ |
+| 2 | Sélectionner "Am" → seuls morceaux en La mineur | ☐ |
+| 3 | Toutes les tonalités disponibles dans le dropdown (24 options) | ☐ |
+| 4 | Combiner tonalité + BPM → résultats cohérents | ☐ |
+
+---
+
+## R.3 — Recherche par mood
+
+| # | Test | Résultat |
+|---|------|----------|
+| 1 | Sélectionner mood "energetic" → morceaux tagués energetic | ☐ |
+| 2 | Mood "chill" → morceaux calmes uniquement | ☐ |
+| 3 | 15 moods disponibles dans le dropdown | ☐ |
+| 4 | Un morceau avec mood "happy,energetic" apparaît pour les deux filtres | ☐ |
+
+---
+
+## R.4 — Recherche dans les paroles
+
+| # | Test | Résultat |
+|---|------|----------|
+| 1 | Taper "tonight" → morceaux contenant "tonight" dans les paroles LRC | ☐ |
+| 2 | Texte inexistant → aucun résultat | ☐ |
+| 3 | Recherche insensible à la casse ("Tonight" = "tonight") | ☐ |
+| 4 | Combiner recherche paroles + mood → résultats cohérents | ☐ |
+
+---
+
+## R.5 — Filtres combinés
+
+| # | Test | Résultat |
+|---|------|----------|
+| 1 | Genre + BPM + durée → seuls morceaux correspondant à tout s'affichent | ☐ |
+| 2 | Tous les filtres activés → résultats cohérents | ☐ |
+| 3 | Cliquer "Clear all" → tous les filtres sont réinitialisés | ☐ |
+| 4 | Badge nombre de filtres actifs s'affiche sur le bouton "Filters" | ☐ |
+| 5 | Filtres synchronisés avec l'URL (partageable via lien) | ☐ |
+| 6 | Panneau de filtres se ferme/reouvre correctement | ☐ |
+
+---
+
 ## Tests transversaux
 
 | # | Test | Résultat |
