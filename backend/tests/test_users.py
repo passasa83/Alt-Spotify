@@ -66,5 +66,5 @@ async def test_get_stats(client: AsyncClient, auth_headers, test_user):
     data = response.json()
     assert "top_tracks" in data
     assert "top_artists" in data
-    assert "total_listening_seconds" in data
-    assert "listening_streak" in data
+    assert "total_minutes" in data
+    assert "streak" in data

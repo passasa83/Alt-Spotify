@@ -43,7 +43,7 @@ async def test_list_tracks(client: AsyncClient, admin_headers):
             "duration_seconds": 180,
         },
     )
-    response = await client.get("/api/v1/tracks")
+    response = await client.get("/api/v1/tracks", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["total"] >= 1
@@ -72,7 +72,7 @@ async def test_list_tracks_filter_genre(client: AsyncClient, admin_headers):
         },
     )
 
-    response = await client.get("/api/v1/tracks?genre=rock")
+    response = await client.get("/api/v1/tracks?genre=rock", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     for item in data["items"]:
@@ -113,7 +113,7 @@ async def test_list_tracks_filter_artist(client: AsyncClient, admin_headers):
         },
     )
 
-    response = await client.get(f"/api/v1/tracks?artist_id={artist1_id}")
+    response = await client.get(f"/api/v1/tracks?artist_id={artist1_id}", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     for item in data["items"]:
@@ -133,14 +133,14 @@ async def test_get_track(client: AsyncClient, admin_headers):
     )
     track_id = create_resp.json()["id"]
 
-    response = await client.get(f"/api/v1/tracks/{track_id}")
+    response = await client.get(f"/api/v1/tracks/{track_id}", headers=admin_headers)
     assert response.status_code == 200
     assert response.json()["title"] == "Get Track"
 
 
-async def test_get_track_not_found(client: AsyncClient):
+async def test_get_track_not_found(client: AsyncClient, admin_headers):
     fake_id = uuid.uuid4()
-    response = await client.get(f"/api/v1/tracks/{fake_id}")
+    response = await client.get(f"/api/v1/tracks/{fake_id}", headers=admin_headers)
     assert response.status_code == 404
 
 
@@ -186,7 +186,7 @@ async def test_delete_track(client: AsyncClient, admin_headers):
     )
     assert response.status_code == 204
 
-    get_resp = await client.get(f"/api/v1/tracks/{track_id}")
+    get_resp = await client.get(f"/api/v1/tracks/{track_id}", headers=admin_headers)
     assert get_resp.status_code == 404
 
 
@@ -234,7 +234,7 @@ async def test_stream_track(client: AsyncClient, admin_headers):
     )
     track_id = create_resp.json()["id"]
 
-    response = await client.get(f"/api/v1/tracks/{track_id}/stream")
+    response = await client.get(f"/api/v1/tracks/{track_id}/stream", headers=admin_headers)
     assert response.status_code == 200
     assert "stream_url" in response.json()
 
@@ -252,5 +252,5 @@ async def test_stream_track_no_file(client: AsyncClient, admin_headers):
     )
     track_id = create_resp.json()["id"]
 
-    response = await client.get(f"/api/v1/tracks/{track_id}/stream")
+    response = await client.get(f"/api/v1/tracks/{track_id}/stream", headers=admin_headers)
     assert response.status_code == 404

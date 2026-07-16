@@ -60,9 +60,9 @@ describe('Home', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Good evening')).toBeInTheDocument();
-    expect(screen.getByText('Recently Played')).toBeInTheDocument();
-    expect(screen.getByText('Featured Artists')).toBeInTheDocument();
-    expect(screen.getByText('Featured Playlists')).toBeInTheDocument();
+    expect(await screen.findByText('Home')).toBeInTheDocument();
+    expect(screen.getByText('Top Tracks')).toBeInTheDocument();
+    expect(screen.getByText('Top Artists')).toBeInTheDocument();
+    expect(screen.getByText('Playlists')).toBeInTheDocument();
   });
 });

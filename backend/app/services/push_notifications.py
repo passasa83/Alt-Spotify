@@ -77,11 +77,14 @@ async def send_push_notification(
     data: dict | None = None,
 ) -> dict:
     from app.core.database import async_session
-    async with async_session() as db:
-        result = await db.execute(
-            select(PushToken).where(PushToken.user_id == user_id)
-        )
-        tokens = result.scalars().all()
+    try:
+        async with async_session() as db:
+            result = await db.execute(
+                select(PushToken).where(PushToken.user_id == user_id)
+            )
+            tokens = result.scalars().all()
+    except Exception:
+        return {"sent": 0, "failed": 0}
 
     if not tokens:
         return {"sent": 0, "failed": 0}

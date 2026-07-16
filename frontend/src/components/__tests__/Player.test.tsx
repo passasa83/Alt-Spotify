@@ -59,7 +59,9 @@ const defaultPlayerState = {
 };
 
 beforeEach(() => {
-  vi.mocked(usePlayerStore).mockReturnValue({ ...defaultPlayerState } as any);
+  const state = { ...defaultPlayerState };
+  vi.mocked(usePlayerStore).mockReturnValue(state as any);
+  (usePlayerStore as any).getState = () => state;
   window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
   window.HTMLMediaElement.prototype.pause = vi.fn();
   Object.defineProperty(window.HTMLMediaElement.prototype, 'src', { writable: true, value: '' });

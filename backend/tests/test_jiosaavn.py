@@ -146,8 +146,8 @@ async def test_enriched_search_no_download_url(mock_httpx, client: AsyncClient, 
 
 
 @pytest.mark.asyncio
-@patch("app.services.jiosaavn.search_jiosaavn")
-async def test_search_local_results_prioritized(client: AsyncClient, admin_headers):
+@patch("app.api.v1.search.search_jiosaavn")
+async def test_search_local_results_prioritized(mock_search, client: AsyncClient, admin_headers):
     artist_resp = await client.post(
         "/api/v1/artists",
         headers=admin_headers,
