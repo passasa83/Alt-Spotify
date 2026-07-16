@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.user import User
-from app.utils.deps import get_current_user, get_current_admin_user
+from app.utils.deps import get_current_user, require_admin
 from app.services.push_notifications import (
     register_push_token,
     remove_push_token,
@@ -74,7 +74,7 @@ async def api_test_push(
 @router.post("/send")
 async def api_send_push(
     req: SendPushRequest,
-    admin: User = Depends(get_current_admin_user),
+    admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     if req.user_id:

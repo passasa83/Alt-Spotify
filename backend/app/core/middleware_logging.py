@@ -1,3 +1,4 @@
+import json
 import time
 import traceback
 
@@ -42,9 +43,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         }
 
         if response.status_code >= 500:
-            error_logger.warning("request_completed", **log_data)
+            error_logger.warning(json.dumps(log_data))
         else:
-            access_logger.info("request_completed", **log_data)
+            access_logger.info(json.dumps(log_data))
 
         if response.status_code >= 400:
             logger.warning("request_error", **log_data)
@@ -63,19 +64,18 @@ class ErrorLoggingMiddleware(BaseHTTPMiddleware):
             path = request.url.path
 
             tb = traceback.format_exc()
-            error_logger.error(
-                "unhandled_exception",
-                request_id=request_id,
-                path=path,
-                method=request.method,
-                traceback=tb,
-            )
+            error_logger.error(json.dumps({
+                "event": "unhandled_exception",
+                "request_id": request_id,
+                "path": path,
+                "method": request.method,
+                "traceback": tb,
+            }))
             logger.error(
                 "unhandled_exception",
                 request_id=request_id,
                 path=path,
                 method=request.method,
-                traceback=tb,
             )
 
             return JSONResponse(

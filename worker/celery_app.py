@@ -18,4 +18,4 @@ app.conf.update(
     worker_prefetch_multiplier=1,
 )
 
-app.autodiscover_tasks(["tasks"])
+import tasks  # noqa: F401

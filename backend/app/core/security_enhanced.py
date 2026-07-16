@@ -39,9 +39,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 class InputSanitizationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if request.url.query_params:
+        if request.query_params:
             sanitized = {}
-            for key, value in request.url.query_params.items():
+            for key, value in request.query_params.items():
                 sanitized[key] = DANGEROUS_CHARS.sub("", value)
             request.scope["query_string"] = "&".join(
                 f"{k}={v}" for k, v in sanitized.items()

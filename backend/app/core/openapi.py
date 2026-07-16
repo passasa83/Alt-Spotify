@@ -34,6 +34,7 @@ Toutes les endpoints protégées nécessitent un header `Authorization: Bearer <
 - Streaming : 30 requêtes/minute par utilisateur
         """,
         version="1.0.0",
+        routes=app.routes,
         contact={
             "name": "Alt Spotify",
             "url": "https://github.com/altspotify",
