@@ -285,7 +285,7 @@ async def jam_websocket(websocket: WebSocket, session_id: uuid.UUID):
     # Subscribe to Redis pub/sub for this session
     import redis.asyncio as aioredis
     from app.core.config import settings
-    from app.core.database import async_session_factory
+    from app.core.database import async_session
     r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     pubsub = r.pubsub()
     await pubsub.subscribe(f"jam:{session_id}")
@@ -300,7 +300,7 @@ async def jam_websocket(websocket: WebSocket, session_id: uuid.UUID):
 
                 if msg_type in ("track_changed", "queue_updated"):
                     # Permission check
-                    async with async_session_factory() as db_session:
+                    async with async_session() as db_session:
                         from sqlalchemy import select as sa_select
                         perm_result = await db_session.execute(
                             sa_select(JamParticipant).where(
@@ -321,7 +321,7 @@ async def jam_websocket(websocket: WebSocket, session_id: uuid.UUID):
                     session_votes = vote_counts.setdefault(str(session_id), set())
                     session_votes.add(user_id)
 
-                    async with async_session_factory() as db_session:
+                    async with async_session() as db_session:
                         from sqlalchemy import select as sa_select, func
                         count_result = await db_session.execute(
                             sa_select(func.count(JamParticipant.id)).where(JamParticipant.session_id == session_id)

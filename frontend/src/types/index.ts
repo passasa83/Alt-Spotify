@@ -119,7 +119,7 @@ export interface ListeningHistory {
 
 export interface UserStats {
   total_plays: number;
-  total_listening_seconds: number;
+  total_minutes: number;
   top_artists: Artist[];
   top_tracks: Track[];
   monthly: {

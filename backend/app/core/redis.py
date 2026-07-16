@@ -1,5 +1,3 @@
-from collections.abc import AsyncGenerator
-
 import redis.asyncio as aioredis
 
 from app.core.config import settings
@@ -7,17 +5,14 @@ from app.core.config import settings
 redis_pool: aioredis.Redis | None = None
 
 
-async def get_redis() -> AsyncGenerator[aioredis.Redis, None]:
+async def get_redis() -> aioredis.Redis:
     global redis_pool
     if redis_pool is None:
         redis_pool = aioredis.from_url(
             settings.REDIS_URL,
             decode_responses=True,
         )
-    try:
-        yield redis_pool
-    finally:
-        pass
+    return redis_pool
 
 
 async def close_redis() -> None:

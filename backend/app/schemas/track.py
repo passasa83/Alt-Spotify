@@ -11,6 +11,7 @@ class TrackCreate(BaseModel):
     duration_seconds: int
     file_url: str | None = None
     hls_path: str | None = None
+    cover_url: str | None = None
     genre: str | None = None
     bpm: float | None = None
     key: str | None = None
@@ -29,6 +30,7 @@ class TrackUpdate(BaseModel):
     duration_seconds: int | None = None
     file_url: str | None = None
     hls_path: str | None = None
+    cover_url: str | None = None
     genre: str | None = None
     bpm: float | None = None
     key: str | None = None
@@ -51,6 +53,7 @@ class TrackResponse(BaseModel):
     duration_seconds: int
     file_url: str | None
     hls_path: str | None
+    cover_url: str | None
     genre: str | None
     bpm: float | None
     key: str | None

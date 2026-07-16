@@ -18,6 +18,7 @@ class Track(Base):
     duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     file_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     hls_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    cover_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     genre: Mapped[str | None] = mapped_column(String(100), index=True, nullable=True)
     bpm: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
     key: Mapped[str | None] = mapped_column(String(10), nullable=True, index=True)
