@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Enum, ForeignKey, Text, Integer
+from sqlalchemy import String, Enum, ForeignKey, Text, Integer, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -14,6 +14,12 @@ class JamSessionStatus(str, enum.Enum):
     ENDED = "ENDED"
 
 
+class JamParticipantRole(str, enum.Enum):
+    HOST = "HOST"
+    MEMBER = "MEMBER"
+    GUEST = "GUEST"
+
+
 class JamSession(Base):
     __tablename__ = "jam_sessions"
 
@@ -23,6 +29,8 @@ class JamSession(Base):
     current_track_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tracks.id"), nullable=True)
     position_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     status: Mapped[JamSessionStatus] = mapped_column(Enum(JamSessionStatus), default=JamSessionStatus.ACTIVE, nullable=False)
+    is_paused: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
     host: Mapped["User"] = relationship("User")
@@ -35,6 +43,8 @@ class JamParticipant(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("jam_sessions.id"), nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), default="MEMBER", nullable=False)
+    device_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     joined_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
     session: Mapped["JamSession"] = relationship("JamSession", back_populates="participants")

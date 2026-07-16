@@ -40,7 +40,7 @@ async def create_session(
     await db.flush()
     await db.refresh(session)
 
-    participant = JamParticipant(session_id=session.id, user_id=current_user.id)
+    participant = JamParticipant(session_id=session.id, user_id=current_user.id, role="HOST")
     db.add(participant)
     await db.flush()
 
@@ -99,7 +99,7 @@ async def join_session(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already in session")
 
-    participant = JamParticipant(session_id=session.id, user_id=current_user.id)
+    participant = JamParticipant(session_id=session.id, user_id=current_user.id, role="MEMBER")
     db.add(participant)
     await db.flush()
 
@@ -220,6 +220,7 @@ async def jam_websocket(websocket: WebSocket, session_id: uuid.UUID):
     # Subscribe to Redis pub/sub for this session
     import redis.asyncio as aioredis
     from app.core.config import settings
+    from app.core.database import async_session_factory
     r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     pubsub = r.pubsub()
     await pubsub.subscribe(f"jam:{session_id}")
@@ -232,8 +233,26 @@ async def jam_websocket(websocket: WebSocket, session_id: uuid.UUID):
                 data = json.loads(message)
                 msg_type = data.get("type")
 
-                if msg_type in ("track_changed", "queue_updated", "vote_skip", "chat"):
-                    # Broadcast to all subscribers via Redis
+                if msg_type in ("track_changed", "queue_updated", "vote_skip"):
+                    # Permission check
+                    async with async_session_factory() as db_session:
+                        from sqlalchemy import select as sa_select
+                        perm_result = await db_session.execute(
+                            sa_select(JamParticipant).where(
+                                JamParticipant.session_id == session_id,
+                                JamParticipant.user_id == uuid.UUID(user_id),
+                            )
+                        )
+                        sender = perm_result.scalar_one_or_none()
+                        if not sender or sender.role == "GUEST":
+                            await websocket.send_text(json.dumps({"type": "error", "message": "Insufficient permissions"}))
+                            continue
+
+                    await r.publish(
+                        f"jam:{session_id}",
+                        json.dumps({**data, "user_id": user_id}),
+                    )
+                elif msg_type in ("position_update", "playback_state", "chat"):
                     await r.publish(
                         f"jam:{session_id}",
                         json.dumps({**data, "user_id": user_id}),

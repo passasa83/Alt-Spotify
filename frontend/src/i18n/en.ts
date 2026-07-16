@@ -80,6 +80,9 @@ const en = {
   'auth.choose_display_name': 'Choose a display name',
   'auth.create_password': 'Create a password',
   'auth.confirm_your_password': 'Confirm your password',
+  'auth.invite_required': 'An invitation is required to create an account',
+  'auth.invite_valid': 'Invitation validated',
+  'auth.no_invite': "Don't have an invitation? Contact an administrator.",
 
   // Settings
   'settings.title': 'Settings',
@@ -158,6 +161,25 @@ const en = {
   'admin.storage_per_artist': 'Storage per Artist',
   'admin.tracks_by_genre': 'Tracks by Genre',
   'admin.most_played': 'Most Played',
+  'admin.invites': 'Invitations',
+  'admin.create_invite': 'Create Invitation',
+  'admin.invite_email_optional': 'Email (optional)',
+  'admin.invite_email_placeholder': 'email@example.com',
+  'admin.max_uses': 'Max Uses',
+  'admin.expires_days': 'Days Until Expiry',
+  'admin.creating': 'Creating...',
+  'admin.no_invites': 'No invitations',
+  'admin.invite_email': 'Email',
+  'admin.uses': 'Uses',
+  'admin.expires': 'Expires',
+  'admin.created': 'Created',
+  'admin.revoked': 'Revoked',
+  'admin.used': 'Used',
+  'admin.copy_link': 'Copy Link',
+  'admin.revoke_invite': 'Revoke Invitation',
+  'admin.connected_devices': 'Connected Devices',
+  'admin.no_devices': 'No connected devices',
+  'admin.last_active': 'Last active',
 
   // Jam
   'jam.create_session': 'Create Session',
@@ -224,6 +246,13 @@ const en = {
   'library.songs_appear': 'Songs you like will appear here',
   'library.save_songs': 'Save songs by tapping the heart icon',
   'library.find_songs': 'Find Songs',
+
+  // Browse
+  'browse.title': 'Browse',
+  'browse.new_releases': 'New Releases',
+  'browse.trending': 'Trending',
+  'browse.genres': 'Genres',
+  'browse.select_genre': 'Select a genre',
 
   // Search
   'search.placeholder': 'What do you want to listen to?',

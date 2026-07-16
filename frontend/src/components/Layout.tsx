@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
@@ -6,8 +7,12 @@ import { usePlayerStore } from '@/stores/playerStore';
 import SkipToContent from './SkipToContent';
 
 const Layout = () => {
-  const { showLyrics, lyrics } = usePlayerStore();
+  const { showLyrics, lyrics, initDevice } = usePlayerStore();
   const lyricsHeight = showLyrics && lyrics.length > 0 ? 256 : 0;
+
+  useEffect(() => {
+    initDevice();
+  }, [initDevice]);
 
   return (
     <div className="flex h-screen flex-col bg-black">

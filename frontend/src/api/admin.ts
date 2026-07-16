@@ -93,3 +93,38 @@ export async function getTopContent(): Promise<TopContent> {
   const response = await client.get('/admin/analytics/top-content');
   return response.data;
 }
+
+export interface AdminInvite {
+  id: string;
+  token: string;
+  email: string | null;
+  max_uses: number;
+  use_count: number;
+  expires_at: string | null;
+  is_revoked: boolean;
+  used_by: string | null;
+  created_at: string;
+  invite_link: string;
+}
+
+export async function getAdminInvites(): Promise<AdminInvite[]> {
+  const response = await client.get('/admin/invites');
+  return response.data;
+}
+
+export async function createInvite(
+  email?: string,
+  maxUses: number = 1,
+  expiresInDays: number = 30
+): Promise<AdminInvite> {
+  const response = await client.post('/admin/invites', {
+    email: email || null,
+    max_uses: maxUses,
+    expires_in_days: expiresInDays,
+  });
+  return response.data;
+}
+
+export async function revokeInvite(inviteId: string): Promise<void> {
+  await client.delete(`/admin/invites/${inviteId}`);
+}

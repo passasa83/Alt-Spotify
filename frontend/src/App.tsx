@@ -24,6 +24,9 @@ import AdminMonitoring from '@/pages/AdminMonitoring';
 import EditTrack from '@/pages/EditTrack';
 import Recommendations from '@/pages/Recommendations';
 import NotFound from '@/pages/NotFound';
+import AdminInvites from '@/pages/AdminInvites';
+import AdminDevices from '@/pages/AdminDevices';
+import Browse from '@/pages/Browse';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuthStore();
@@ -70,6 +73,7 @@ const App = () => {
       >
         <Route index element={<Home />} />
         <Route path="search" element={<SearchPage />} />
+        <Route path="browse" element={<Browse />} />
         <Route path="library" element={<Library />} />
         <Route path="playlist/:id" element={<PlaylistDetail />} />
         <Route path="track/:id" element={<TrackDetail />} />
@@ -89,6 +93,8 @@ const App = () => {
         <Route path="admin/catalogue" element={<AdminCatalogue />} />
         <Route path="admin/monitoring" element={<AdminMonitoring />} />
         <Route path="admin/tracks/:id/edit" element={<EditTrack />} />
+        <Route path="admin/invites" element={<AdminInvites />} />
+        <Route path="admin/devices" element={<AdminDevices />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

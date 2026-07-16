@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
@@ -12,6 +14,7 @@ from app.core.security import (
     verify_password,
     verify_token,
 )
+from app.models.admin_invite import AdminInviteToken
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse, TokenResponse
 from app.utils.deps import get_current_user
@@ -22,8 +25,30 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(body: UserCreate, request: Request, db: AsyncSession = Depends(get_db)):
+async def register(
+    body: UserCreate,
+    request: Request,
+    invite_token: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
     client_ip = request.client.host if request.client else "unknown"
+
+    if not invite_token:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token required")
+
+    result = await db.execute(
+        select(AdminInviteToken).where(AdminInviteToken.token == invite_token)
+    )
+    invite = result.scalar_one_or_none()
+    if not invite or invite.is_revoked:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid invitation token")
+    if invite.expires_at and invite.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token expired")
+    if invite.use_count >= invite.max_uses:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token already used")
+    if invite.email and invite.email.lower() != body.email.lower():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation not valid for this email")
+
     result = await db.execute(select(User).where(User.email == body.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
@@ -39,6 +64,10 @@ async def register(body: UserCreate, request: Request, db: AsyncSession = Depend
     )
     db.add(user)
     await db.flush()
+
+    invite.use_count += 1
+    invite.used_by = user.id
+
     await db.refresh(user)
     logger.info("user_registered", user_id=str(user.id), ip=client_ip)
     return user

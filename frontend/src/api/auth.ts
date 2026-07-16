@@ -11,8 +11,10 @@ export const login = async (email: string, password: string): Promise<TokenRespo
   return response.data;
 };
 
-export const register = async (email: string, pseudo: string, password: string): Promise<User> => {
-  const response = await client.post('/auth/register', { email, pseudo, password });
+export const register = async (email: string, pseudo: string, password: string, inviteToken?: string): Promise<User> => {
+  const params: Record<string, string> = {};
+  if (inviteToken) params.invite_token = inviteToken;
+  const response = await client.post('/auth/register', { email, pseudo, password }, { params });
   return response.data;
 };
 
