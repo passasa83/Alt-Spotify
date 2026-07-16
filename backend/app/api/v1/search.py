@@ -13,6 +13,7 @@ from app.schemas.album import AlbumResponse
 from app.schemas.track import TrackResponse
 from app.schemas.playlist import PlaylistResponse
 from app.services.meilisearch import search_meili
+from app.services.musicbrainz import search_recordings, search_artists
 from app.services.jiosaavn import search_jiosaavn, import_from_jiosaavn
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -123,7 +124,7 @@ async def search_jiosaavn_only(
     auto_import: bool = Query(True),
     db: AsyncSession = Depends(get_db),
 ):
-    """Search JioSaavn directly and optionally auto-import tracks into the database."""
+    """Search JioSaavn directly and optionally auto-import tracks."""
     jio_results = await search_jiosaavn(q, limit=limit)
 
     if not auto_import:
@@ -142,4 +143,65 @@ async def search_jiosaavn_only(
     return {
         "results": jio_results,
         "imported": imported,
+    }
+
+
+@router.get("/enriched")
+async def search_enriched(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(10, ge=1, le=50),
+    auto_import: bool = Query(True),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Search MusicBrainz for rich metadata + JioSaavn for audio download.
+    Flow:
+    1. MusicBrainz provides title, artist, album, duration, ISRC
+    2. JioSaavn provides the MP3 download URL
+    3. Combined result is imported into the database
+    """
+    mb_results = await search_recordings(q, limit=limit)
+
+    enriched = []
+    for mb_track in mb_results:
+        search_query = f"{mb_track['title']} {mb_track['artist']}"
+        jio_results = await search_jiosaavn(search_query, limit=1)
+
+        jio_song = jio_results[0] if jio_results else None
+
+        entry = {
+            "title": mb_track["title"],
+            "artist": mb_track["artist"],
+            "album": mb_track["album"],
+            "duration": mb_track["duration"],
+            "isrc": mb_track.get("isrc"),
+            "musicbrainz_id": mb_track.get("musicbrainz_id"),
+            "download_url": jio_song.get("download_url") if jio_song else None,
+            "image_url": jio_song.get("image_url") if jio_song else "",
+            "jiosaavn_id": jio_song.get("jiosaavn_id") if jio_song else None,
+            "imported": False,
+        }
+
+        if auto_import and jio_song:
+            combined = {
+                "title": mb_track["title"],
+                "artist": mb_track["artist"],
+                "album": mb_track["album"],
+                "duration": mb_track["duration"],
+                "image_url": jio_song.get("image_url", ""),
+                "download_url": jio_song.get("download_url"),
+                "language": jio_song.get("language", ""),
+                "year": jio_song.get("year", ""),
+            }
+            track_id = await import_from_jiosaavn(combined, db)
+            if track_id:
+                entry["track_id"] = str(track_id)
+                entry["imported"] = True
+
+        enriched.append(entry)
+
+    return {
+        "query": q,
+        "count": len(enriched),
+        "results": enriched,
     }

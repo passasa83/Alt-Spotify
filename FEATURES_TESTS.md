@@ -114,6 +114,32 @@
 
 ---
 
+## J.2 — MusicBrainz + JioSaavn enrichi
+
+| # | Test | Résultat |
+|---|------|----------|
+| **MusicBrainz** | | |
+| 1 | Recherche "Bohemian Rhapsody" → retourne titre, artiste (Queen), album, durée, ISRC | ☐ |
+| 2 | Recherche artiste "Queen" → retourne nom, pays, type | ☐ |
+| 3 | Lookup par MusicBrainz ID → retourne les détails complets | ☐ |
+| 4 | Timeout MusicBrainz (> 15s) → erreur gérée, fallback sur JioSaavn seul | ☐ |
+| **Enriched search** | | |
+| 5 | `GET /search/enriched?q=...` → retourne résultats avec métadonnées MusicBrainz | ☐ |
+| 6 | Métadonnées MusicBrainz (titre, artiste, album, ISRC) présentes dans la réponse | ☐ |
+| 7 | URL de téléchargement JioSaavn trouvée et présente dans la réponse | ☐ |
+| 8 | `auto_import=true` → le track est importé dans la BDD avec les métadonnées enrichies | ☐ |
+| 9 | `auto_import=false` → résultats retournés sans import | ☐ |
+| 10 | JioSaavn ne trouve pas le morceau → `download_url` est null, `imported` est false | ☐ |
+| 11 | Track importé avec le titre exact de MusicBrainz (pas celui de JioSaavn) | ☐ |
+| 12 | L'artiste MusicBrainz est utilisé pour la création en BDD | ☐ |
+| **Intégrité** | | |
+| 13 | Les deux APIs appelées en parallèle quand possible (performance) | ☐ |
+| 14 | Si MusicBrainz échoue, la recherche JioSaavn seule fonctionne toujours | ☐ |
+| 15 | Si JioSaavn échoue, les métadonnées MusicBrainz sont quand même retournées | ☐ |
+| 16 | ISRC de MusicBrainz stocké dans le track si disponible | ☐ |
+
+---
+
 ## Tests transversaux
 
 | # | Test | Résultat |
