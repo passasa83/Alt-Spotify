@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Boolean, ForeignKey
+from sqlalchemy import String, Boolean, ForeignKey, Integer, DateTime, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,6 +17,11 @@ class Playlist(Base):
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     is_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_collaborative: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_smart: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    smart_rules: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    max_tracks: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
+    auto_refresh: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    last_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     updated_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),

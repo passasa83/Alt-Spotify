@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Search, Library, Plus, Heart, Radio, BarChart3, Upload, Headphones, Activity, Sparkles, Mail, Compass } from 'lucide-react';
+import { Home, Search, Library, Plus, Heart, Radio, BarChart3, Upload, Headphones, Activity, Sparkles, Mail, Compass, History as HistoryIcon, ListMusic } from 'lucide-react';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useEffect } from 'react';
@@ -60,6 +60,14 @@ const Sidebar = () => {
           <NavLink to="/podcasts" className={navLinkClass} aria-label={t('nav.podcasts')}>
             <Headphones size={24} aria-hidden="true" />
             {t('nav.podcasts')}
+          </NavLink>
+          <NavLink to="/history" className={navLinkClass} aria-label={t('history.title')}>
+            <HistoryIcon size={24} aria-hidden="true" />
+            {t('history.title')}
+          </NavLink>
+          <NavLink to="/smart-playlist/new" className={navLinkClass} aria-label={t('smart.create_title')}>
+            <ListMusic size={24} aria-hidden="true" />
+            {t('smart.create_title')}
           </NavLink>
           {user?.role === 'ADMIN' && (
             <NavLink to="/admin/upload" className={navLinkClass} aria-label={t('nav.upload')}>

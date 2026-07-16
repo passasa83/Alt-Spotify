@@ -37,5 +37,10 @@ class PlaylistResponse(BaseModel):
     description: str | None
     is_public: bool
     is_collaborative: bool
+    is_smart: bool = False
+    smart_rules: dict | None = None
+    max_tracks: int = 50
+    auto_refresh: bool = False
+    last_refreshed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

@@ -140,6 +140,40 @@
 
 ---
 
+## P.1 — Playlists Intelligentes
+
+| # | Test | Résultat |
+|---|------|----------|
+| **Smart Playlists** | | |
+| 1 | Créer une playlist intelligente avec règle "genre = Rock" → les tracks rock sont ajoutés | ☐ |
+| 2 | Règle "top 10 les plus écoutés" → les 10 tracks avec le plus de plays sont ajoutés | ☐ |
+| 3 | Règle "écouté dans les 30 derniers jours" → uniquement les tracks récents | ☐ |
+| 4 | Règle "artiste contient Queen" → tous les morceaux de Queen | ☐ |
+| 5 | Règle "durée min 180s" → uniquement les morceaux de 3min+ | ☐ |
+| 6 | Règle "contenu explicite = non" → pas de tracks explicites | ☐ |
+| 7 | Combinaison de règles (genre + durée) → intersection des résultats | ☐ |
+| 8 | Refresh manuel → les tracks sont mis à jour | ☐ |
+| 9 | Max tracks = 10 → seul 10 tracks sont retournés | ☐ |
+| 10 | Badge "intelligente" affiché sur la playlist dans la sidebar | ☐ |
+| **Historique** | | |
+| 11 | Page /history affiche l'historique d'écoute chronologique | ☐ |
+| 12 | Filtre par date → uniquement les écoutes dans la période | ☐ |
+| 13 | Filtre par genre → uniquement les écoutes de ce genre | ☐ |
+| 14 | Pagination fonctionne (50 items par page) | ☐ |
+| 15 | Cliquer sur un morceau → il se lance | ☐ |
+| **Top du mois/année** | | |
+| 16 | Générer "Top Songs — Janvier 2026" → playlist créée avec les top tracks | ☐ |
+| 17 | Générer "Top Songs — 2026" → playlist créée avec les top tracks de l'année | ☐ |
+| 18 | Régénérer pour la même période → la playlist est mise à jour (pas de doublon) | ☐ |
+| 19 | Aucune donnée pour la période → erreur 404 propre | ☐ |
+| **Détection doublons** | | |
+| 20 | Playlist avec doublons exacts → `GET /duplicates` les retourne | ☐ |
+| 21 | `POST /remove-duplicates?keep=first` → garde la première occurrence | ☐ |
+| 22 | `POST /remove-duplicates?keep=last` → garde la dernière occurrence | ☐ |
+| 23 | Playlist sans doublons → aucune action | ☐ |
+
+---
+
 ## Tests transversaux
 
 | # | Test | Résultat |

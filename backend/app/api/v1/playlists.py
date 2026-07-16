@@ -1,14 +1,16 @@
 import uuid
 from math import ceil
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func, update, delete, and_, extract
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.playlist import Playlist
 from app.models.playlist_track import PlaylistTrack
 from app.models.track import Track
+from app.models.listening_history import ListeningHistory
 from app.schemas.playlist import (
     PlaylistCreate,
     PlaylistUpdate,
@@ -221,3 +223,346 @@ async def reorder_playlist(
         )
     await db.flush()
     return {"message": "Playlist reordered"}
+
+
+# ──────────────────────────────────────────────
+# P.1 — Smart Playlists
+# ──────────────────────────────────────────────
+
+@router.post("/smart", response_model=PlaylistResponse, status_code=status.HTTP_201_CREATED)
+async def create_smart_playlist(
+    title: str = Query(...),
+    rules: dict = Query(...),
+    max_tracks: int = Query(50, ge=1, le=500),
+    auto_refresh: bool = Query(False),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    playlist = Playlist(
+        title=title,
+        owner_id=current_user.id,
+        is_smart=True,
+        smart_rules=rules,
+        max_tracks=max_tracks,
+        auto_refresh=auto_refresh,
+        is_public=False,
+    )
+    db.add(playlist)
+    await db.flush()
+    await db.refresh(playlist)
+
+    from app.services.smart_playlist import evaluate_smart_playlist
+    await evaluate_smart_playlist(playlist, db)
+    await db.flush()
+    await db.refresh(playlist)
+
+    return playlist
+
+
+@router.post("/{playlist_id}/refresh")
+async def refresh_smart_playlist(
+    playlist_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Playlist).where(Playlist.id == playlist_id))
+    playlist = result.scalar_one_or_none()
+    if not playlist:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found")
+    if playlist.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    if not playlist.is_smart:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not a smart playlist")
+
+    from app.services.smart_playlist import evaluate_smart_playlist
+    count = await evaluate_smart_playlist(playlist, db)
+    await db.flush()
+
+    return {"message": f"Smart playlist refreshed with {count} tracks", "track_count": count}
+
+
+@router.put("/{playlist_id}/rules")
+async def update_smart_playlist_rules(
+    playlist_id: uuid.UUID,
+    rules: dict = Query(...),
+    max_tracks: int = Query(50, ge=1, le=500),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Playlist).where(Playlist.id == playlist_id))
+    playlist = result.scalar_one_or_none()
+    if not playlist:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found")
+    if playlist.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    if not playlist.is_smart:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not a smart playlist")
+
+    playlist.smart_rules = rules
+    playlist.max_tracks = max_tracks
+
+    from app.services.smart_playlist import evaluate_smart_playlist
+    count = await evaluate_smart_playlist(playlist, db)
+    await db.flush()
+    await db.refresh(playlist)
+
+    return playlist
+
+
+# ──────────────────────────────────────────────
+# P.2 — Complete Listening History
+# ──────────────────────────────────────────────
+
+@router.get("/user/history")
+async def get_user_history(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    artist_id: uuid.UUID | None = None,
+    genre: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
+        select(ListeningHistory, Track)
+        .join(Track, ListeningHistory.track_id == Track.id)
+        .where(ListeningHistory.user_id == current_user.id)
+    )
+
+    if from_date:
+        try:
+            from_dt = datetime.fromisoformat(from_date)
+            query = query.where(ListeningHistory.played_at >= from_dt)
+        except ValueError:
+            pass
+    if to_date:
+        try:
+            to_dt = datetime.fromisoformat(to_date)
+            query = query.where(ListeningHistory.played_at <= to_dt)
+        except ValueError:
+            pass
+    if artist_id:
+        query = query.where(Track.artist_id == artist_id)
+    if genre:
+        query = query.where(Track.genre.ilike(genre))
+
+    count_q = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_q)).scalar() or 0
+
+    query = query.order_by(ListeningHistory.played_at.desc())
+    query = query.offset((page - 1) * page_size).limit(page_size)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    items = []
+    for lh, track in rows:
+        items.append({
+            "id": str(lh.id),
+            "track_id": str(track.id),
+            "title": track.title,
+            "artist_id": str(track.artist_id),
+            "cover_url": track.cover_url,
+            "duration_seconds": track.duration_seconds,
+            "played_at": lh.played_at.isoformat() if lh.played_at else None,
+            "duration_listened_seconds": lh.duration_listened_seconds,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": ceil(total / page_size) if total else 0,
+    }
+
+
+# ──────────────────────────────────────────────
+# P.3 — Top of Month/Year Playlists
+# ──────────────────────────────────────────────
+
+@router.post("/generate-top")
+async def generate_top_playlist(
+    period: str = Query(..., regex="^(month|year)$"),
+    year: int = Query(..., ge=2000, le=2100),
+    month: int | None = Query(None, ge=1, le=12),
+    limit: int = Query(25, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if period == "month" and month is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="month parameter required for period=month")
+
+    if period == "month":
+        start_date = datetime(year, month, 1)
+        if month == 12:
+            end_date = datetime(year + 1, 1, 1)
+        else:
+            end_date = datetime(year, month + 1, 1)
+        title = f"Top Songs — {start_date.strftime('%B %Y')}"
+    else:
+        start_date = datetime(year, 1, 1)
+        end_date = datetime(year + 1, 1, 1)
+        title = f"Top Songs — {year}"
+
+    result = await db.execute(
+        select(
+            ListeningHistory.track_id,
+            func.count(ListeningHistory.id).label("play_count"),
+        )
+        .where(
+            ListeningHistory.user_id == current_user.id,
+            ListeningHistory.played_at >= start_date,
+            ListeningHistory.played_at < end_date,
+        )
+        .group_by(ListeningHistory.track_id)
+        .order_by(func.count(ListeningHistory.id).desc())
+        .limit(limit)
+    )
+    top_tracks = result.all()
+
+    if not top_tracks:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No listening data for this period")
+
+    existing = await db.execute(
+        select(Playlist).where(
+            Playlist.owner_id == current_user.id,
+            Playlist.title == title,
+        )
+    )
+    playlist = existing.scalar_one_or_none()
+    if not playlist:
+        playlist = Playlist(
+            title=title,
+            owner_id=current_user.id,
+            description=f"Auto-generated top songs for {title.split('—')[1].strip()}",
+            is_public=False,
+        )
+        db.add(playlist)
+        await db.flush()
+
+    await db.execute(
+        delete(PlaylistTrack).where(PlaylistTrack.playlist_id == playlist.id)
+    )
+
+    for i, row in enumerate(top_tracks):
+        pt = PlaylistTrack(
+            playlist_id=playlist.id,
+            track_id=row.track_id,
+            position=i,
+            added_by=current_user.id,
+        )
+        db.add(pt)
+
+    await db.flush()
+    await db.refresh(playlist)
+
+    return {
+        "playlist_id": str(playlist.id),
+        "title": title,
+        "track_count": len(top_tracks),
+    }
+
+
+# ──────────────────────────────────────────────
+# P.4 — Duplicate Detection
+# ──────────────────────────────────────────────
+
+@router.get("/{playlist_id}/duplicates")
+async def find_duplicates(
+    playlist_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Playlist).where(Playlist.id == playlist_id))
+    playlist = result.scalar_one_or_none()
+    if not playlist:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found")
+
+    result = await db.execute(
+        select(PlaylistTrack, Track)
+        .join(Track, PlaylistTrack.track_id == Track.id)
+        .where(PlaylistTrack.playlist_id == playlist_id)
+        .order_by(PlaylistTrack.position)
+    )
+    rows = result.all()
+
+    exact_groups: dict[str, list] = {}
+    fuzzy_groups: dict[str, list] = {}
+
+    for pt, track in rows:
+        key = str(track.id)
+        if key not in exact_groups:
+            exact_groups[key] = []
+        exact_groups[key].append({
+            "track_id": str(track.id),
+            "title": track.title,
+            "artist_id": str(track.artist_id),
+            "position": pt.position,
+            "added_at": pt.added_at.isoformat() if pt.added_at else None,
+        })
+
+        fuzzy_key = f"{track.title.lower().strip()}|{str(track.artist_id)}"
+        if fuzzy_key not in fuzzy_groups:
+            fuzzy_groups[fuzzy_key] = []
+        fuzzy_groups[fuzzy_key].append({
+            "track_id": str(track.id),
+            "title": track.title,
+            "artist_id": str(track.artist_id),
+            "position": pt.position,
+        })
+
+    exact_dupes = {k: v for k, v in exact_groups.items() if len(v) > 1}
+    fuzzy_dupes = {k: v for k, v in fuzzy_groups.items() if len(v) > 1}
+
+    return {
+        "exact_duplicates": list(exact_dupes.values()),
+        "fuzzy_duplicates": list(fuzzy_dupes.values()),
+        "total_exact": sum(len(v) for v in exact_dupes.values()),
+        "total_fuzzy": sum(len(v) for v in fuzzy_dupes.values()),
+    }
+
+
+@router.post("/{playlist_id}/remove-duplicates")
+async def remove_duplicates(
+    playlist_id: uuid.UUID,
+    keep: str = Query("first", regex="^(first|last)$"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Playlist).where(Playlist.id == playlist_id))
+    playlist = result.scalar_one_or_none()
+    if not playlist:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found")
+    if playlist.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+
+    result = await db.execute(
+        select(PlaylistTrack)
+        .where(PlaylistTrack.playlist_id == playlist_id)
+        .order_by(PlaylistTrack.position)
+    )
+    all_pts = result.scalars().all()
+
+    seen_track_ids: dict[str, PlaylistTrack] = {}
+    to_delete: list[PlaylistTrack] = []
+
+    for pt in all_pts:
+        tid = str(pt.track_id)
+        if tid in seen_track_ids:
+            if keep == "first":
+                to_delete.append(pt)
+            else:
+                to_delete.append(seen_track_ids[tid])
+                seen_track_ids[tid] = pt
+        else:
+            seen_track_ids[tid] = pt
+
+    removed_count = len(to_delete)
+    for pt in to_delete:
+        await db.delete(pt)
+
+    await db.flush()
+
+    return {"message": f"Removed {removed_count} duplicate(s)", "removed": removed_count}

@@ -37,6 +37,33 @@ const fr = {
   'player.jam_session': 'Session Jam',
   'player.now_playing': 'En cours de lecture',
 
+  // History
+  'history.title': 'Historique d\'écoute',
+  'history.from': 'Du',
+  'history.to': 'Au',
+  'history.genre_filter': 'Filtrer par genre...',
+  'history.empty': 'Aucun historique d\'écoute',
+
+  // Smart Playlists
+  'smart.create_title': 'Créer une playlist intelligente',
+  'smart.playlist_name': 'Nom de la playlist',
+  'smart.name_placeholder': 'Ma playlist intelligente...',
+  'smart.max_tracks': 'Nombre max de morceaux',
+  'smart.rules': 'Règles',
+  'smart.add_rule': 'Ajouter une règle',
+  'smart.creating': 'Création...',
+  'smart.create': 'Créer la playlist',
+  'smart.genre': 'Genre',
+  'smart.explicit': 'Contenu explicite',
+  'smart.min_plays': 'Écouté au moins X fois',
+  'smart.min_duration': 'Durée min (secondes)',
+  'smart.max_duration': 'Durée max (secondes)',
+  'smart.recent_days': 'Écouté dans les X derniers jours',
+  'smart.top_n': 'Top N morceaux les plus écoutés',
+  'smart.artist': 'Artiste',
+  'smart.equals': 'est égal à',
+  'smart.contains': 'contient',
+
   // Actions
   'action.save': 'Enregistrer',
   'action.delete': 'Supprimer',

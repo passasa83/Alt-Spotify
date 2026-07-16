@@ -27,6 +27,8 @@ import NotFound from '@/pages/NotFound';
 import AdminInvites from '@/pages/AdminInvites';
 import AdminDevices from '@/pages/AdminDevices';
 import Browse from '@/pages/Browse';
+import History from '@/pages/History';
+import SmartPlaylistCreate from '@/pages/SmartPlaylistCreate';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuthStore();
@@ -95,6 +97,8 @@ const App = () => {
         <Route path="admin/tracks/:id/edit" element={<EditTrack />} />
         <Route path="admin/invites" element={<AdminInvites />} />
         <Route path="admin/devices" element={<AdminDevices />} />
+        <Route path="history" element={<History />} />
+        <Route path="smart-playlist/new" element={<SmartPlaylistCreate />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
