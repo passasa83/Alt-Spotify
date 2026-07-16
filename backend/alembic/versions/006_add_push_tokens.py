@@ -15,15 +15,16 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "push_tokens",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False, index=True),
-        sa.Column("token", sa.String(512), unique=True, nullable=False, index=True),
-        sa.Column("platform", sa.String(20), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("last_used_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS push_tokens (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id),
+            token VARCHAR(512) UNIQUE NOT NULL,
+            platform VARCHAR(20) NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            last_used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+    """)
 
 
 def downgrade() -> None:

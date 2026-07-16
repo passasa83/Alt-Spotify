@@ -15,19 +15,20 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "notifications",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False, index=True),
-        sa.Column("type", sa.String(50), nullable=False),
-        sa.Column("title", sa.String(255), nullable=False),
-        sa.Column("message", sa.Text(), nullable=False),
-        sa.Column("data", JSONB(), nullable=True),
-        sa.Column("is_read", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
-    op.create_index("ix_notifications_user_id", "notifications", ["user_id"])
-    op.create_index("ix_notifications_created_at", "notifications", ["created_at"])
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id),
+            type VARCHAR(50) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            data JSONB,
+            is_read BOOLEAN NOT NULL DEFAULT false,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_notifications_user_id ON notifications (user_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_notifications_created_at ON notifications (created_at)")
 
 
 def downgrade() -> None:

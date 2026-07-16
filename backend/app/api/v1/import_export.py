@@ -23,7 +23,7 @@ from app.services.deezer import extract_playlist_id as extract_deezer_id, fetch_
 router = APIRouter(prefix="/playlists/import-export", tags=["import-export"])
 
 
-@router.get("/import-export/status")
+@router.get("/status")
 async def import_status(
     _current_user: User = Depends(get_current_user),
 ):
@@ -239,7 +239,7 @@ class SpotifyImportRequest(BaseModel):
     url: str
 
 
-@router.post("/import-export/spotify")
+@router.post("/spotify")
 async def import_from_spotify(
     body: SpotifyImportRequest,
     current_user: User = Depends(get_current_user),
@@ -300,7 +300,7 @@ class DeezerImportRequest(BaseModel):
     url: str
 
 
-@router.post("/import-export/deezer")
+@router.post("/deezer")
 async def import_from_deezer(
     body: DeezerImportRequest,
     current_user: User = Depends(get_current_user),

@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "002"
-down_revision = None
+down_revision = "001"
 branch_labels = None
 depends_on = None
 
@@ -18,31 +18,28 @@ def upgrade() -> None:
     # Add hls_path to tracks
     op.add_column("tracks", sa.Column("hls_path", sa.String(500), nullable=True))
 
-    # Create jam_sessions table
-    op.create_table(
-        "jam_sessions",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("code", sa.String(8), unique=True, index=True, nullable=False),
-        sa.Column("host_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("current_track_id", UUID(as_uuid=True), sa.ForeignKey("tracks.id"), nullable=True),
-        sa.Column("position_ms", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column(
-            "status",
-            sa.Enum("ACTIVE", "ENDED", name="jamsessionsstatus"),
-            nullable=False,
-            server_default="ACTIVE",
-        ),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
+    # Create jam_sessions table (IF NOT EXISTS for idempotency with 001)
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS jam_sessions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            code VARCHAR(8) UNIQUE NOT NULL,
+            host_id UUID NOT NULL REFERENCES users(id),
+            current_track_id UUID REFERENCES tracks(id),
+            position_ms INTEGER NOT NULL DEFAULT 0,
+            status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+    """)
 
-    # Create jam_participants table
-    op.create_table(
-        "jam_participants",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("session_id", UUID(as_uuid=True), sa.ForeignKey("jam_sessions.id"), nullable=False),
-        sa.Column("user_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("joined_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
+    # Create jam_participants table (IF NOT EXISTS for idempotency with 001)
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS jam_participants (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            session_id UUID NOT NULL REFERENCES jam_sessions(id),
+            user_id UUID NOT NULL REFERENCES users(id),
+            joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+    """)
 
     # Create follows table if not exists
     op.execute("""

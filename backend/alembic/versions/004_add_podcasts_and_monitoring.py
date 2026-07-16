@@ -15,34 +15,36 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "podcasts",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("title", sa.String(255), nullable=False, index=True),
-        sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("image_url", sa.String(500), nullable=True),
-        sa.Column("author", sa.String(255), nullable=True),
-        sa.Column("feed_url", sa.String(500), nullable=True, index=True),
-        sa.Column("categories", JSON(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS podcasts (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            title VARCHAR(255) NOT NULL,
+            description TEXT,
+            image_url VARCHAR(500),
+            author VARCHAR(255),
+            feed_url VARCHAR(500),
+            categories JSON,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+    """)
 
-    op.create_table(
-        "episodes",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("podcast_id", UUID(as_uuid=True), sa.ForeignKey("podcasts.id"), nullable=False, index=True),
-        sa.Column("title", sa.String(255), nullable=False, index=True),
-        sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("audio_url", sa.String(500), nullable=True),
-        sa.Column("duration_seconds", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("episode_number", sa.Integer(), nullable=True),
-        sa.Column("season_number", sa.Integer(), nullable=True),
-        sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("is_played", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS episodes (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            podcast_id UUID NOT NULL REFERENCES podcasts(id),
+            title VARCHAR(255) NOT NULL,
+            description TEXT,
+            audio_url VARCHAR(500),
+            duration_seconds INTEGER NOT NULL DEFAULT 0,
+            episode_number INTEGER,
+            season_number INTEGER,
+            published_at TIMESTAMP WITH TIME ZONE,
+            is_played BOOLEAN NOT NULL DEFAULT false,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+    """)
 
-    op.create_index("ix_episodes_podcast_id", "episodes", ["podcast_id"])
+    op.execute("CREATE INDEX IF NOT EXISTS ix_episodes_podcast_id ON episodes (podcast_id)")
 
 
 def downgrade() -> None:
