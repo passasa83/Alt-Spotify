@@ -1,9 +1,12 @@
+import { useEffect, useRef, useCallback } from 'react';
 import { useEqualizerStore, BAND_FREQUENCIES } from '@/stores/equalizerStore';
+import { usePlayerStore } from '@/stores/playerStore';
 import { X } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  audioRef: React.RefObject<HTMLAudioElement | null>;
 }
 
 const PRESET_NAMES = [
@@ -15,8 +18,101 @@ const PRESET_NAMES = [
   { id: 'rock', label: 'Rock' },
 ];
 
-const Equalizer = ({ isOpen, onClose }: Props) => {
+const Equalizer = ({ isOpen, onClose, audioRef }: Props) => {
   const { bands, preset, isEnabled, setBand, setPreset, toggle } = useEqualizerStore();
+  const { replayGainEnabled, currentTrack } = usePlayerStore();
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const filtersRef = useRef<BiquadFilterNode[]>([]);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const outputRef = useRef<GainNode | null>(null);
+
+  const initAudioContext = useCallback(() => {
+    if (audioContextRef.current) return audioContextRef.current;
+
+    const ctx = new AudioContext();
+    audioContextRef.current = ctx;
+
+    const source = ctx.createMediaElementSource(audioRef.current!);
+    sourceRef.current = source;
+
+    const output = ctx.createGain();
+    outputRef.current = output;
+
+    let lastNode: AudioNode = source;
+
+    BAND_FREQUENCIES.forEach((freq, i) => {
+      const filter = ctx.createBiquadFilter();
+      filter.type = i === 0 ? 'lowshelf' : i === BAND_FREQUENCIES.length - 1 ? 'highshelf' : 'peaking';
+      filter.frequency.value = freq;
+      filter.Q.value = 1.4;
+      filter.gain.value = bands[i] || 0;
+      filtersRef.current[i] = filter;
+      lastNode.connect(filter);
+      lastNode = filter;
+    });
+
+    const gainNode = ctx.createGain();
+    gainNodeRef.current = gainNode;
+    lastNode.connect(gainNode);
+    gainNode.connect(output);
+    output.connect(ctx.destination);
+
+    return ctx;
+  }, [audioRef, bands]);
+
+  useEffect(() => {
+    if (!audioRef.current || !isEnabled || !isOpen) return;
+
+    let ctx = audioContextRef.current;
+    if (!ctx) {
+      ctx = initAudioContext();
+    }
+
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+  }, [isEnabled, isOpen, audioRef, initAudioContext]);
+
+  useEffect(() => {
+    if (!isEnabled || !audioContextRef.current) {
+      filtersRef.current.forEach((filter) => {
+        if (filter) filter.gain.value = 0;
+      });
+      return;
+    }
+    bands.forEach((value, i) => {
+      if (filtersRef.current[i]) {
+        filtersRef.current[i].gain.value = value;
+      }
+    });
+  }, [bands, isEnabled]);
+
+  useEffect(() => {
+    if (!gainNodeRef.current || !audioRef.current) return;
+
+    if (replayGainEnabled && currentTrack?.track_gain != null) {
+      const gainDb = currentTrack.track_gain;
+      const gainLinear = Math.pow(10, gainDb / 20);
+      gainNodeRef.current.gain.value = Math.min(gainLinear, 3);
+    } else {
+      gainNodeRef.current.gain.value = 1;
+    }
+  }, [replayGainEnabled, currentTrack]);
+
+  useEffect(() => {
+    return () => {
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+        sourceRef.current = null;
+        filtersRef.current = [];
+        gainNodeRef.current = null;
+        outputRef.current = null;
+      }
+    };
+  }, []);
 
   if (!isOpen) return null;
 

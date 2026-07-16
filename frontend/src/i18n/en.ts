@@ -32,6 +32,7 @@ const en = {
   'player.audio_settings': 'Audio Settings',
   'player.crossfade': 'Crossfade',
   'player.replay_gain': 'ReplayGain',
+  'player.playback_speed': 'Playback Speed',
   'player.equalizer': 'Equalizer',
   'player.jam_session': 'Jam Session',
   'player.now_playing': 'Now Playing',

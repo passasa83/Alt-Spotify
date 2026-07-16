@@ -45,6 +45,8 @@ export interface Track {
   lyrics_lrc?: string;
   allowed_territories?: string[];
   is_explicit: boolean;
+  track_gain?: number;
+  track_peak?: number;
   play_count: number;
   created_at: string;
 }

@@ -30,6 +30,7 @@ interface PlayerState {
   showLyrics: boolean;
   crossfadeDuration: number;
   replayGainEnabled: boolean;
+  playbackRate: number;
   offlineTracks: Map<string, Blob>;
   deviceId: string;
   connectedDevices: Device[];
@@ -52,6 +53,7 @@ interface PlayerState {
   setUseHls: (use: boolean) => void;
   setCrossfadeDuration: (duration: number) => void;
   toggleReplayGain: () => void;
+  setPlaybackRate: (rate: number) => void;
   downloadTrack: (trackId: string, blob: Blob) => void;
   removeDownload: (trackId: string) => void;
   isDownloaded: (trackId: string) => boolean;
@@ -75,6 +77,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   showLyrics: false,
   crossfadeDuration: 0,
   replayGainEnabled: true,
+  playbackRate: 1,
   offlineTracks: new Map(),
   deviceId: generateDeviceId(),
   connectedDevices: [],
@@ -206,6 +209,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const { replayGainEnabled } = get();
     set({ replayGainEnabled: !replayGainEnabled });
   },
+
+  setPlaybackRate: (rate) => set({ playbackRate: Math.max(0.5, Math.min(3, rate)) }),
 
   downloadTrack: (trackId, blob) => {
     const { offlineTracks } = get();

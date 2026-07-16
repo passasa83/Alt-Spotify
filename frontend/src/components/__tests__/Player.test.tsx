@@ -19,11 +19,6 @@ vi.mock('@/components/DownloadButton', () => ({
 vi.mock('@/components/Equalizer', () => ({
   default: () => <div data-testid="equalizer">Equalizer</div>,
 }));
-vi.mock('@/hooks/useCrossfade', () => ({
-  useCrossfade: () => ({
-    startCrossfade: vi.fn(),
-  }),
-}));
 
 const createTrack = (id: string, title = 'Test Track'): Track => ({
   id,
@@ -43,10 +38,12 @@ const defaultPlayerState = {
   duration: 0,
   shuffle: false,
   repeat: 'off',
+  queue: [],
   lyrics: [],
   showLyrics: false,
   crossfadeDuration: 0,
   replayGainEnabled: true,
+  playbackRate: 1,
   togglePlay: vi.fn(),
   next: vi.fn(),
   prev: vi.fn(),
@@ -58,6 +55,7 @@ const defaultPlayerState = {
   toggleLyrics: vi.fn(),
   setCrossfadeDuration: vi.fn(),
   toggleReplayGain: vi.fn(),
+  setPlaybackRate: vi.fn(),
 };
 
 beforeEach(() => {

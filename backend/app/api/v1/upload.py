@@ -57,6 +57,8 @@ async def upload_audio(
 
     # Extract metadata with mutagen
     metadata = {}
+    replay_gain = None
+    track_peak = None
     try:
         import tempfile, os
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
@@ -72,6 +74,23 @@ async def upload_audio(
                     "genre": audio.get("genre", [None])[0],
                     "duration": audio.info.length if audio.info else 0,
                 }
+            audio_full = MutagenFile(tmp_path)
+            if audio_full and hasattr(audio_full, 'tags'):
+                for tag_key in ['REPLAYGAIN_TRACK_GAIN', 'R128_TRACK_GAIN']:
+                    if tag_key in audio_full.tags:
+                        val = str(audio_full.tags[tag_key][0]).replace(' dB', '').replace('dB', '')
+                        try:
+                            replay_gain = float(val)
+                            break
+                        except ValueError:
+                            pass
+                for tag_key in ['REPLAYGAIN_TRACK_PEAK', 'TXXX:REPLAYGAIN_TRACK_PEAK']:
+                    if tag_key in audio_full.tags:
+                        try:
+                            track_peak = float(str(audio_full.tags[tag_key][0]))
+                            break
+                        except (ValueError, KeyError):
+                            pass
         finally:
             os.unlink(tmp_path)
     except Exception:
@@ -113,6 +132,8 @@ async def upload_audio(
         genre=genre or metadata.get("genre"),
         is_explicit=is_explicit,
         allowed_territories=territories_list,
+        track_gain=replay_gain,
+        track_peak=track_peak,
     )
     db.add(track)
     await db.flush()

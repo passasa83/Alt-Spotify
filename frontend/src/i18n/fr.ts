@@ -32,6 +32,7 @@ const fr = {
   'player.audio_settings': 'Paramètres audio',
   'player.crossfade': 'Fondu enchaîné',
   'player.replay_gain': 'ReplayGain',
+  'player.playback_speed': 'Vitesse de lecture',
   'player.equalizer': 'Égaliseur',
   'player.jam_session': 'Session Jam',
   'player.now_playing': 'En cours de lecture',

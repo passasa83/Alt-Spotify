@@ -16,14 +16,16 @@ import {
   Download,
   Sliders,
   Settings2,
+  Gauge,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import SynchronizedLyrics from './SynchronizedLyrics';
 import DownloadButton from './DownloadButton';
 import Equalizer from './Equalizer';
-import { useCrossfade } from '@/hooks/useCrossfade';
 import { useTranslation } from '@/hooks/useTranslation';
+
+const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 
 const Player = () => {
   const navigate = useNavigate();
@@ -36,10 +38,12 @@ const Player = () => {
     duration,
     shuffle,
     repeat,
+    queue,
     lyrics,
     showLyrics,
     crossfadeDuration,
     replayGainEnabled,
+    playbackRate,
     togglePlay,
     next,
     prev,
@@ -51,16 +55,44 @@ const Player = () => {
     toggleLyrics,
     setCrossfadeDuration,
     toggleReplayGain,
+    setPlaybackRate,
   } = usePlayerStore();
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const nextAudioRef = useRef<HTMLAudioElement | null>(null);
+  const crossfadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
   const [isLiked, setIsLiked] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
 
-  const { startCrossfade } = useCrossfade(audioRef);
+  const getNextTrack = useCallback(() => {
+    const store = usePlayerStore.getState();
+    const { queue, shuffle: sh, repeat: rp } = store;
+    if (queue.length === 0) {
+      if (rp === 'all' && store.currentTrack) return store.currentTrack;
+      return null;
+    }
+    return sh ? queue[Math.floor(Math.random() * queue.length)] : queue[0];
+  }, []);
+
+  const preloadNextTrack = useCallback(() => {
+    const nextTrack = getNextTrack();
+    if (!nextTrack) {
+      if (nextAudioRef.current) {
+        nextAudioRef.current.pause();
+        nextAudioRef.current.src = '';
+        nextAudioRef.current = null;
+      }
+      return;
+    }
+    if (!nextAudioRef.current) {
+      nextAudioRef.current = new Audio();
+      nextAudioRef.current.preload = 'auto';
+    }
+    nextAudioRef.current.src = getTrackStreamUrl(nextTrack.id);
+  }, [getNextTrack]);
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -83,8 +115,8 @@ const Player = () => {
     };
 
     const handleEnded = () => {
-      if (crossfadeDuration > 0) {
-        startCrossfade();
+      if (crossfadeDuration > 0 && nextAudioRef.current) {
+        startCrossfadeTransition();
       } else {
         next();
       }
@@ -101,6 +133,47 @@ const Player = () => {
     };
   }, [crossfadeDuration]);
 
+  const startCrossfadeTransition = useCallback(() => {
+    if (crossfadeTimerRef.current) {
+      clearInterval(crossfadeTimerRef.current);
+    }
+
+    const currentAudio = audioRef.current;
+    const nextAudio = nextAudioRef.current;
+    if (!currentAudio || !nextAudio || !nextAudio.src) {
+      next();
+      return;
+    }
+
+    const store = usePlayerStore.getState();
+    const fadeSteps = 20;
+    const fadeInterval = (crossfadeDuration * 1000) / fadeSteps;
+    let step = 0;
+
+    nextAudio.volume = 0;
+    nextAudio.play().catch(() => {});
+
+    crossfadeTimerRef.current = setInterval(() => {
+      step++;
+      const progress = step / fadeSteps;
+      currentAudio.volume = Math.max(0, (1 - progress) * store.volume);
+      nextAudio.volume = Math.min(1, progress * store.volume);
+
+      if (step >= fadeSteps) {
+        if (crossfadeTimerRef.current) {
+          clearInterval(crossfadeTimerRef.current);
+          crossfadeTimerRef.current = null;
+        }
+        currentAudio.pause();
+        currentAudio.src = '';
+        audioRef.current = nextAudio;
+        nextAudioRef.current = null;
+        next();
+        setDuration(nextAudio.duration || 0);
+      }
+    }, fadeInterval);
+  }, [crossfadeDuration, next, setDuration]);
+
   useEffect(() => {
     if (audioRef.current && currentTrack) {
       audioRef.current.src = getTrackStreamUrl(currentTrack.id);
@@ -109,6 +182,7 @@ const Player = () => {
         audioRef.current.play().catch(() => {});
       }
     }
+    preloadNextTrack();
   }, [currentTrack]);
 
   useEffect(() => {
@@ -126,6 +200,28 @@ const Player = () => {
       audioRef.current.volume = volume;
     }
   }, [volume]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate]);
+
+  useEffect(() => {
+    preloadNextTrack();
+  }, [shuffle, repeat, queue]);
+
+  useEffect(() => {
+    return () => {
+      if (crossfadeTimerRef.current) {
+        clearInterval(crossfadeTimerRef.current);
+      }
+      if (nextAudioRef.current) {
+        nextAudioRef.current.pause();
+        nextAudioRef.current = null;
+      }
+    };
+  }, []);
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
@@ -254,6 +350,11 @@ const Player = () => {
       </div>
 
       <div className="flex w-1/4 items-center justify-end gap-2">
+        {playbackRate !== 1 && (
+          <span className="rounded bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-green-400">
+            {playbackRate}x
+          </span>
+        )}
         <button
           onClick={toggleLyrics}
           className={`p-1 ${showLyrics ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
@@ -306,7 +407,7 @@ const Player = () => {
       </div>
 
       {showSettings && (
-        <div className="absolute bottom-full right-4 mb-2 w-72 rounded-lg bg-gray-800 p-4 shadow-xl" role="dialog" aria-label={t('player.audio_settings')}>
+        <div className="absolute bottom-full right-4 mb-2 w-80 rounded-lg bg-gray-800 p-4 shadow-xl" role="dialog" aria-label={t('player.audio_settings')}>
           <h3 className="mb-3 text-sm font-medium text-white">{t('player.audio_settings')}</h3>
 
           <div className="mb-3">
@@ -329,6 +430,30 @@ const Player = () => {
             />
           </div>
 
+          <div className="mb-3">
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-xs text-gray-400 flex items-center gap-1">
+                <Gauge size={12} /> {t('player.playback_speed')}
+              </label>
+              <span className="text-xs text-gray-500">{playbackRate}x</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {PLAYBACK_RATES.map((rate) => (
+                <button
+                  key={rate}
+                  onClick={() => setPlaybackRate(rate)}
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+                    playbackRate === rate
+                      ? 'bg-green-500 text-black'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {rate}x
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
             <label className="text-xs text-gray-400">{t('player.replay_gain')}</label>
             <button
@@ -344,7 +469,7 @@ const Player = () => {
         </div>
       )}
 
-      <Equalizer isOpen={showEqualizer} onClose={() => setShowEqualizer(false)} />
+      <Equalizer isOpen={showEqualizer} onClose={() => setShowEqualizer(false)} audioRef={audioRef} />
     </div>
   );
 };
