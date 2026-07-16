@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+from datetime import datetime, timezone
 
 from app.core.database import get_db
 from app.models.artist import Artist
@@ -10,20 +12,71 @@ from app.models.playlist import Playlist
 from app.models.podcast import Podcast
 from app.schemas.artist import ArtistResponse
 from app.schemas.album import AlbumResponse
-from app.schemas.track import TrackResponse
+from app.schemas.track import TrackResponse, SearchTrackResponse
 from app.schemas.playlist import PlaylistResponse
+from app.services.deezer import search_deezer
+from app.services.jiosaavn import search_jiosaavn, import_from_jiosaavn
 from app.services.meilisearch import search_meili
 from app.services.musicbrainz import search_recordings, search_artists
-from app.services.jiosaavn import search_jiosaavn, import_from_jiosaavn
 
 router = APIRouter(prefix="/search", tags=["search"])
 
 
-async def _try_meilisearch(query: str, index: str, limit: int, offset: int) -> list[dict]:
-    try:
-        return await search_meili(query, index=index, limit=limit, offset=offset)
-    except Exception:
-        return []
+def _track_to_response(track: Track, artist_name: str = "") -> SearchTrackResponse:
+    return SearchTrackResponse(
+        id=track.id,
+        title=track.title,
+        album_id=track.album_id,
+        artist_id=track.artist_id,
+        artist={"id": str(track.artist_id), "name": artist_name} if artist_name else None,
+        duration_seconds=track.duration_seconds,
+        file_url=track.file_url,
+        hls_path=track.hls_path,
+        cover_url=track.cover_url,
+        genre=track.genre,
+        bpm=track.bpm,
+        key=track.key,
+        mood=track.mood,
+        lyrics_lrc=track.lyrics_lrc,
+        track_gain=track.track_gain,
+        track_peak=track.track_peak,
+        album_gain=track.album_gain,
+        isrc=track.isrc,
+        allowed_territories=track.allowed_territories,
+        is_explicit=track.is_explicit,
+        play_count=track.play_count,
+        created_at=track.created_at or datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+
+
+async def _find_local_track(db: AsyncSession, isrc: str | None, title: str, artist_name: str) -> Track | None:
+    """Find a track in the local DB by ISRC (exact match) or title+artist (fuzzy)."""
+    if isrc:
+        result = await db.execute(select(Track).where(Track.isrc == isrc))
+        track = result.scalars().first()
+        if track:
+            return track
+
+    artist_ids_subq = select(Artist.id).where(Artist.name.ilike(f"%{artist_name}%")).scalar_subquery()
+    result = await db.execute(
+        select(Track).where(
+            Track.title.ilike(f"%{title}%"),
+            Track.artist_id.in_(artist_ids_subq),
+        ).limit(1)
+    )
+    return result.scalars().first()
+
+
+async def _ensure_artist(db: AsyncSession, name: str) -> UUID:
+    """Find or create an artist by name, return artist_id."""
+    result = await db.execute(select(Artist).where(Artist.name.ilike(f"%{name}%")))
+    artist = result.scalars().first()
+    if artist:
+        return artist.id
+    artist = Artist(name=name)
+    db.add(artist)
+    await db.flush()
+    return artist.id
 
 
 @router.get("")
@@ -46,88 +99,124 @@ async def search(
     types = [t.strip() for t in type.split(",")]
     offset = (page - 1) * page_size
     results: dict = {}
+    like_pattern = f"%{q}%"
 
     if "artists" in types:
-        meili_hits = await _try_meilisearch(q, "artists", page_size, offset)
-        if meili_hits:
-            results["artists"] = [ArtistResponse(**a) for a in meili_hits]
-        else:
-            result = await db.execute(
-                select(Artist).where(Artist.name.ilike(f"%{q}%")).offset(offset).limit(page_size)
-            )
-            results["artists"] = [ArtistResponse.model_validate(a) for a in result.scalars().all()]
+        result = await db.execute(
+            select(Artist).where(Artist.name.ilike(like_pattern)).offset(offset).limit(page_size)
+        )
+        results["artists"] = [ArtistResponse.model_validate(a) for a in result.scalars().all()]
 
     if "albums" in types:
-        meili_hits = await _try_meilisearch(q, "albums", page_size, offset)
-        if meili_hits:
-            results["albums"] = [AlbumResponse(**a) for a in meili_hits]
-        else:
-            result = await db.execute(
-                select(Album).where(Album.title.ilike(f"%{q}%")).offset(offset).limit(page_size)
-            )
-            results["albums"] = [AlbumResponse.model_validate(a) for a in result.scalars().all()]
+        result = await db.execute(
+            select(Album).where(Album.title.ilike(like_pattern)).offset(offset).limit(page_size)
+        )
+        results["albums"] = [AlbumResponse.model_validate(a) for a in result.scalars().all()]
 
     if "tracks" in types:
-        meili_hits = await _try_meilisearch(q, "tracks", page_size, offset)
-        if meili_hits and not any([genre, year, min_duration, max_duration, min_bpm, max_bpm, key, mood]):
-            results["tracks"] = [TrackResponse(**t) for t in meili_hits]
-        else:
-            query = select(Track).where(Track.title.ilike(f"%{q}%"))
+        has_advanced_filters = any([genre, year, min_duration, max_duration, min_bpm, max_bpm, key, mood, lyrics])
+
+        if has_advanced_filters:
+            artist_ids_subq = select(Artist.id).where(Artist.name.ilike(like_pattern)).scalar_subquery()
+            query_stmt = select(Track).where(
+                or_(Track.title.ilike(like_pattern), Track.artist_id.in_(artist_ids_subq))
+            )
             if genre:
-                query = query.where(Track.genre.ilike(genre))
+                query_stmt = query_stmt.where(Track.genre.ilike(genre))
             if year:
-                query = query.where(Track.created_at >= f"{year}-01-01", Track.created_at < f"{year+1}-01-01")
+                query_stmt = query_stmt.where(Track.created_at >= f"{year}-01-01", Track.created_at < f"{year+1}-01-01")
             if min_duration is not None:
-                query = query.where(Track.duration_seconds >= min_duration)
+                query_stmt = query_stmt.where(Track.duration_seconds >= min_duration)
             if max_duration is not None:
-                query = query.where(Track.duration_seconds <= max_duration)
+                query_stmt = query_stmt.where(Track.duration_seconds <= max_duration)
             if min_bpm is not None:
-                query = query.where(Track.bpm >= min_bpm)
+                query_stmt = query_stmt.where(Track.bpm >= min_bpm)
             if max_bpm is not None:
-                query = query.where(Track.bpm <= max_bpm)
+                query_stmt = query_stmt.where(Track.bpm <= max_bpm)
             if key:
-                query = query.where(Track.key.ilike(key))
+                query_stmt = query_stmt.where(Track.key.ilike(key))
             if mood:
-                query = query.where(Track.mood.ilike(f"%{mood}%"))
+                query_stmt = query_stmt.where(Track.mood.ilike(f"%{mood}%"))
             if lyrics:
-                query = query.where(Track.lyrics_lrc.ilike(f"%{lyrics}%"))
-            result = await db.execute(query.offset(offset).limit(page_size))
-            local_tracks = [TrackResponse.model_validate(t) for t in result.scalars().all()]
-            results["tracks"] = local_tracks
+                query_stmt = query_stmt.where(Track.lyrics_lrc.ilike(f"%{lyrics}%"))
+            result = await db.execute(query_stmt.offset(offset).limit(page_size))
+            tracks = []
+            for t in result.scalars().all():
+                artist_result = await db.execute(select(Artist).where(Artist.id == t.artist_id))
+                artist_obj = artist_result.scalar_one_or_none()
+                tracks.append(_track_to_response(t, artist_obj.name if artist_obj else ""))
+            results["tracks"] = tracks
+        else:
+            artist_ids_subq = select(Artist.id).where(Artist.name.ilike(like_pattern)).scalar_subquery()
+            local_result = await db.execute(
+                select(Track).where(
+                    or_(Track.title.ilike(like_pattern), Track.artist_id.in_(artist_ids_subq))
+                ).limit(page_size)
+            )
+            local_tracks_map: dict[str, tuple[Track, str]] = {}
+            for t in local_result.scalars().all():
+                artist_result = await db.execute(select(Artist).where(Artist.id == t.artist_id))
+                artist_obj = artist_result.scalar_one_or_none()
+                aname = artist_obj.name if artist_obj else ""
+                local_tracks_map[t.title.lower().strip()] = (t, aname)
 
-            if len(local_tracks) < page_size:
-                jio_results = await search_jiosaavn(q, limit=page_size - len(local_tracks))
-                imported_tracks = []
-                for jio_song in jio_results:
-                    track_id = await import_from_jiosaavn(jio_song, db)
-                    if track_id:
-                        track_result = await db.execute(select(Track).where(Track.id == track_id))
-                        track = track_result.scalar_one_or_none()
-                        if track:
-                            imported_tracks.append(TrackResponse.model_validate(track))
+            external_results = await search_deezer(q, limit=page_size)
 
-                results["tracks"] = list(results["tracks"]) + imported_tracks
+            tracks = []
+            seen_isrcs: set[str] = set()
+            seen_titles: set[str] = set()
+
+            for ext in external_results:
+                ext_isrc = ext.get("isrc")
+                ext_title_key = ext["title"].lower().strip()
+                local_match = local_tracks_map.get(ext_title_key)
+
+                if local_match:
+                    tracks.append(_track_to_response(local_match[0], local_match[1]))
+                    seen_titles.add(ext_title_key)
+                    if ext_isrc:
+                        seen_isrcs.add(ext_isrc)
+                else:
+                    artist_id = await _ensure_artist(db, ext["artist"])
+                    stub = Track(
+                        title=ext["title"],
+                        artist_id=artist_id,
+                        duration_seconds=ext.get("duration", 0),
+                        cover_url=ext.get("cover_url"),
+                        isrc=ext.get("isrc"),
+                        genre=genre,
+                        is_explicit=ext.get("explicit", False),
+                        file_url=None,
+                        hls_path=None,
+                    )
+                    db.add(stub)
+                    await db.flush()
+                    tracks.append(_track_to_response(stub, ext["artist"]))
+                    seen_titles.add(ext_title_key)
+                    if ext_isrc:
+                        seen_isrcs.add(ext_isrc)
+
+            for title_key, (t, aname) in local_tracks_map.items():
+                if title_key not in seen_titles:
+                    tracks.append(_track_to_response(t, aname))
+
+            await db.commit()
+            results["tracks"] = tracks
 
     if "playlists" in types:
-        meili_hits = await _try_meilisearch(q, "playlists", page_size, offset)
-        if meili_hits:
-            results["playlists"] = [PlaylistResponse(**p) for p in meili_hits]
-        else:
-            result = await db.execute(
-                select(Playlist).where(Playlist.is_public == True, Playlist.title.ilike(f"%{q}%")).offset(offset).limit(page_size)
-            )
-            results["playlists"] = [PlaylistResponse.model_validate(p) for p in result.scalars().all()]
+        result = await db.execute(
+            select(Playlist).where(
+                Playlist.is_public == True, Playlist.title.ilike(like_pattern)
+            ).offset(offset).limit(page_size)
+        )
+        results["playlists"] = [PlaylistResponse.model_validate(p) for p in result.scalars().all()]
 
     if "podcasts" in types:
-        meili_hits = await _try_meilisearch(q, "podcasts", page_size, offset)
-        if meili_hits:
-            results["podcasts"] = meili_hits
-        else:
-            result = await db.execute(
-                select(Podcast).where(Podcast.title.ilike(f"%{q}%")).offset(offset).limit(page_size)
-            )
-            from app.schemas.podcast import PodcastResponse
-            results["podcasts"] = [PodcastResponse.model_validate(p) for p in result.scalars().all()]
+        result = await db.execute(
+            select(Podcast).where(Podcast.title.ilike(like_pattern)).offset(offset).limit(page_size)
+        )
+        from app.schemas.podcast import PodcastResponse
+        results["podcasts"] = [PodcastResponse.model_validate(p) for p in result.scalars().all()]
 
     return results
 
@@ -170,10 +259,6 @@ async def search_enriched(
 ):
     """
     Search MusicBrainz for rich metadata + JioSaavn for audio download.
-    Flow:
-    1. MusicBrainz provides title, artist, album, duration, ISRC
-    2. JioSaavn provides the MP3 download URL
-    3. Combined result is imported into the database
     """
     mb_results = await search_recordings(q, limit=limit)
 

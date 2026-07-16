@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -20,6 +21,7 @@ class TrackCreate(BaseModel):
     track_gain: float | None = None
     track_peak: float | None = None
     album_gain: float | None = None
+    isrc: str | None = None
     allowed_territories: list[str] | None = None
     is_explicit: bool = False
 
@@ -39,6 +41,7 @@ class TrackUpdate(BaseModel):
     track_gain: float | None = None
     track_peak: float | None = None
     album_gain: float | None = None
+    isrc: str | None = None
     allowed_territories: list[str] | None = None
     is_explicit: bool | None = None
 
@@ -62,6 +65,34 @@ class TrackResponse(BaseModel):
     track_gain: float | None
     track_peak: float | None
     album_gain: float | None
+    isrc: str | None
+    allowed_territories: list[str] | None
+    is_explicit: bool
+    play_count: int
+    created_at: datetime
+
+
+class SearchTrackResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    album_id: uuid.UUID | None
+    artist_id: uuid.UUID
+    artist: dict[str, Any] | None = None
+    duration_seconds: int
+    file_url: str | None
+    hls_path: str | None
+    cover_url: str | None
+    genre: str | None
+    bpm: float | None
+    key: str | None
+    mood: str | None
+    lyrics_lrc: str | None
+    track_gain: float | None
+    track_peak: float | None
+    album_gain: float | None
+    isrc: str | None
     allowed_territories: list[str] | None
     is_explicit: bool
     play_count: int

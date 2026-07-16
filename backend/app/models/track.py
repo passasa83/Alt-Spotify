@@ -28,6 +28,7 @@ class Track(Base):
     track_peak: Mapped[float | None] = mapped_column(Float, nullable=True)
     album_gain: Mapped[float | None] = mapped_column(Float, nullable=True)
     allowed_territories: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    isrc: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     is_explicit: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     play_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))

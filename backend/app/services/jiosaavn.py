@@ -11,13 +11,19 @@ JIOSAAVN_API_BASE = "https://saavn.me"
 JIOSAAVN_SEARCH_URL = f"{JIOSAAVN_API_BASE}/search"
 JIOSAAVN_SONG_URL = f"{JIOSAAVN_API_BASE}/songs"
 
+JIOSAAVN_TIMEOUT = 3.0
+
 
 async def search_jiosaavn(query: str, limit: int = 5) -> list[dict]:
     """Search JioSaavn for songs and return normalized results."""
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(JIOSAAVN_TIMEOUT, connect=2.0)) as client:
             resp = await client.get(JIOSAAVN_SEARCH_URL, params={"song": query})
             resp.raise_for_status()
+            content_type = resp.headers.get("content-type", "")
+            if "json" not in content_type:
+                logger.warning("jiosaavn_not_json", content_type=content_type)
+                return []
             data = resp.json()
 
         songs = data.get("songs", {}).get("data", [])

@@ -39,7 +39,8 @@ async def test_search_tracks(client: AsyncClient, admin_headers):
     data = response.json()
     assert "tracks" in data
     assert len(data["tracks"]) >= 1
-    assert data["tracks"][0]["title"] == "Searchable Track"
+    titles = [t["title"] for t in data["tracks"]]
+    assert "Searchable Track" in titles
 
 
 async def test_search_artists(client: AsyncClient, admin_headers):

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.database import init_db
 from app.core.redis import close_redis
+from app.services.meilisearch import ensure_indexes, reindex_all
 from app.core.metrics import MetricsMiddleware
 from app.core.logging import setup_logging
 from app.core.middleware_logging import RequestLoggingMiddleware, ErrorLoggingMiddleware
@@ -32,6 +33,13 @@ async def lifespan(app: FastAPI):
     setup_logging()
     logger.info("application_starting", project=settings.PROJECT_NAME)
     await init_db()
+    try:
+        await ensure_indexes()
+        logger.info("meilisearch_indexes_ready")
+        await reindex_all()
+        logger.info("meilisearch_reindex_complete")
+    except Exception as e:
+        logger.warning("meilisearch_init_failed", error=str(e))
     logger.info("application_started", project=settings.PROJECT_NAME)
     yield
     logger.info("application_shutting_down")

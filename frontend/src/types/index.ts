@@ -46,6 +46,7 @@ export interface Track {
   key?: string;
   mood?: string;
   lyrics_lrc?: string;
+  isrc?: string;
   allowed_territories?: string[];
   is_explicit: boolean;
   track_gain?: number;
