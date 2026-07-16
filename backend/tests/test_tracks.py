@@ -186,7 +186,7 @@ async def test_delete_track(client: AsyncClient, admin_headers):
     )
     assert response.status_code == 204
 
-    get_resp = await client.get(f"/api/v1/tracks/{track_id}")
+    get_resp = await client.get(f"/api/v1/tracks/{track_id}", headers=admin_headers)
     assert get_resp.status_code == 404
 
 

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func, update, text, cast, String, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
@@ -38,18 +38,15 @@ async def list_tracks(
     
     # Territory filter
     if current_user.country:
-        territory_filter = (Track.allowed_territories.is_(None)) | (Track.allowed_territories.any(current_user.country))
-    else:
-        territory_filter = Track.allowed_territories.is_(None)
+        territory_filter = (Track.allowed_territories.is_(None)) | (cast(Track.allowed_territories, String).contains(f'"{current_user.country}"'))
+        query = query.where(territory_filter)
+        count_query = count_query.where(territory_filter)
     
     # Explicit content filter
     if current_user.is_child_account:
         explicit_filter = Track.is_explicit == False
-    else:
-        explicit_filter = True # No filter
-    
-    query = query.where(territory_filter).where(explicit_filter)
-    count_query = count_query.where(territory_filter).where(explicit_filter)
+        query = query.where(explicit_filter)
+        count_query = count_query.where(explicit_filter)
 
     if q:
         query = query.where(Track.title.ilike(f"%{q}%"))

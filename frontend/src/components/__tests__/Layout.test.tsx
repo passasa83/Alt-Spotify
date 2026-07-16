@@ -16,6 +16,13 @@ vi.mock('@/stores/playerStore', () => ({
   usePlayerStore: () => ({
     showLyrics: false,
     lyrics: [],
+    initDevice: vi.fn(),
+  }),
+}));
+vi.mock('@/stores/authStore', () => ({
+  useAuthStore: () => ({
+    user: { id: '1', email: 'test@test.com' },
+    refreshAuth: vi.fn(),
   }),
 }));
 
