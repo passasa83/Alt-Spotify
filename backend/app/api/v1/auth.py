@@ -33,21 +33,19 @@ async def register(
 ):
     client_ip = request.client.host if request.client else "unknown"
 
-    if not invite_token:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token required")
-
-    result = await db.execute(
-        select(AdminInviteToken).where(AdminInviteToken.token == invite_token)
-    )
-    invite = result.scalar_one_or_none()
-    if not invite or invite.is_revoked:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid invitation token")
-    if invite.expires_at and invite.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token expired")
-    if invite.use_count >= invite.max_uses:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token already used")
-    if invite.email and invite.email.lower() != body.email.lower():
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation not valid for this email")
+    if invite_token:
+        result = await db.execute(
+            select(AdminInviteToken).where(AdminInviteToken.token == invite_token)
+        )
+        invite = result.scalar_one_or_none()
+        if not invite or invite.is_revoked:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid invitation token")
+        if invite.expires_at and invite.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token expired")
+        if invite.use_count >= invite.max_uses:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token already used")
+        if invite.email and invite.email.lower() != body.email.lower():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation not valid for this email")
 
     result = await db.execute(select(User).where(User.email == body.email))
     if result.scalar_one_or_none():
@@ -65,8 +63,9 @@ async def register(
     db.add(user)
     await db.flush()
 
-    invite.use_count += 1
-    invite.used_by = user.id
+    if invite_token:
+        invite.use_count += 1
+        invite.used_by = user.id
 
     await db.refresh(user)
     logger.info("user_registered", user_id=str(user.id), ip=client_ip)
