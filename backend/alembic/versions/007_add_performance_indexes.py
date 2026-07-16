@@ -5,7 +5,7 @@ import sqlalchemy as sa
 
 
 revision = "007_add_performance_indexes"
-down_revision = "006_add_push_tokens"
+down_revision = "006"
 branch_labels = None
 depends_on = None
 

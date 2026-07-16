@@ -8,7 +8,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "008"
-down_revision = "007"
+down_revision = "007_add_performance_indexes"
 branch_labels = None
 depends_on = None
 
