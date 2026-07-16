@@ -23,8 +23,8 @@ async def _create_other_user(db_session):
 
 
 @pytest.mark.asyncio
-@patch("app.api.v1.social.notify_follow_push", new_callable=AsyncMock)
-@patch("app.api.v1.social.notify_follow", new_callable=AsyncMock)
+@patch("app.services.push_notifications.notify_follow_push", new_callable=AsyncMock)
+@patch("app.services.notifications.notify_follow", new_callable=AsyncMock)
 async def test_follow_user(mock_notify_follow, mock_notify_push, client: AsyncClient, auth_headers, db_session, test_user):
     other = await _create_other_user(db_session)
 
@@ -54,8 +54,8 @@ async def test_follow_user_not_found(client: AsyncClient, auth_headers):
 
 
 @pytest.mark.asyncio
-@patch("app.api.v1.social.notify_follow_push", new_callable=AsyncMock)
-@patch("app.api.v1.social.notify_follow", new_callable=AsyncMock)
+@patch("app.services.push_notifications.notify_follow_push", new_callable=AsyncMock)
+@patch("app.services.notifications.notify_follow", new_callable=AsyncMock)
 async def test_follow_user_duplicate(mock_notify_follow, mock_notify_push, client: AsyncClient, auth_headers, db_session):
     other = await _create_other_user(db_session)
 
@@ -123,8 +123,8 @@ async def test_follow_artist_duplicate(client: AsyncClient, auth_headers, admin_
 
 
 @pytest.mark.asyncio
-@patch("app.api.v1.social.notify_follow_push", new_callable=AsyncMock)
-@patch("app.api.v1.social.notify_follow", new_callable=AsyncMock)
+@patch("app.services.push_notifications.notify_follow_push", new_callable=AsyncMock)
+@patch("app.services.notifications.notify_follow", new_callable=AsyncMock)
 async def test_get_followers(mock_notify_follow, mock_notify_push, client: AsyncClient, auth_headers, db_session, test_user):
     other = await _create_other_user(db_session)
 
@@ -145,8 +145,8 @@ async def test_get_followers(mock_notify_follow, mock_notify_push, client: Async
 
 
 @pytest.mark.asyncio
-@patch("app.api.v1.social.notify_follow_push", new_callable=AsyncMock)
-@patch("app.api.v1.social.notify_follow", new_callable=AsyncMock)
+@patch("app.services.push_notifications.notify_follow_push", new_callable=AsyncMock)
+@patch("app.services.notifications.notify_follow", new_callable=AsyncMock)
 async def test_get_following(mock_notify_follow, mock_notify_push, client: AsyncClient, auth_headers, db_session):
     other = await _create_other_user(db_session)
 

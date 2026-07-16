@@ -59,6 +59,75 @@ async def list_playlists(
     )
 
 
+# ──────────────────────────────────────────────
+# P.2 — Complete Listening History
+# ──────────────────────────────────────────────
+
+@router.get("/user/history")
+async def get_user_history(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    artist_id: uuid.UUID | None = None,
+    genre: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
+        select(ListeningHistory, Track)
+        .join(Track, ListeningHistory.track_id == Track.id)
+        .where(ListeningHistory.user_id == current_user.id)
+    )
+
+    if from_date:
+        try:
+            from_dt = datetime.fromisoformat(from_date)
+            query = query.where(ListeningHistory.played_at >= from_dt)
+        except ValueError:
+            pass
+    if to_date:
+        try:
+            to_dt = datetime.fromisoformat(to_date)
+            query = query.where(ListeningHistory.played_at <= to_dt)
+        except ValueError:
+            pass
+    if artist_id:
+        query = query.where(Track.artist_id == artist_id)
+    if genre:
+        query = query.where(Track.genre.ilike(genre))
+
+    count_q = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_q)).scalar() or 0
+
+    query = query.order_by(ListeningHistory.played_at.desc())
+    query = query.offset((page - 1) * page_size).limit(page_size)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    items = []
+    for lh, track in rows:
+        items.append({
+            "id": str(lh.id),
+            "track_id": str(track.id),
+            "title": track.title,
+            "artist_id": str(track.artist_id),
+            "cover_url": track.cover_url,
+            "duration_seconds": track.duration_seconds,
+            "played_at": lh.played_at.isoformat() if lh.played_at else None,
+            "duration_listened_seconds": lh.duration_listened_seconds,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": ceil(total / page_size) if total else 0,
+    }
+
+
 @router.get("/{playlist_id}", response_model=PlaylistResponse)
 async def get_playlist(playlist_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Playlist).where(Playlist.id == playlist_id))
@@ -317,75 +386,6 @@ async def update_smart_playlist_rules(
     await db.refresh(playlist)
 
     return playlist
-
-
-# ──────────────────────────────────────────────
-# P.2 — Complete Listening History
-# ──────────────────────────────────────────────
-
-@router.get("/user/history")
-async def get_user_history(
-    from_date: str | None = None,
-    to_date: str | None = None,
-    artist_id: uuid.UUID | None = None,
-    genre: str | None = None,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    query = (
-        select(ListeningHistory, Track)
-        .join(Track, ListeningHistory.track_id == Track.id)
-        .where(ListeningHistory.user_id == current_user.id)
-    )
-
-    if from_date:
-        try:
-            from_dt = datetime.fromisoformat(from_date)
-            query = query.where(ListeningHistory.played_at >= from_dt)
-        except ValueError:
-            pass
-    if to_date:
-        try:
-            to_dt = datetime.fromisoformat(to_date)
-            query = query.where(ListeningHistory.played_at <= to_dt)
-        except ValueError:
-            pass
-    if artist_id:
-        query = query.where(Track.artist_id == artist_id)
-    if genre:
-        query = query.where(Track.genre.ilike(genre))
-
-    count_q = select(func.count()).select_from(query.subquery())
-    total = (await db.execute(count_q)).scalar() or 0
-
-    query = query.order_by(ListeningHistory.played_at.desc())
-    query = query.offset((page - 1) * page_size).limit(page_size)
-
-    result = await db.execute(query)
-    rows = result.all()
-
-    items = []
-    for lh, track in rows:
-        items.append({
-            "id": str(lh.id),
-            "track_id": str(track.id),
-            "title": track.title,
-            "artist_id": str(track.artist_id),
-            "cover_url": track.cover_url,
-            "duration_seconds": track.duration_seconds,
-            "played_at": lh.played_at.isoformat() if lh.played_at else None,
-            "duration_listened_seconds": lh.duration_listened_seconds,
-        })
-
-    return {
-        "items": items,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": ceil(total / page_size) if total else 0,
-    }
 
 
 # ──────────────────────────────────────────────

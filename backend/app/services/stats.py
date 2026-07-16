@@ -181,8 +181,8 @@ async def get_listening_streak(user_id: uuid.UUID, db: AsyncSession) -> dict:
 
 
 async def get_annual_wrapped(user_id: uuid.UUID, year: int, db: AsyncSession) -> dict:
-    year_start = datetime(year, 1, 1, tzinfo=timezone.utc)
-    year_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    year_start = datetime(year, 1, 1)
+    year_end = datetime(year + 1, 1, 1)
 
     # Total stats
     total_result = await db.execute(

@@ -2,44 +2,44 @@ import client from './client';
 import type { Playlist, PlaylistTrack, PaginatedResponse } from '@/types';
 
 export const getPlaylists = async (page = 1, perPage = 20): Promise<PaginatedResponse<Playlist>> => {
-  const response = await client.get('/playlists', { params: { page, per_page: perPage } });
+  const response = await client.get('/playlists', { params: { page, page_size: perPage } });
   return response.data;
 };
 
-export const getPlaylist = async (id: number): Promise<Playlist> => {
+export const getPlaylist = async (id: string): Promise<Playlist> => {
   const response = await client.get(`/playlists/${id}`);
   return response.data;
 };
 
-export const getPlaylistTracks = async (id: number): Promise<PlaylistTrack[]> => {
+export const getPlaylistTracks = async (id: string): Promise<PlaylistTrack[]> => {
   const response = await client.get(`/playlists/${id}/tracks`);
   return response.data;
 };
 
-export const createPlaylist = async (data: { name: string; description?: string; is_public?: boolean }): Promise<Playlist> => {
+export const createPlaylist = async (data: { title: string; description?: string; is_public?: boolean }): Promise<Playlist> => {
   const response = await client.post('/playlists', data);
   return response.data;
 };
 
-export const updatePlaylist = async (id: number, data: { name?: string; description?: string; is_public?: boolean }): Promise<Playlist> => {
+export const updatePlaylist = async (id: string, data: { title?: string; description?: string; is_public?: boolean }): Promise<Playlist> => {
   const response = await client.put(`/playlists/${id}`, data);
   return response.data;
 };
 
-export const deletePlaylist = async (id: number): Promise<void> => {
+export const deletePlaylist = async (id: string): Promise<void> => {
   await client.delete(`/playlists/${id}`);
 };
 
-export const addTrackToPlaylist = async (playlistId: number, trackId: number): Promise<PlaylistTrack> => {
+export const addTrackToPlaylist = async (playlistId: string, trackId: string): Promise<PlaylistTrack> => {
   const response = await client.post(`/playlists/${playlistId}/tracks`, { track_id: trackId });
   return response.data;
 };
 
-export const removeTrackFromPlaylist = async (playlistId: number, trackId: number): Promise<void> => {
+export const removeTrackFromPlaylist = async (playlistId: string, trackId: string): Promise<void> => {
   await client.delete(`/playlists/${playlistId}/tracks/${trackId}`);
 };
 
-export const reorderPlaylist = async (playlistId: number, trackId: number, newPosition: number): Promise<void> => {
+export const reorderPlaylist = async (playlistId: string, trackId: string, newPosition: number): Promise<void> => {
   await client.put(`/playlists/${playlistId}/reorder`, { track_id: trackId, new_position: newPosition });
 };
 
