@@ -1,7 +1,19 @@
 import { create } from 'zustand';
 import type { Track, LyricsLine } from '@/types';
+import type { Device } from '@/api/devices';
+import { registerDevice, sendHeartbeat, getDevices } from '@/api/devices';
 
 export type RepeatMode = 'off' | 'one' | 'all';
+
+function generateDeviceId(): string {
+  const stored = localStorage.getItem('device_id');
+  if (stored) return stored;
+  const id = `web_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  localStorage.setItem('device_id', id);
+  return id;
+}
+
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
 interface PlayerState {
   currentTrack: Track | null;
@@ -19,6 +31,8 @@ interface PlayerState {
   crossfadeDuration: number;
   replayGainEnabled: boolean;
   offlineTracks: Map<string, Blob>;
+  deviceId: string;
+  connectedDevices: Device[];
   setTrack: (track: Track) => void;
   play: () => void;
   pause: () => void;
@@ -41,6 +55,9 @@ interface PlayerState {
   downloadTrack: (trackId: string, blob: Blob) => void;
   removeDownload: (trackId: string) => void;
   isDownloaded: (trackId: string) => boolean;
+  initDevice: () => Promise<void>;
+  refreshDevices: () => Promise<void>;
+  transferPlayback: (deviceId: string) => Promise<void>;
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -59,6 +76,46 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   crossfadeDuration: 0,
   replayGainEnabled: true,
   offlineTracks: new Map(),
+  deviceId: generateDeviceId(),
+  connectedDevices: [],
+
+  initDevice: async () => {
+    const { deviceId } = get();
+    try {
+      const deviceName = navigator.userAgent.includes('Mobile') ? 'Mobile Browser' : 'Web Browser';
+      await registerDevice(deviceId, deviceName, 'web');
+
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      heartbeatInterval = setInterval(() => {
+        sendHeartbeat(deviceId).catch(() => {});
+      }, 30000);
+
+      const devices = await getDevices();
+      set({ connectedDevices: devices });
+    } catch {
+      // Device registration failed silently
+    }
+  },
+
+  refreshDevices: async () => {
+    try {
+      const devices = await getDevices();
+      set({ connectedDevices: devices });
+    } catch {
+      // silently fail
+    }
+  },
+
+  transferPlayback: async (targetDeviceId: string) => {
+    const { deviceId } = get();
+    try {
+      const { transferPlayback: apiTransfer } = await import('@/api/devices');
+      await apiTransfer(targetDeviceId);
+      await get().refreshDevices();
+    } catch {
+      // silently fail
+    }
+  },
 
   setTrack: (track) => {
     const { currentTrack, history } = get();

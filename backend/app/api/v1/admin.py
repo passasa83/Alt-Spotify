@@ -37,7 +37,7 @@ async def get_dashboard(
 
     active_sessions = (
         await db.execute(
-            select(func.count(JamSession.id)).where(JamSession.is_active.is_(True))
+            select(func.count(JamSession.id)).where(JamSession.status == "ACTIVE")
         )
     ).scalar() or 0
 

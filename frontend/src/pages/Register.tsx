@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -12,6 +12,8 @@ const Register = () => {
   const { register, isLoading } = useAuthStore();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('invite');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +30,7 @@ const Register = () => {
     }
 
     try {
-      await register(email, pseudo, password);
+      await register(email, pseudo, password, inviteToken || undefined);
       navigate('/login');
     } catch {
       setError(t('auth.registration_failed'));
@@ -46,6 +48,18 @@ const Register = () => {
         </div>
 
         <h1 className="mb-6 text-center text-2xl font-bold text-white">{t('auth.register_title')}</h1>
+
+        {inviteToken ? (
+          <div className="mb-4 rounded-md bg-green-500/20 p-3 text-center text-sm text-green-400">
+            {t('auth.invite_valid')}
+          </div>
+        ) : (
+          <div className="mb-4 rounded-md bg-yellow-500/20 p-3 text-center text-sm text-yellow-400">
+            {t('auth.invite_required')}
+            <br />
+            <span className="text-xs opacity-75">{t('auth.no_invite')}</span>
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 rounded-md bg-red-500/20 p-3 text-center text-sm text-red-400" role="alert">

@@ -80,6 +80,9 @@ const fr = {
   'auth.choose_display_name': 'Choisissez un nom d\'affichage',
   'auth.create_password': 'Créez un mot de passe',
   'auth.confirm_your_password': 'Confirmez votre mot de passe',
+  'auth.invite_required': 'Une invitation est requise pour créer un compte',
+  'auth.invite_valid': 'Invitation validée',
+  'auth.no_invite': 'Vous n\'avez pas d\'invitation ? Contactez un administrateur.',
 
   // Settings
   'settings.title': 'Paramètres',
@@ -158,6 +161,25 @@ const fr = {
   'admin.storage_per_artist': 'Espace par artiste',
   'admin.tracks_by_genre': 'Titres par genre',
   'admin.most_played': 'Les plus écoutés',
+  'admin.invites': 'Invitations',
+  'admin.create_invite': 'Créer une invitation',
+  'admin.invite_email_optional': 'E-mail (facultatif)',
+  'admin.invite_email_placeholder': 'email@example.com',
+  'admin.max_uses': 'Utilisations max',
+  'admin.expires_days': 'Jours avant expiration',
+  'admin.creating': 'Création...',
+  'admin.no_invites': 'Aucune invitation',
+  'admin.invite_email': 'E-mail',
+  'admin.uses': 'Utilisations',
+  'admin.expires': 'Expiration',
+  'admin.created': 'Créé le',
+  'admin.revoked': 'Révoqué',
+  'admin.used': 'Utilisé',
+  'admin.copy_link': 'Copier le lien',
+  'admin.revoke_invite': 'Révoquer l\'invitation',
+  'admin.connected_devices': 'Appareils connectés',
+  'admin.no_devices': 'Aucun appareil connecté',
+  'admin.last_active': 'Dernière activité',
 
   // Jam
   'jam.create_session': 'Créer une session',
@@ -224,6 +246,13 @@ const fr = {
   'library.songs_appear': 'Les titres que vous aimez apparaîtront ici',
   'library.save_songs': 'Enregistrez les titres en appuyant sur l\'icône cœur',
   'library.find_songs': 'Trouver des titres',
+
+  // Browse
+  'browse.title': 'Parcourir',
+  'browse.new_releases': 'Nouveautés',
+  'browse.trending': 'Tendances',
+  'browse.genres': 'Genres',
+  'browse.select_genre': 'Sélectionnez un genre',
 
   // Search
   'search.placeholder': 'Que souhaitez-vous écouter ?',

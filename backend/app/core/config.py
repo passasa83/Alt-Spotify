@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     MINIO_BUCKET: str = "alt-spotify"
     MINIO_SECURE: bool = False
 
+    MEILISEARCH_URL: str = "http://meilisearch:7700"
+    MEILISEARCH_MASTER_KEY: str = "changeme"
+
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
     # Security / logging / rate-limit settings

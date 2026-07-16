@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Search, Library, Plus, Heart, Radio, BarChart3, Upload, Headphones, Activity, Sparkles } from 'lucide-react';
+import { Home, Search, Library, Plus, Heart, Radio, BarChart3, Upload, Headphones, Activity, Sparkles, Mail, Compass } from 'lucide-react';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useEffect } from 'react';
@@ -32,6 +32,10 @@ const Sidebar = () => {
           <NavLink to="/" className={navLinkClass} aria-label={t('nav.home')}>
             <Home size={24} aria-hidden="true" />
             {t('nav.home')}
+          </NavLink>
+          <NavLink to="/browse" className={navLinkClass} aria-label={t('browse.title')}>
+            <Compass size={24} aria-hidden="true" />
+            {t('browse.title')}
           </NavLink>
           <NavLink to="/search" className={navLinkClass} aria-label={t('nav.search')}>
             <Search size={24} aria-hidden="true" />
@@ -67,6 +71,12 @@ const Sidebar = () => {
             <NavLink to="/admin/dashboard" className={navLinkClass} aria-label={t('admin.dashboard')}>
               <Activity size={24} aria-hidden="true" />
               {t('admin.dashboard')}
+            </NavLink>
+          )}
+          {user?.role === 'ADMIN' && (
+            <NavLink to="/admin/invites" className={navLinkClass} aria-label={t('admin.invites')}>
+              <Mail size={24} aria-hidden="true" />
+              {t('admin.invites')}
             </NavLink>
           )}
         </nav>

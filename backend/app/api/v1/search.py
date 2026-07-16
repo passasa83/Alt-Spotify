@@ -12,8 +12,16 @@ from app.schemas.artist import ArtistResponse
 from app.schemas.album import AlbumResponse
 from app.schemas.track import TrackResponse
 from app.schemas.playlist import PlaylistResponse
+from app.services.meilisearch import search_meili
 
 router = APIRouter(prefix="/search", tags=["search"])
+
+
+async def _try_meilisearch(query: str, index: str, limit: int, offset: int) -> list[dict]:
+    try:
+        return await search_meili(query, index=index, limit=limit, offset=offset)
+    except Exception:
+        return []
 
 
 @router.get("")
@@ -33,47 +41,59 @@ async def search(
     results: dict = {}
 
     if "artists" in types:
-        result = await db.execute(
-            select(Artist)
-            .where(Artist.name.ilike(f"%{q}%"))
-            .offset(offset)
-            .limit(page_size)
-        )
-        results["artists"] = [ArtistResponse.model_validate(a) for a in result.scalars().all()]
+        meili_hits = await _try_meilisearch(q, "artists", page_size, offset)
+        if meili_hits:
+            results["artists"] = [ArtistResponse(**a) for a in meili_hits]
+        else:
+            result = await db.execute(
+                select(Artist).where(Artist.name.ilike(f"%{q}%")).offset(offset).limit(page_size)
+            )
+            results["artists"] = [ArtistResponse.model_validate(a) for a in result.scalars().all()]
 
     if "albums" in types:
-        query = select(Album).where(Album.title.ilike(f"%{q}%"))
-        result = await db.execute(query.offset(offset).limit(page_size))
-        results["albums"] = [AlbumResponse.model_validate(a) for a in result.scalars().all()]
+        meili_hits = await _try_meilisearch(q, "albums", page_size, offset)
+        if meili_hits:
+            results["albums"] = [AlbumResponse(**a) for a in meili_hits]
+        else:
+            result = await db.execute(
+                select(Album).where(Album.title.ilike(f"%{q}%")).offset(offset).limit(page_size)
+            )
+            results["albums"] = [AlbumResponse.model_validate(a) for a in result.scalars().all()]
 
     if "tracks" in types:
-        query = select(Track).where(Track.title.ilike(f"%{q}%"))
-        if genre:
-            query = query.where(Track.genre.ilike(genre))
-        if min_duration is not None:
-            query = query.where(Track.duration_seconds >= min_duration)
-        if max_duration is not None:
-            query = query.where(Track.duration_seconds <= max_duration)
-        result = await db.execute(query.offset(offset).limit(page_size))
-        results["tracks"] = [TrackResponse.model_validate(t) for t in result.scalars().all()]
+        meili_hits = await _try_meilisearch(q, "tracks", page_size, offset)
+        if meili_hits:
+            results["tracks"] = [TrackResponse(**t) for t in meili_hits]
+        else:
+            query = select(Track).where(Track.title.ilike(f"%{q}%"))
+            if genre:
+                query = query.where(Track.genre.ilike(genre))
+            if min_duration is not None:
+                query = query.where(Track.duration_seconds >= min_duration)
+            if max_duration is not None:
+                query = query.where(Track.duration_seconds <= max_duration)
+            result = await db.execute(query.offset(offset).limit(page_size))
+            results["tracks"] = [TrackResponse.model_validate(t) for t in result.scalars().all()]
 
     if "playlists" in types:
-        result = await db.execute(
-            select(Playlist)
-            .where(Playlist.is_public == True, Playlist.title.ilike(f"%{q}%"))
-            .offset(offset)
-            .limit(page_size)
-        )
-        results["playlists"] = [PlaylistResponse.model_validate(p) for p in result.scalars().all()]
+        meili_hits = await _try_meilisearch(q, "playlists", page_size, offset)
+        if meili_hits:
+            results["playlists"] = [PlaylistResponse(**p) for p in meili_hits]
+        else:
+            result = await db.execute(
+                select(Playlist).where(Playlist.is_public == True, Playlist.title.ilike(f"%{q}%")).offset(offset).limit(page_size)
+            )
+            results["playlists"] = [PlaylistResponse.model_validate(p) for p in result.scalars().all()]
 
     if "podcasts" in types:
-        result = await db.execute(
-            select(Podcast)
-            .where(Podcast.title.ilike(f"%{q}%"))
-            .offset(offset)
-            .limit(page_size)
-        )
-        from app.schemas.podcast import PodcastResponse
-        results["podcasts"] = [PodcastResponse.model_validate(p) for p in result.scalars().all()]
+        meili_hits = await _try_meilisearch(q, "podcasts", page_size, offset)
+        if meili_hits:
+            results["podcasts"] = meili_hits
+        else:
+            result = await db.execute(
+                select(Podcast).where(Podcast.title.ilike(f"%{q}%")).offset(offset).limit(page_size)
+            )
+            from app.schemas.podcast import PodcastResponse
+            results["podcasts"] = [PodcastResponse.model_validate(p) for p in result.scalars().all()]
 
     return results
