@@ -53,6 +53,7 @@ const fr = {
   'action.unfollow': 'Ne plus suivre',
   'action.show_all': 'Tout afficher',
   'action.back': 'Retour',
+  'action.close': 'Fermer',
 
   // Auth
   'auth.login': 'Se connecter',
@@ -334,6 +335,12 @@ const fr = {
   'import.unmatched_tracks': 'Titres sans correspondance :',
   'import.invalid_file': 'Veuillez sélectionner un fichier CSV ou JSON',
   'import.failed': 'Échec de l\'importation',
+  'import.file_import': 'Fichier',
+  'import.spotify_help': 'Collez l\'URL d\'une playlist Spotify pour l\'importer dans votre bibliothèque.',
+  'import.import_spotify': 'Importer depuis Spotify',
+  'import.spotify_success': 'Playlist importée avec succès !',
+  'import.spotify_tracks_matched': 'titres correspondants trouvés',
+  'import.spotify_unmatched': 'titres non trouvés dans le catalogue local',
 
   // Share
   'share.title': 'Partager',

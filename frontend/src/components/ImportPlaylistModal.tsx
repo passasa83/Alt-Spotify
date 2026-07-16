@@ -1,6 +1,9 @@
 import { useState, useRef } from 'react';
 import { Upload, X, Check, AlertCircle, FileText } from 'lucide-react';
 import client from '@/api/client';
+import { importPlaylistFromSpotify } from '@/api/playlists';
+import type { SpotifyImportResult } from '@/api/playlists';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface ImportResult {
   playlist_id: string;
@@ -15,10 +18,15 @@ interface Props {
 }
 
 const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
+  const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [spotifyUrl, setSpotifyUrl] = useState('');
+  const [importTab, setImportTab] = useState<'file' | 'spotify'>('file');
+  const [spotifyLoading, setSpotifyLoading] = useState(false);
+  const [spotifyResult, setSpotifyResult] = useState<SpotifyImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -72,7 +80,27 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
     setFile(null);
     setResult(null);
     setError(null);
+    setSpotifyUrl('');
+    setSpotifyResult(null);
+    setImportTab('file');
     onClose();
+  };
+
+  const handleSpotifyImport = async () => {
+    if (!spotifyUrl.trim()) return;
+    setSpotifyLoading(true);
+    setError(null);
+    try {
+      const result = await importPlaylistFromSpotify(spotifyUrl);
+      setSpotifyResult(result);
+      if (onImported) {
+        onImported(result.playlist_id);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to import from Spotify');
+    } finally {
+      setSpotifyLoading(false);
+    }
   };
 
   return (
@@ -85,7 +113,33 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
           </button>
         </div>
 
-        {!result ? (
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setImportTab('file')}
+            className={`px-4 py-2 rounded-full text-sm font-medium ${
+              importTab === 'file' ? 'bg-white text-black' : 'bg-gray-800 text-gray-300'
+            }`}
+          >
+            {t('import.file_import')}
+          </button>
+          <button
+            onClick={() => setImportTab('spotify')}
+            className={`px-4 py-2 rounded-full text-sm font-medium ${
+              importTab === 'spotify' ? 'bg-green-500 text-black' : 'bg-gray-800 text-gray-300'
+            }`}
+          >
+            Spotify
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-3 flex items-center gap-2 rounded bg-red-500/20 px-3 py-2 text-sm text-red-400">
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
+
+        {importTab === 'file' && !result && (
           <>
             <div
               onClick={() => fileInputRef.current?.click()}
@@ -103,10 +157,10 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
                 <>
                   <Upload size={32} className="mb-2 text-gray-400" />
                   <p className="text-sm text-white">
-                    Drop a CSV or JSON file here
+                    {t('import.drop_csv')}
                   </p>
                   <p className="text-xs text-gray-400">
-                    CSV columns: title, artist, album (optional)
+                    {t('import.csv_columns')}
                   </p>
                 </>
               )}
@@ -120,22 +174,17 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
               className="hidden"
             />
 
-            {error && (
-              <div className="mt-3 flex items-center gap-2 rounded bg-red-500/20 px-3 py-2 text-sm text-red-400">
-                <AlertCircle size={16} />
-                {error}
-              </div>
-            )}
-
             <button
               onClick={handleImport}
               disabled={!file || isImporting}
               className="mt-4 w-full rounded-full bg-green-500 py-3 font-bold text-black transition-colors hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isImporting ? 'Importing...' : 'Import Playlist'}
+              {isImporting ? t('import.importing') : t('import.import_playlist')}
             </button>
           </>
-        ) : (
+        )}
+
+        {result && importTab === 'file' && (
           <div>
             <div className="mb-4 flex items-center gap-3 rounded-lg bg-green-500/10 p-4">
               <Check size={24} className="text-green-500" />
@@ -166,8 +215,50 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
               onClick={handleClose}
               className="w-full rounded-full bg-white py-3 font-bold text-black hover:scale-105"
             >
-              Done
+              {t('import.done')}
             </button>
+          </div>
+        )}
+
+        {importTab === 'spotify' && (
+          <div className="space-y-4">
+            {spotifyResult ? (
+              <div className="rounded-lg bg-green-500/10 p-4">
+                <p className="text-green-400 font-medium">{t('import.spotify_success')}</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  {spotifyResult.title} — {spotifyResult.matched}/{spotifyResult.total_spotify_tracks} {t('import.spotify_tracks_matched')}
+                </p>
+                {spotifyResult.unmatched > 0 && (
+                  <p className="text-sm text-yellow-400 mt-1">
+                    {spotifyResult.unmatched} {t('import.spotify_unmatched')}
+                  </p>
+                )}
+                <button
+                  onClick={handleClose}
+                  className="mt-3 rounded-full bg-green-500 px-6 py-2 text-sm font-bold text-black hover:bg-green-400"
+                >
+                  {t('action.close')}
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-gray-400">{t('import.spotify_help')}</p>
+                <input
+                  type="url"
+                  value={spotifyUrl}
+                  onChange={(e) => setSpotifyUrl(e.target.value)}
+                  placeholder="https://open.spotify.com/playlist/..."
+                  className="w-full rounded-md border border-gray-600 bg-gray-800 px-4 py-3 text-white placeholder-gray-400 outline-none focus:border-green-500"
+                />
+                <button
+                  onClick={handleSpotifyImport}
+                  disabled={spotifyLoading || !spotifyUrl.trim()}
+                  className="w-full rounded-full bg-green-500 py-3 font-bold text-black hover:bg-green-400 disabled:opacity-50"
+                >
+                  {spotifyLoading ? t('import.importing') : t('import.import_spotify')}
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

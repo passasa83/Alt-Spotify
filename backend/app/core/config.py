@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     MEILISEARCH_URL: str = "http://meilisearch:7700"
     MEILISEARCH_MASTER_KEY: str = "changeme"
 
+    SPOTIFY_CLIENT_ID: str | None = None
+    SPOTIFY_CLIENT_SECRET: str | None = None
+
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
     ALLOWED_HOSTS: str = "*"
 

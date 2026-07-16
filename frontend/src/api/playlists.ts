@@ -74,3 +74,17 @@ export const exportPlaylistJson = async (playlistId: string): Promise<Blob> => {
   });
   return response.data;
 };
+
+export interface SpotifyImportResult {
+  playlist_id: string;
+  title: string;
+  matched: number;
+  unmatched: number;
+  unmatched_tracks: { title: string; artist: string; album: string }[];
+  total_spotify_tracks: number;
+}
+
+export const importPlaylistFromSpotify = async (url: string): Promise<SpotifyImportResult> => {
+  const response = await client.post('/playlists/import-export/spotify', { url });
+  return response.data;
+};

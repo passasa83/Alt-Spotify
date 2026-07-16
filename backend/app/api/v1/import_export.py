@@ -17,6 +17,7 @@ from app.models.album import Album
 from app.schemas.common import MessageResponse
 from app.utils.deps import get_current_user
 from app.models.user import User
+from app.services.spotify import extract_playlist_id, fetch_spotify_playlist
 
 router = APIRouter(prefix="/playlists/import-export", tags=["import-export"])
 
@@ -218,3 +219,61 @@ async def export_json(
         media_type="application/json",
         headers={"Content-Disposition": f"attachment; filename={playlist.title}.json"},
     )
+
+
+from pydantic import BaseModel
+
+
+class SpotifyImportRequest(BaseModel):
+    url: str
+
+
+@router.post("/import-export/spotify")
+async def import_from_spotify(
+    body: SpotifyImportRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    playlist_id = extract_playlist_id(body.url)
+    if not playlist_id:
+        raise HTTPException(status_code=400, detail="Invalid Spotify playlist URL")
+
+    spotify_data = await fetch_spotify_playlist(playlist_id)
+    if not spotify_data:
+        raise HTTPException(status_code=502, detail="Failed to fetch Spotify playlist. Check that SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET are configured.")
+
+    playlist = Playlist(
+        title=spotify_data["title"],
+        description=spotify_data.get("description", ""),
+        owner_id=current_user.id,
+        is_public=True,
+    )
+    db.add(playlist)
+    await db.flush()
+
+    rows = [
+        {"title": t["title"], "artist": t["artist"], "album": t["album"]}
+        for t in spotify_data["tracks"]
+    ]
+    matched_tracks, unmatched_rows = await _match_tracks(rows, db)
+
+    for i, track in enumerate(matched_tracks):
+        pt = PlaylistTrack(
+            playlist_id=playlist.id,
+            track_id=track.id,
+            position=i,
+            added_by=current_user.id,
+        )
+        db.add(pt)
+
+    await db.flush()
+    await db.refresh(playlist)
+
+    return {
+        "playlist_id": str(playlist.id),
+        "title": playlist.title,
+        "matched": len(matched_tracks),
+        "unmatched": len(unmatched_rows),
+        "unmatched_tracks": unmatched_rows[:20],
+        "total_spotify_tracks": spotify_data["track_count"],
+    }
