@@ -217,19 +217,30 @@ async def search(
             tracks = []
             seen_isrcs: set[str] = set()
             seen_keys: set[str] = set()
+            seen_track_ids: set[str] = set()
+            seen_deezer_ids: set[int] = set()
 
             for ext in external_results:
                 ext_isrc = ext.get("isrc")
+                ext_deezer_id = ext.get("deezer_id")
                 ext_dedup_key = f"{_normalize_title(ext['title'])}|{_normalize_title(ext['artist'])}"
                 local_match = local_tracks_map.get(ext_dedup_key)
 
                 if ext_isrc and ext_isrc in seen_isrcs:
                     continue
+                if ext_deezer_id and ext_deezer_id in seen_deezer_ids:
+                    continue
+                if ext_deezer_id:
+                    seen_deezer_ids.add(ext_deezer_id)
 
                 if local_match:
+                    local_track_id = str(local_match[0].id)
+                    if local_track_id in seen_track_ids:
+                        continue
                     aimg = local_artist_images.get(ext_dedup_key)
                     tracks.append(_track_to_response(local_match[0], local_match[1], aimg))
                     seen_keys.add(ext_dedup_key)
+                    seen_track_ids.add(local_track_id)
                     if ext_isrc:
                         seen_isrcs.add(ext_isrc)
                     artist_picture = ext.get("artist_picture")
@@ -264,8 +275,11 @@ async def search(
 
             for dedup_key, (t, aname) in local_tracks_map.items():
                 if dedup_key not in seen_keys:
-                    aimg = local_artist_images.get(dedup_key)
-                    tracks.append(_track_to_response(t, aname, aimg))
+                    local_track_id = str(t.id)
+                    if local_track_id not in seen_track_ids:
+                        aimg = local_artist_images.get(dedup_key)
+                        tracks.append(_track_to_response(t, aname, aimg))
+                        seen_track_ids.add(local_track_id)
 
             await db.commit()
             results["tracks"] = tracks
