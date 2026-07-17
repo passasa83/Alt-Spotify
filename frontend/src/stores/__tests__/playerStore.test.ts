@@ -6,6 +6,7 @@ const createTrack = (id: string, title = 'Test Track'): Track => ({
   id,
   title,
   artist_id: 'artist-1',
+  file_url: 'local:/test/file.flac',
   duration_seconds: 180,
   play_count: 0,
   created_at: '2024-01-01',

@@ -121,6 +121,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   setTrack: (track) => {
+    if (!track.file_url && !track.hls_path) return;
     const { currentTrack, history } = get();
     if (currentTrack) {
       set({ history: [currentTrack, ...history].slice(0, 50) });

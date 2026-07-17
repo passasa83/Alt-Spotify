@@ -23,6 +23,8 @@ const TrackCard = ({ track }: TrackCardProps) => {
   const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  const hasAudio = !!(track.file_url || track.hls_path);
+
   return (
     <>
       <div className="group relative cursor-pointer rounded-md bg-gray-900 p-3 transition-colors hover:bg-gray-800">
@@ -30,18 +32,24 @@ const TrackCard = ({ track }: TrackCardProps) => {
           <img
             src={resolveCoverUrl(track.cover_url || track.album?.cover_url)}
             alt={track.title}
-            className="h-40 w-full rounded-md object-cover shadow-lg"
+            className={`h-40 w-full rounded-md object-cover shadow-lg ${!hasAudio ? 'opacity-50' : ''}`}
           />
-          <button
-            onClick={() => setTrack(track)}
-            className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-black shadow-xl transition-all ${
-              isCurrentTrack && isPlaying
-                ? 'opacity-100 translate-y-0'
-                : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
-            }`}
-          >
-            <Play size={18} fill="currentColor" />
-          </button>
+          {hasAudio ? (
+            <button
+              onClick={() => setTrack(track)}
+              className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-black shadow-xl transition-all ${
+                isCurrentTrack && isPlaying
+                  ? 'opacity-100 translate-y-0'
+                  : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
+              }`}
+            >
+              <Play size={18} fill="currentColor" />
+            </button>
+          ) : (
+            <div className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 text-gray-400 shadow-xl">
+              <Play size={18} />
+            </div>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();

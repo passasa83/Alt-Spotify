@@ -78,25 +78,33 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
                   <span className={`text-sm ${isCurrentTrack ? 'text-green-500' : 'text-gray-400 group-hover:hidden'}`}>
                     {isCurrentTrack && isPlaying ? '♪' : index + 1}
                   </span>
-                  <button
-                    onClick={() => setTrack(track)}
-                    className="hidden text-white group-hover:block"
-                    aria-label={`${t('player.play')} ${track.title}`}
-                  >
-                    <Play size={14} fill="currentColor" />
-                  </button>
+                  {(track.file_url || track.hls_path) ? (
+                    <button
+                      onClick={() => setTrack(track)}
+                      className="hidden text-white group-hover:block"
+                      aria-label={`${t('player.play')} ${track.title}`}
+                    >
+                      <Play size={14} fill="currentColor" />
+                    </button>
+                  ) : (
+                    <span className="hidden text-gray-600 group-hover:block">—</span>
+                  )}
                 </div>
               )}
 
               <div className="flex items-center gap-3">
                 {!showIndex && (
-                  <button
-                    onClick={() => setTrack(track)}
-                    className="hidden text-white group-hover:block"
-                    aria-label={`${t('player.play')} ${track.title}`}
-                  >
-                    <Play size={14} fill="currentColor" />
-                  </button>
+                  (track.file_url || track.hls_path) ? (
+                    <button
+                      onClick={() => setTrack(track)}
+                      className="hidden text-white group-hover:block"
+                      aria-label={`${t('player.play')} ${track.title}`}
+                    >
+                      <Play size={14} fill="currentColor" />
+                    </button>
+                  ) : (
+                    <span className="hidden text-gray-600 group-hover:block">—</span>
+                  )
                 )}
                 <img
                   src={resolveCoverUrl(track.cover_url || track.album?.cover_url)}
