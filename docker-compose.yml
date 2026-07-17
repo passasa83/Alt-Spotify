@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: altspotify
-      POSTGRES_USER: altspotify
+      POSTGRES_DB: ${POSTGRES_DB:-altspotify}
+      POSTGRES_USER: ${POSTGRES_USER:-altspotify}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
     ports:
       - "5432:5432"
     volumes:
       - ${POSTGRES_DATA_DIR:-./data/postgres}:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U altspotify -d altspotify"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-altspotify} -d ${POSTGRES_DB:-altspotify}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -68,18 +68,28 @@ services:
       - backend-net
 
   backend:
-    build: ./backend
+    build:
+      context: https://github.com/passasa83/Alt-Spotify.git#Akajox:backend
     ports:
       - "8000:8000"
-    env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://altspotify:${POSTGRES_PASSWORD:-changeme}@postgres:5432/altspotify
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-altspotify}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-altspotify}
       REDIS_URL: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-alt-spotify}
       SECRET_KEY: ${SECRET_KEY:-changeme}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_DEFAULT: ${RATE_LIMIT_DEFAULT:-100/minute}
+      RATE_LIMIT_AUTH: ${RATE_LIMIT_AUTH:-10/minute}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,8 +107,8 @@ services:
       - frontend-net
 
   worker:
-    build: ./worker
-    env_file: .env
+    build:
+      context: https://github.com/passasa83/Alt-Spotify.git#Akajox:worker
     environment:
       REDIS_URL: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
@@ -113,7 +123,8 @@ services:
       - backend-net
 
   frontend:
-    build: ./frontend
+    build:
+      context: https://github.com/passasa83/Alt-Spotify.git#Akajox:frontend
     ports:
       - "3000:80"
     labels:
@@ -121,6 +132,17 @@ services:
       - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
       - "traefik.http.routers.frontend.entrypoints=web"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      - "traefik.http.routers.frontend.middlewares=sec-headers,compress"
+      # Middlewares intégrés (Remplace dynamic.yml)
+      - "traefik.http.middlewares.sec-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.sec-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.sec-headers.headers.stsPreload=true"
+      - "traefik.http.middlewares.sec-headers.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.sec-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.sec-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.sec-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.sec-headers.headers.frameDeny=true"
+      - "traefik.http.middlewares.compress.compress=true"
     depends_on:
       - backend
     networks:
@@ -128,13 +150,17 @@ services:
 
   traefik:
     image: traefik:v2.11
+    command:
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--providers.docker.network=frontend-net"
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
       - traefik_certs:/letsencrypt
     depends_on:
       - backend
@@ -144,10 +170,6 @@ services:
       - backend-net
 
 volumes:
-  postgres_data:
-  redis_data:
-  minio_data:
-  meilisearch_data:
   traefik_certs:
 
 networks:
