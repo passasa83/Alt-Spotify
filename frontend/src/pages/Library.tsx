@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useLibraryStore } from '@/stores/libraryStore';
+import { usePlayerStore } from '@/stores/playerStore';
 import PlaylistCard from '@/components/PlaylistCard';
 import ImportPlaylistModal from '@/components/ImportPlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
+import TrackContextMenu from '@/components/TrackContextMenu';
+import AddToPlaylistModal from '@/components/AddToPlaylistModal';
 import { Link } from 'react-router-dom';
-import { Plus, Upload } from 'lucide-react';
+import { Plus, Upload, Play } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
+import type { Track } from '@/types';
 
 const Library = () => {
   const { t } = useTranslation();
@@ -13,6 +17,8 @@ const Library = () => {
   const [activeTab, setActiveTab] = useState<'playlists' | 'favorites'>('playlists');
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
+  const { setTrack, currentTrack, isPlaying } = usePlayerStore();
 
   useEffect(() => {
     loadPlaylists();
@@ -112,37 +118,66 @@ const Library = () => {
               </Link>
             </div>
           ) : (
-            <div className="space-y-1">
-              {favorites.map((track) => (
-                <div
-                  key={track.id}
-                  className="flex items-center gap-4 rounded-md px-4 py-2 hover:bg-gray-800"
-                >
-                  <img
-                    src={track.cover_url || track.album?.cover_url || '/placeholder-album.png'}
-                    alt={track.title}
-                    className="h-10 w-10 rounded object-cover"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      to={`/track/${track.id}`}
-                      className="block truncate text-sm font-medium text-white hover:underline"
-                    >
-                      {track.title}
-                    </Link>
-                    <Link
-                      to={`/artist/${track.artist_id}`}
-                      className="block truncate text-xs text-gray-400 hover:underline"
-                    >
-                      {track.artist?.name || 'Unknown Artist'}
-                    </Link>
+            <div className="space-y-0.5">
+              {favorites.map((track) => {
+                const isCurrentTrack = currentTrack?.id === track.id;
+                return (
+                  <div
+                    key={track.id}
+                    className="group flex items-center gap-4 rounded-md px-4 py-2 hover:bg-gray-800"
+                  >
+                    <div className="relative h-10 w-10">
+                      <img
+                        src={track.cover_url || track.album?.cover_url || '/placeholder-album.png'}
+                        alt={track.title}
+                        className="h-10 w-10 rounded object-cover"
+                      />
+                      <button
+                        onClick={() => setTrack(track)}
+                        className={`absolute inset-0 flex items-center justify-center rounded bg-black/50 transition-opacity ${
+                          isCurrentTrack && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                      >
+                        <Play size={16} fill="white" className="text-white" />
+                      </button>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        to={`/track/${track.id}`}
+                        className={`block truncate text-sm font-medium hover:underline ${isCurrentTrack ? 'text-green-500' : 'text-white'}`}
+                      >
+                        {track.title}
+                      </Link>
+                      <Link
+                        to={`/artist/${track.artist_id}`}
+                        className="block truncate text-xs text-gray-400 hover:underline"
+                      >
+                        {track.artist?.name || 'Unknown Artist'}
+                      </Link>
+                    </div>
+                    <div className="opacity-0 group-hover:opacity-100">
+                      <TrackContextMenu
+                        track={track}
+                        onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       )}
+
+      <AddToPlaylistModal
+        isOpen={!!playlistModalTrack}
+        onClose={() => setPlaylistModalTrack(null)}
+        track={playlistModalTrack}
+        onCreateNew={() => {
+          setPlaylistModalTrack(null);
+          setShowCreateModal(true);
+        }}
+      />
     </div>
   );
 };

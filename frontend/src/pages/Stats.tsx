@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { getUserStats } from '@/api/users';
 import { useTranslation } from '@/hooks/useTranslation';
-import type { UserStats } from '@/types';
+import { usePlayerStore } from '@/stores/playerStore';
+import TrackContextMenu from '@/components/TrackContextMenu';
+import AddToPlaylistModal from '@/components/AddToPlaylistModal';
+import CreatePlaylistModal from '@/components/CreatePlaylistModal';
+import type { UserStats, Track } from '@/types';
 import { Clock, Music, Flame, BarChart3 } from 'lucide-react';
 
 const Stats = () => {
@@ -9,6 +13,9 @@ const Stats = () => {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const { setTrack } = usePlayerStore();
 
   useEffect(() => {
     getUserStats()
@@ -74,18 +81,25 @@ const Stats = () => {
           <h3 className="mb-4 text-lg font-semibold text-white">{t('stats.top_tracks')}</h3>
           <div className="space-y-3">
             {stats.top_tracks.slice(0, 5).map((track, i) => (
-              <div key={track.id} className="flex items-center gap-3">
+              <div key={track.id} className="group flex items-center gap-3">
                 <span className="w-6 text-center text-sm font-bold text-gray-500">{i + 1}</span>
                 <img
                   src={track.cover_url || '/placeholder-album.png'}
                   alt={track.title}
-                  className="h-10 w-10 rounded object-cover"
+                  className="h-10 w-10 rounded object-cover cursor-pointer"
+                  onClick={() => setTrack(track as Track)}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-white">{track.title}</p>
+                  <p className="truncate text-sm font-medium text-white cursor-pointer hover:underline" onClick={() => setTrack(track as Track)}>{track.title}</p>
                   <p className="truncate text-xs text-gray-400">
                     {track.artist?.name || t('player.unknown_artist')}
                   </p>
+                </div>
+                <div className="opacity-0 group-hover:opacity-100">
+                  <TrackContextMenu
+                    track={track as Track}
+                    onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
+                  />
                 </div>
               </div>
             ))}
@@ -171,6 +185,20 @@ const Stats = () => {
           </div>
         </div>
       </div>
+
+      <AddToPlaylistModal
+        isOpen={!!playlistModalTrack}
+        onClose={() => setPlaylistModalTrack(null)}
+        track={playlistModalTrack}
+        onCreateNew={() => {
+          setPlaylistModalTrack(null);
+          setShowCreateModal(true);
+        }}
+      />
+      <CreatePlaylistModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+      />
     </div>
   );
 };

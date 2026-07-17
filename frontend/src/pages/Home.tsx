@@ -50,23 +50,9 @@ const Home = () => {
     <div className="space-y-8 pb-24">
       <section>
         <h2 className="mb-4 text-2xl font-bold text-white">{t('nav.home')}</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {recentTracks.slice(0, 6).map((track) => (
-            <div
-              key={track.id}
-              className="flex items-center gap-4 rounded-md bg-white/10 p-2 transition-colors hover:bg-white/20"
-              onClick={() => {
-                const { setTrack } = usePlayerStore.getState();
-                setTrack(track);
-              }}
-            >
-              <img
-                src={track.cover_url || track.album?.cover_url || '/placeholder-album.png'}
-                alt={track.title}
-                className="h-12 w-12 rounded object-cover"
-              />
-              <span className="truncate text-sm font-semibold text-white">{track.title}</span>
-            </div>
+            <TrackCard key={track.id} track={track} />
           ))}
         </div>
       </section>

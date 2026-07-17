@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { usePlayerStore } from '@/stores/playerStore';
+import TrackContextMenu from '@/components/TrackContextMenu';
+import AddToPlaylistModal from '@/components/AddToPlaylistModal';
+import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import type { Track } from '@/types';
-import { Clock, Filter, Calendar } from 'lucide-react';
+import { Clock, Filter, Calendar, Play } from 'lucide-react';
 
 interface HistoryItem {
   id: string;
@@ -13,6 +16,7 @@ interface HistoryItem {
   duration_seconds: number;
   played_at: string;
   duration_listened_seconds: number;
+  artist?: { id: string; name: string; image_url?: string };
 }
 
 const History = () => {
@@ -25,6 +29,8 @@ const History = () => {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [genre, setGenre] = useState('');
+  const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const fetchHistory = async (p: number) => {
     setLoading(true);
@@ -62,6 +68,18 @@ const History = () => {
     const d = new Date(iso);
     return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
+
+  const itemToTrack = (item: HistoryItem): Track => ({
+    id: item.track_id,
+    title: item.title,
+    artist_id: item.artist_id,
+    cover_url: item.cover_url,
+    duration_seconds: item.duration_seconds,
+    is_explicit: false,
+    play_count: 0,
+    created_at: '',
+    artist: item.artist,
+  } as Track);
 
   return (
     <div className="space-y-6">
@@ -103,33 +121,52 @@ const History = () => {
           <p className="text-gray-500">{t('history.empty')}</p>
         </div>
       ) : (
-        <div className="space-y-1">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => setTrack({ id: item.track_id, title: item.title, artist_id: item.artist_id, cover_url: item.cover_url, duration_seconds: item.duration_seconds, is_explicit: false, play_count: 0, created_at: '' } as Track)}
-              className={`flex cursor-pointer items-center gap-4 rounded-lg px-4 py-3 transition-colors ${
-                currentTrack?.id === item.track_id && isPlaying
-                  ? 'bg-green-500/10 text-green-400'
-                  : 'hover:bg-gray-800 text-gray-300'
-              }`}
-            >
-              <img
-                src={item.cover_url || '/placeholder-album.png'}
-                alt={item.title}
-                className="h-10 w-10 rounded object-cover"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{item.title}</p>
-                <p className="truncate text-xs text-gray-500">
-                  {item.duration_listened_seconds > 0
-                    ? `${formatTime(item.duration_listened_seconds)} / ${formatTime(item.duration_seconds)}`
-                    : formatTime(item.duration_seconds)}
-                </p>
+        <div className="space-y-0.5">
+          {items.map((item) => {
+            const isCurrentTrack = currentTrack?.id === item.track_id;
+            return (
+              <div
+                key={item.id}
+                className={`group flex items-center gap-4 rounded-lg px-4 py-3 transition-colors ${
+                  isCurrentTrack && isPlaying
+                    ? 'bg-green-500/10 text-green-400'
+                    : 'hover:bg-gray-800 text-gray-300'
+                }`}
+              >
+                <div className="relative h-10 w-10">
+                  <img
+                    src={item.cover_url || '/placeholder-album.png'}
+                    alt={item.title}
+                    className="h-10 w-10 rounded object-cover"
+                  />
+                  <button
+                    onClick={() => setTrack(itemToTrack(item))}
+                    className={`absolute inset-0 flex items-center justify-center rounded bg-black/50 transition-opacity ${
+                      isCurrentTrack && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    }`}
+                  >
+                    <Play size={16} fill="white" className="text-white" />
+                  </button>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className={`truncate text-sm font-medium ${isCurrentTrack ? 'text-green-500' : ''}`}>{item.title}</p>
+                  <p className="truncate text-xs text-gray-500">
+                    {item.artist?.name || ''}
+                    {item.duration_listened_seconds > 0
+                      ? ` • ${formatTime(item.duration_listened_seconds)} / ${formatTime(item.duration_seconds)}`
+                      : ` • ${formatTime(item.duration_seconds)}`}
+                  </p>
+                </div>
+                <span className="text-xs text-gray-500">{formatDate(item.played_at)}</span>
+                <div className="opacity-0 group-hover:opacity-100">
+                  <TrackContextMenu
+                    track={itemToTrack(item)}
+                    onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
+                  />
+                </div>
               </div>
-              <span className="text-xs text-gray-500">{formatDate(item.played_at)}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -152,6 +189,20 @@ const History = () => {
           </button>
         </div>
       )}
+
+      <AddToPlaylistModal
+        isOpen={!!playlistModalTrack}
+        onClose={() => setPlaylistModalTrack(null)}
+        track={playlistModalTrack}
+        onCreateNew={() => {
+          setPlaylistModalTrack(null);
+          setShowCreateModal(true);
+        }}
+      />
+      <CreatePlaylistModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+      />
     </div>
   );
 };

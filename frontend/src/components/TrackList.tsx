@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import { Play, Trash2, Edit } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useAuthStore } from '@/stores/authStore';
+import TrackContextMenu from '@/components/TrackContextMenu';
+import AddToPlaylistModal from '@/components/AddToPlaylistModal';
+import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import type { Track } from '@/types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -14,10 +18,12 @@ interface TrackListProps {
 }
 
 const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: TrackListProps) => {
-  const { setTrack, currentTrack, isPlaying, addToQueue } = usePlayerStore();
+  const { setTrack, currentTrack, isPlaying } = usePlayerStore();
   const { t } = useTranslation();
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
+  const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const handleDelete = async (e: React.MouseEvent, trackId: string) => {
     e.stopPropagation();
@@ -47,12 +53,13 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
   return (
     <div className="w-full">
       {showIndex && (
-        <div className="mb-2 grid grid-cols-[16px_4fr_3fr_minmax(120px,1fr)] gap-4 border-b border-gray-700 px-4 py-2 text-xs uppercase tracking-wider text-gray-400 md:grid-cols-[16px_4fr_2fr_3fr_minmax(120px,1fr)]">
+        <div className="mb-2 grid grid-cols-[16px_4fr_3fr_minmax(80px,1fr)_32px] gap-4 border-b border-gray-700 px-4 py-2 text-xs uppercase tracking-wider text-gray-400 md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]">
           <span className="text-right">#</span>
           <span>{t('player.next').includes('Next') ? 'Title' : 'Titre'}</span>
           {showAlbum && <span className="hidden md:block">{t('nav.albums')}</span>}
           <span className="hidden md:block">{t('playlist.track_added')}</span>
           <span className="text-right">{t('player.now_playing').includes('Now') ? 'Duration' : 'Durée'}</span>
+          <span />
         </div>
       )}
 
@@ -68,7 +75,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
               onKeyDown={(e) => handleKeyDown(e, track)}
               className={`group grid cursor-pointer items-center gap-4 rounded-md px-4 py-2 transition-colors hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-green-500 ${
                 isCurrentTrack ? 'bg-gray-800' : ''
-              } ${showIndex ? 'grid-cols-[16px_4fr_3fr_minmax(120px,1fr)] md:grid-cols-[16px_4fr_2fr_3fr_minmax(120px,1fr)]' : 'grid-cols-[4fr_3fr_minmax(120px,1fr)] md:grid-cols-[4fr_2fr_3fr_minmax(120px,1fr)]'}`}
+              } ${showIndex ? 'grid-cols-[16px_4fr_3fr_minmax(80px,1fr)_32px] md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]' : 'grid-cols-[4fr_3fr_minmax(80px,1fr)_32px] md:grid-cols-[4fr_2fr_3fr_minmax(80px,1fr)_32px]'}`}
               onDoubleClick={() => setTrack(track)}
             >
               {showIndex && (
@@ -128,6 +135,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
               <span className="hidden text-sm text-gray-400 md:block">{t('playlist.track_added')}</span>
 
               <div className="flex items-center justify-end gap-2">
+                <span className="text-sm text-gray-400">{formatDuration(track.duration_seconds)}</span>
                 {isAdmin && (
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100">
                     <Link 
@@ -145,22 +153,31 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
                     </button>
                   </div>
                 )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    addToQueue(track);
-                  }}
-                  className="text-gray-400 opacity-0 hover:text-white group-hover:opacity-100"
-                  aria-label={`${t('action.save')} ${track.title}`}
-                >
-                  +
-                </button>
-                <span className="text-sm text-gray-400">{formatDuration(track.duration)}</span>
+                <div className="opacity-0 group-hover:opacity-100">
+                  <TrackContextMenu
+                    track={track}
+                    onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
+                  />
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      <AddToPlaylistModal
+        isOpen={!!playlistModalTrack}
+        onClose={() => setPlaylistModalTrack(null)}
+        track={playlistModalTrack}
+        onCreateNew={() => {
+          setPlaylistModalTrack(null);
+          setShowCreateModal(true);
+        }}
+      />
+      <CreatePlaylistModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+      />
     </div>
   );
 };

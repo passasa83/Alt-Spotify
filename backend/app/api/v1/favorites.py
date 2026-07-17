@@ -1,7 +1,9 @@
 import uuid
+from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -111,24 +113,38 @@ async def list_favorites(
 
     if entity_ids and entity_type == "track":
         res = await db.execute(
-            select(Track, Artist)
-            .join(Artist, Track.artist_id == Artist.id)
+            select(Track)
+            .options(selectinload(Track.artist), selectinload(Track.album))
             .where(Track.id.in_(entity_ids))
         )
-        rows = res.all()
-        for track, artist in rows:
-            entities.append({
-                "id": str(track.id),
-                "title": track.title,
-                "artist_id": str(track.artist_id),
-                "duration": track.duration_seconds,
-                "cover_url": track.cover_url,
-                "file_url": track.file_url,
-                "hls_path": track.hls_path,
-                "genre": track.genre,
-                "is_explicit": track.is_explicit,
-                "artist": {"id": str(artist.id), "name": artist.name},
-            })
+        tracks = {str(t.id): t for t in res.scalars().all()}
+        for fav in favorites:
+            track = tracks.get(str(fav.entity_id))
+            if track:
+                entities.append({
+                    "id": str(track.id),
+                    "title": track.title,
+                    "album_id": str(track.album_id) if track.album_id else None,
+                    "artist_id": str(track.artist_id),
+                    "duration_seconds": track.duration_seconds,
+                    "cover_url": track.cover_url,
+                    "file_url": track.file_url,
+                    "hls_path": track.hls_path,
+                    "genre": track.genre,
+                    "bpm": track.bpm,
+                    "key": track.key,
+                    "mood": track.mood,
+                    "lyrics_lrc": track.lyrics_lrc,
+                    "track_gain": track.track_gain,
+                    "track_peak": track.track_peak,
+                    "album_gain": track.album_gain,
+                    "isrc": track.isrc,
+                    "is_explicit": track.is_explicit,
+                    "play_count": track.play_count,
+                    "created_at": track.created_at.isoformat() if track.created_at else None,
+                    "artist": {"id": str(track.artist.id), "name": track.artist.name, "image_url": track.artist.image_url} if track.artist else None,
+                    "album": {"id": str(track.album.id), "title": track.album.title, "cover_url": track.album.cover_url} if track.album else None,
+                })
     elif entity_ids and entity_type == "album":
         res = await db.execute(select(Album).where(Album.id.in_(entity_ids)))
         entities = [{"id": str(a.id), "title": a.title, "cover_url": a.cover_url} for a in res.scalars().all()]
