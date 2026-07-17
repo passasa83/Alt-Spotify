@@ -5,8 +5,11 @@ import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useAuthStore } from '@/stores/authStore';
-import { Play, Shuffle, MoreHorizontal, Clock, Trash2, X, Pencil } from 'lucide-react';
-import type { Playlist, PlaylistTrack } from '@/types';
+import TrackContextMenu from '@/components/TrackContextMenu';
+import AddToPlaylistModal from '@/components/AddToPlaylistModal';
+import CreatePlaylistModal from '@/components/CreatePlaylistModal';
+import { Play, Shuffle, Clock, Trash2, Pencil, Heart } from 'lucide-react';
+import type { Playlist, PlaylistTrack, Track } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
 
 const PlaylistDetail = () => {
@@ -20,11 +23,14 @@ const PlaylistDetail = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const { setTrack } = usePlayerStore();
   const { loadPlaylists } = useLibraryStore();
   const addToast = useToastStore((s) => s.addToast);
   const { user } = useAuthStore();
   const isOwner = playlist?.owner_id === user?.id;
+  const isLikedSongs = playlist?.title === 'Liked Songs';
 
   useEffect(() => {
     const loadPlaylist = async () => {
@@ -62,7 +68,12 @@ const PlaylistDetail = () => {
   const handleRemoveTrack = async (trackId: string) => {
     if (!id) return;
     try {
-      await removeTrackFromPlaylist(id, trackId);
+      if (isLikedSongs) {
+        const { removeFavorite } = await import('@/api/favorites');
+        await removeFavorite('track', trackId);
+      } else {
+        await removeTrackFromPlaylist(id, trackId);
+      }
       setTracks((prev) => prev.filter((pt) => pt.track_id !== trackId));
       addToast('Track removed from playlist');
     } catch {
@@ -134,6 +145,10 @@ const PlaylistDetail = () => {
             alt={playlist.title}
             className="h-48 w-48 rounded-md object-cover shadow-2xl md:h-56 md:w-56"
           />
+        ) : isLikedSongs ? (
+          <div className="flex h-48 w-48 items-center justify-center rounded-md bg-gradient-to-br from-purple-700 to-blue-300 shadow-2xl md:h-56 md:w-56">
+            <Heart size={64} className="text-white" fill="white" />
+          </div>
         ) : (
           <div className="flex h-48 w-48 items-center justify-center rounded-md bg-gradient-to-br from-purple-700 to-blue-300 shadow-2xl md:h-56 md:w-56">
             <span className="text-6xl">♫</span>
@@ -146,7 +161,7 @@ const PlaylistDetail = () => {
             <p className="mt-2 text-sm text-gray-400">{playlist.description}</p>
           )}
           <p className="mt-2 text-sm text-gray-400">
-            {playlist.owner?.pseudo || 'Unknown'} • {tracks.length} {t('playlist.songs')}
+            {playlist.owner_name || 'Unknown'} • {tracks.length} {t('playlist.songs')}
             {hours > 0 && `, ${hours} hr`}
             {minutes > 0 && ` ${minutes} min`}
           </p>
@@ -166,7 +181,7 @@ const PlaylistDetail = () => {
         >
           <Shuffle size={24} />
         </button>
-        {isOwner && (
+        {isOwner && !isLikedSongs && (
           <>
             <button
               onClick={openEditModal}
@@ -186,7 +201,7 @@ const PlaylistDetail = () => {
         )}
       </div>
 
-      <div className="mb-2 grid grid-cols-[16px_4fr_3fr_minmax(120px,1fr)] gap-4 border-b border-gray-700 px-4 py-2 text-xs uppercase tracking-wider text-gray-400 md:grid-cols-[16px_4fr_2fr_3fr_minmax(120px,1fr)]">
+      <div className="mb-2 grid grid-cols-[16px_4fr_3fr_minmax(80px,1fr)_32px] gap-4 border-b border-gray-700 px-4 py-2 text-xs uppercase tracking-wider text-gray-400 md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]">
         <span className="text-right">#</span>
         <span>Title</span>
         <span className="hidden md:block">Album</span>
@@ -194,6 +209,7 @@ const PlaylistDetail = () => {
         <span className="flex justify-end">
           <Clock size={16} />
         </span>
+        <span />
       </div>
 
       <div className="space-y-0.5">
@@ -201,7 +217,7 @@ const PlaylistDetail = () => {
           pt.track && (
             <div
               key={pt.track_id}
-              className="group grid cursor-pointer items-center gap-4 rounded-md px-4 py-2 transition-colors hover:bg-gray-800 md:grid-cols-[16px_4fr_2fr_3fr_minmax(120px,1fr)]"
+              className="group grid cursor-pointer items-center gap-4 rounded-md px-4 py-2 transition-colors hover:bg-gray-800 md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]"
               onDoubleClick={() => pt.track && setTrack(pt.track)}
             >
               <div className="flex items-center justify-end">
@@ -226,21 +242,19 @@ const PlaylistDetail = () => {
               </div>
               <span className="hidden truncate text-sm text-gray-400 md:block">{pt.track.album?.title || 'Unknown Album'}</span>
               <span className="hidden text-sm text-gray-400 md:block">{pt.added_at ? new Date(pt.added_at).toLocaleDateString() : 'Recently'}</span>
-              <div className="flex items-center justify-end gap-2">
-                <span className="text-sm text-gray-400">
-                  {Math.floor(pt.track.duration_seconds / 60)}:{(pt.track.duration_seconds % 60).toString().padStart(2, '0')}
-                </span>
+              <span className="text-right text-sm text-gray-400">
+                {Math.floor(pt.track.duration_seconds / 60)}:{(pt.track.duration_seconds % 60).toString().padStart(2, '0')}
+              </span>
+              <div className="flex justify-end">
                 {isOwner && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveTrack(pt.track_id);
-                    }}
-                    className="opacity-0 text-gray-400 transition-all hover:text-red-500 group-hover:opacity-100"
-                    title="Remove from playlist"
-                  >
-                    <X size={16} />
-                  </button>
+                  <div className="opacity-0 transition-all group-hover:opacity-100">
+                    <TrackContextMenu
+                      track={pt.track}
+                      menuDirection="left"
+                      onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
+                      onRemoveFromPlaylist={(t) => handleRemoveTrack(String(t.id))}
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -312,6 +326,20 @@ const PlaylistDetail = () => {
           </div>
         </div>
       )}
+
+      <AddToPlaylistModal
+        isOpen={!!playlistModalTrack}
+        onClose={() => setPlaylistModalTrack(null)}
+        track={playlistModalTrack}
+        onCreateNew={() => {
+          setPlaylistModalTrack(null);
+          setShowCreateModal(true);
+        }}
+      />
+      <CreatePlaylistModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+      />
     </div>
   );
 };

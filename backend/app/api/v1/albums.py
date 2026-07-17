@@ -4,6 +4,7 @@ from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -12,6 +13,7 @@ from app.models.track import Track
 from app.schemas.album import AlbumCreate, AlbumUpdate, AlbumResponse
 from app.schemas.track import TrackResponse
 from app.schemas.common import PaginatedResponse
+from app.utils.track_serializer import serialize_track
 from app.utils.deps import get_current_user, require_admin
 from app.models.follow import Follow, FollowType
 
@@ -64,8 +66,14 @@ async def get_album(album_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 
 @router.get("/{album_id}/tracks", response_model=list[TrackResponse])
 async def get_album_tracks(album_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Track).where(Track.album_id == album_id).order_by(Track.created_at))
-    return list(result.scalars().all())
+    result = await db.execute(
+        select(Track)
+        .options(selectinload(Track.artist), selectinload(Track.album))
+        .where(Track.album_id == album_id)
+        .order_by(Track.created_at)
+    )
+    tracks = result.scalars().all()
+    return [serialize_track(t) for t in tracks]
 
 
 @router.post("", response_model=AlbumResponse, status_code=status.HTTP_201_CREATED)

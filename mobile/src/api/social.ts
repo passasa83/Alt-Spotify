@@ -1,4 +1,4 @@
-import { client } from './client';
+import client from './client';
 
 export const followUser = async (userId: string): Promise<void> => {
   await client.post(`/social/follow/${userId}`);

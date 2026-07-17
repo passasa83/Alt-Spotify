@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.core.database import get_db
 from app.utils.deps import require_admin
+from app.utils.storage import get_storage_used
 from app.models.user import User, UserRole
 from app.models.track import Track
 from app.models.album import Album
@@ -41,24 +42,11 @@ async def get_dashboard(
         )
     ).scalar() or 0
 
-    storage_used = "N/A"
-    import os
-    for path in ["/", "/data", "/app"]:
-        try:
-            stat = os.statvfs(path)
-            used = (stat.f_blocks - stat.f_bfree) * stat.f_frsize
-            if used > 0:
-                gb = used / (1024 ** 3)
-                storage_used = f"{gb:.1f} GB"
-                break
-        except (OSError, AttributeError):
-            continue
-
     return {
         "total_users": total_users,
         "total_tracks": total_tracks,
         "plays_today": plays_today,
-        "storage_used": storage_used,
+        "storage_used": get_storage_used(),
         "active_jam_sessions": active_sessions,
     }
 
@@ -209,24 +197,11 @@ async def catalogue_stats(
         for row in storage_per_artist_result.all()
     ]
 
-    storage_used = "N/A"
-    import os
-    for path in ["/", "/data", "/app"]:
-        try:
-            stat = os.statvfs(path)
-            used = (stat.f_blocks - stat.f_bfree) * stat.f_frsize
-            if used > 0:
-                gb = used / (1024 ** 3)
-                storage_used = f"{gb:.1f} GB"
-                break
-        except (OSError, AttributeError):
-            continue
-
     return {
         "total_tracks": total_tracks,
         "total_albums": total_albums,
         "total_artists": total_artists,
-        "storage_used": storage_used,
+        "storage_used": get_storage_used(),
         "tracks_by_genre": tracks_by_genre,
         "most_played": most_played,
         "storage_per_artist": storage_per_artist,

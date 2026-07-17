@@ -97,7 +97,8 @@ async def test_get_me_unauthenticated(client: AsyncClient):
 async def test_refresh_token(client: AsyncClient, test_user):
     refresh_token = create_refresh_token(str(test_user.id))
     response = await client.post(
-        f"/api/v1/auth/refresh?token={refresh_token}",
+        "/api/v1/auth/refresh",
+        json={"refresh_token": refresh_token},
     )
     assert response.status_code == 200
     data = response.json()

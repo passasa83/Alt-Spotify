@@ -309,7 +309,7 @@ const AdminUpload = () => {
                   }}
                   className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-gray-200 hover:bg-gray-700"
                 >
-                  <img src={t.cover_url || '/placeholder-album.png'} className="h-8 w-8 rounded object-cover" />
+                  <img src={t.cover_url || '/placeholder-album.svg'} className="h-8 w-8 rounded object-cover" />
                   <div>
                     <p className="font-medium text-white">{t.title}</p>
                     <p className="text-xs text-gray-400">{t.artist?.name || 'Unknown'}</p>

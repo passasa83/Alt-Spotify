@@ -23,6 +23,7 @@ from app.schemas.playlist import (
 from app.schemas.track import TrackResponse
 from app.schemas.common import PaginatedResponse
 from app.utils.deps import get_current_user
+from app.utils.track_serializer import serialize_track
 from app.models.user import User
 
 router = APIRouter(prefix="/playlists", tags=["playlists"])
@@ -55,8 +56,46 @@ async def list_playlists(
         query.offset((page - 1) * page_size).limit(page_size).order_by(Playlist.created_at.desc())
     )
     items = result.scalars().all()
+
+    playlist_ids = [p.id for p in items]
+    counts = {}
+    if playlist_ids:
+        count_res = await db.execute(
+            select(PlaylistTrack.playlist_id, func.count(PlaylistTrack.track_id))
+            .where(PlaylistTrack.playlist_id.in_(playlist_ids))
+            .group_by(PlaylistTrack.playlist_id)
+        )
+        counts = {row[0]: row[1] for row in count_res.all()}
+
+    owner_ids = list({p.owner_id for p in items})
+    owner_map = {}
+    if owner_ids:
+        owner_res = await db.execute(select(User.id, User.pseudo).where(User.id.in_(owner_ids)))
+        owner_map = {row[0]: row[1] for row in owner_res.all()}
+
+    items_with_count = []
+    for p in items:
+        item_dict = {
+            "id": p.id,
+            "title": p.title,
+            "owner_id": p.owner_id,
+            "description": p.description,
+            "is_public": p.is_public,
+            "is_collaborative": p.is_collaborative,
+            "is_smart": getattr(p, "is_smart", False),
+            "smart_rules": getattr(p, "smart_rules", None),
+            "max_tracks": getattr(p, "max_tracks", 50),
+            "auto_refresh": getattr(p, "auto_refresh", False),
+            "last_refreshed_at": getattr(p, "last_refreshed_at", None),
+            "created_at": p.created_at,
+            "updated_at": p.updated_at,
+            "track_count": counts.get(p.id, 0),
+            "owner_name": owner_map.get(p.owner_id),
+        }
+        items_with_count.append(item_dict)
+
     return PaginatedResponse(
-        items=items, total=total, page=page, page_size=page_size, pages=ceil(total / page_size) if total else 0
+        items=items_with_count, total=total, page=page, page_size=page_size, pages=ceil(total / page_size) if total else 0
     )
 
 
@@ -129,13 +168,32 @@ async def get_user_history(
     }
 
 
-@router.get("/{playlist_id}", response_model=PlaylistResponse)
+@router.get("/{playlist_id}")
 async def get_playlist(playlist_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Playlist).where(Playlist.id == playlist_id))
     playlist = result.scalar_one_or_none()
     if not playlist:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found")
-    return playlist
+
+    owner_result = await db.execute(select(User.pseudo).where(User.id == playlist.owner_id))
+    owner_name = owner_result.scalar_one_or_none()
+
+    return {
+        "id": playlist.id,
+        "title": playlist.title,
+        "owner_id": playlist.owner_id,
+        "description": playlist.description,
+        "is_public": playlist.is_public,
+        "is_collaborative": playlist.is_collaborative,
+        "is_smart": getattr(playlist, "is_smart", False),
+        "smart_rules": getattr(playlist, "smart_rules", None),
+        "max_tracks": getattr(playlist, "max_tracks", 50),
+        "auto_refresh": getattr(playlist, "auto_refresh", False),
+        "last_refreshed_at": getattr(playlist, "last_refreshed_at", None),
+        "created_at": playlist.created_at,
+        "updated_at": playlist.updated_at,
+        "owner_name": owner_name,
+    }
 
 
 @router.get("/{playlist_id}/tracks")
@@ -158,7 +216,7 @@ async def get_playlist_tracks(playlist_id: uuid.UUID, db: AsyncSession = Depends
                 "position": pt.position,
                 "added_by": str(pt.added_by) if pt.added_by else None,
                 "added_at": pt.added_at.isoformat() if pt.added_at else None,
-                "track": TrackResponse.model_validate(pt.track).model_dump(mode="json"),
+                "track": serialize_track(pt.track),
             })
     return items
 

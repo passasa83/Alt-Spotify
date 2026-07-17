@@ -53,6 +53,8 @@ class TrackResponse(BaseModel):
     title: str
     album_id: uuid.UUID | None
     artist_id: uuid.UUID
+    artist: dict[str, Any] | None = None
+    album: dict[str, Any] | None = None
     duration_seconds: int
     file_url: str | None
     hls_path: str | None

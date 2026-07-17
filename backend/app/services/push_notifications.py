@@ -70,6 +70,45 @@ async def remove_all_user_tokens(db: AsyncSession, user_id: uuid.UUID) -> None:
     await db.flush()
 
 
+async def _send_to_tokens(tokens: list, title: str, body: str, data: dict | None = None) -> dict:
+    if not tokens:
+        return {"sent": 0, "failed": 0}
+
+    messages = []
+    for token in tokens:
+        messages.append({
+            "to": token.token,
+            "sound": "default",
+            "title": title,
+            "body": body,
+            "data": data or {},
+            "channelId": "default",
+        })
+
+    sent = 0
+    failed = 0
+    async with httpx.AsyncClient() as client:
+        for message in messages:
+            try:
+                response = await client.post(
+                    EXPO_PUSH_API,
+                    json=message,
+                    timeout=10.0,
+                )
+                if response.status_code == 200:
+                    resp_data = response.json()
+                    if resp_data.get("data", {}).get("status") == "ok":
+                        sent += 1
+                    else:
+                        failed += 1
+                else:
+                    failed += 1
+            except Exception:
+                failed += 1
+
+    return {"sent": sent, "failed": failed}
+
+
 async def send_push_notification(
     user_id: uuid.UUID,
     title: str,
@@ -86,42 +125,7 @@ async def send_push_notification(
     except Exception:
         return {"sent": 0, "failed": 0}
 
-    if not tokens:
-        return {"sent": 0, "failed": 0}
-
-    messages = []
-    for token in tokens:
-        messages.append({
-            "to": token.token,
-            "sound": "default",
-            "title": title,
-            "body": body,
-            "data": data or {},
-            "channelId": "default",
-        })
-
-    sent = 0
-    failed = 0
-    async with httpx.AsyncClient() as client:
-        for message in messages:
-            try:
-                response = await client.post(
-                    EXPO_PUSH_API,
-                    json=message,
-                    timeout=10.0,
-                )
-                if response.status_code == 200:
-                    resp_data = response.json()
-                    if resp_data.get("data", {}).get("status") == "ok":
-                        sent += 1
-                    else:
-                        failed += 1
-                else:
-                    failed += 1
-            except Exception:
-                failed += 1
-
-    return {"sent": sent, "failed": failed}
+    return await _send_to_tokens(list(tokens), title, body, data)
 
 
 async def send_bulk_push(
@@ -137,42 +141,7 @@ async def send_bulk_push(
         )
         tokens = result.scalars().all()
 
-    if not tokens:
-        return {"sent": 0, "failed": 0}
-
-    messages = []
-    for token in tokens:
-        messages.append({
-            "to": token.token,
-            "sound": "default",
-            "title": title,
-            "body": body,
-            "data": data or {},
-            "channelId": "default",
-        })
-
-    sent = 0
-    failed = 0
-    async with httpx.AsyncClient() as client:
-        for message in messages:
-            try:
-                response = await client.post(
-                    EXPO_PUSH_API,
-                    json=message,
-                    timeout=10.0,
-                )
-                if response.status_code == 200:
-                    resp_data = response.json()
-                    if resp_data.get("data", {}).get("status") == "ok":
-                        sent += 1
-                    else:
-                        failed += 1
-                else:
-                    failed += 1
-            except Exception:
-                failed += 1
-
-    return {"sent": sent, "failed": failed}
+    return await _send_to_tokens(list(tokens), title, body, data)
 
 
 async def notify_new_release_push(

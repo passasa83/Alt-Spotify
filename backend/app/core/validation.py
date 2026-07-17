@@ -33,7 +33,7 @@ def sanitize_string(value: str, max_length: int = 1000) -> str:
     return value
 
 
-ALLOWED_AUDIO_TYPES = {"audio/mpeg", "audio/wav", "audio/flac", "audio/ogg", "audio/mp4", "audio/x-m4a"}
+ALLOWED_AUDIO_TYPES = {"audio/mpeg", "audio/wav", "audio/flac", "audio/ogg", "audio/mp4", "audio/x-m4a", "audio/opus", "audio/x-ms-wma", "audio/alac", "audio/x-aac", "video/mp4"}
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 

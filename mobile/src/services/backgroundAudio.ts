@@ -17,22 +17,6 @@ export const configureBackgroundAudio = async () => {
   }
 };
 
-export const enableAudioMode = async () => {
-  try {
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      staysActiveInBackground: true,
-      interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
-      playsInSilentModeIOS: true,
-      shouldDuckAndroid: true,
-      interruptionModeAndroid: InterruptionModeAndroid.MixWithOthers,
-      playThroughEarpieceAndroid: false,
-    });
-  } catch (error) {
-    console.warn('Failed to enable audio mode:', error);
-  }
-};
-
 export const setAudioInterruptionMode = async () => {
   try {
     if (Platform.OS === 'ios') {

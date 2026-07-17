@@ -1,4 +1,4 @@
-import { Music } from 'lucide-react';
+import { Music, Heart } from 'lucide-react';
 import type { Playlist } from '@/types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -9,6 +9,7 @@ interface PlaylistCardProps {
 
 const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
   const { t } = useTranslation();
+  const isLikedSongs = playlist.title === 'Liked Songs';
   const colors = [
     'from-purple-700 to-blue-300',
     'from-green-700 to-cyan-300',
@@ -31,6 +32,10 @@ const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
             alt={playlist.title}
             className="h-40 w-full rounded-md object-cover shadow-lg"
           />
+        ) : isLikedSongs ? (
+          <div className="flex h-40 w-full items-center justify-center rounded-md bg-gradient-to-br from-purple-700 to-blue-300 shadow-lg">
+            <Heart size={40} className="text-white" fill="white" />
+          </div>
         ) : (
           <div
             className={`flex h-40 w-full items-center justify-center rounded-md bg-gradient-to-br ${colors[colorIndex]} shadow-lg`}
@@ -41,7 +46,8 @@ const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
       </div>
       <p className="block truncate text-sm font-semibold text-white">{playlist.title}</p>
       <p className="block truncate text-xs text-gray-400">
-        By {playlist.owner?.pseudo || t('playlist.owner')} • {t('playlist.playlist')}
+        {playlist.owner_name && <>{playlist.owner_name} • </>}
+        {playlist.track_count !== undefined ? `${playlist.track_count} ${t('playlist.songs')}` : t('playlist.playlist')}
       </p>
     </Link>
   );

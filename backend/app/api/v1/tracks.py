@@ -5,6 +5,7 @@ from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select, func, update, text, cast, String, literal
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
@@ -16,11 +17,32 @@ from app.models.listening_history import ListeningHistory
 from app.schemas.track import TrackCreate, TrackUpdate, TrackResponse
 from app.schemas.common import PaginatedResponse
 from app.utils.deps import get_current_user, get_current_user_from_header_or_query, require_admin
+from app.utils.track_serializer import serialize_track
 from app.models.user import User
 
 logger = structlog.get_logger("app")
 
 router = APIRouter(prefix="/tracks", tags=["tracks"])
+
+
+async def _get_track_for_user(track_id: uuid.UUID, current_user: User, db: AsyncSession) -> Track:
+    result = await db.execute(
+        select(Track)
+        .options(selectinload(Track.artist), selectinload(Track.album))
+        .where(Track.id == track_id)
+    )
+    track = result.scalar_one_or_none()
+    if not track:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+
+    if track.allowed_territories:
+        if not current_user.country or current_user.country not in track.allowed_territories:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Track not available in your territory")
+
+    if current_user.is_child_account and track.is_explicit:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Explicit content is restricted for child accounts")
+
+    return track
 
 
 @router.get("", response_model=PaginatedResponse[TrackResponse])
@@ -88,35 +110,23 @@ async def list_tracks(
 
     total = (await db.execute(count_query)).scalar() or 0
     result = await db.execute(
-        query.offset((page - 1) * page_size).limit(page_size).order_by(Track.created_at.desc())
+        query.options(selectinload(Track.artist), selectinload(Track.album))
+        .offset((page - 1) * page_size).limit(page_size).order_by(Track.created_at.desc())
     )
     items = result.scalars().all()
     return PaginatedResponse(
-        items=items, total=total, page=page, page_size=page_size, pages=ceil(total / page_size) if total else 0
+        items=[serialize_track(t) for t in items], total=total, page=page, page_size=page_size, pages=ceil(total / page_size) if total else 0
     )
 
 
-@router.get("/{track_id}", response_model=TrackResponse)
+@router.get("/{track_id}")
 async def get_track(
     track_id: uuid.UUID, 
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Track).where(Track.id == track_id))
-    track = result.scalar_one_or_none()
-    if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
-    
-    # Territory check
-    if track.allowed_territories:
-        if not current_user.country or current_user.country not in track.allowed_territories:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Track not available in your territory")
-            
-    # Explicit content check
-    if current_user.is_child_account and track.is_explicit:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Explicit content is restricted for child accounts")
-
-    return track
+    track = await _get_track_for_user(track_id, current_user, db)
+    return serialize_track(track)
 
 
 @router.post("", response_model=TrackResponse, status_code=status.HTTP_201_CREATED)
@@ -128,8 +138,13 @@ async def create_track(
     track = Track(**body.model_dump())
     db.add(track)
     await db.flush()
-    await db.refresh(track)
-    return track
+    result = await db.execute(
+        select(Track)
+        .options(selectinload(Track.artist), selectinload(Track.album))
+        .where(Track.id == track.id)
+    )
+    track = result.scalar_one()
+    return serialize_track(track)
 
 
 @router.put("/{track_id}", response_model=TrackResponse)
@@ -146,8 +161,13 @@ async def update_track(
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(track, field, value)
     await db.flush()
-    await db.refresh(track)
-    return track
+    result = await db.execute(
+        select(Track)
+        .options(selectinload(Track.artist), selectinload(Track.album))
+        .where(Track.id == track_id)
+    )
+    track = result.scalar_one()
+    return serialize_track(track)
 
 
 @router.delete("/{track_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -169,19 +189,7 @@ async def play_track(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Track).where(Track.id == track_id))
-    track = result.scalar_one_or_none()
-    if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
-    
-    # Territory check
-    if track.allowed_territories:
-        if not current_user.country or current_user.country not in track.allowed_territories:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Track not available in your territory")
-
-    # Explicit content check
-    if current_user.is_child_account and track.is_explicit:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Explicit content is restricted for child accounts")
+    await _get_track_for_user(track_id, current_user, db)
 
     await db.execute(update(Track).where(Track.id == track_id).values(play_count=Track.play_count + 1))
 
@@ -204,19 +212,7 @@ async def stream_track(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_from_header_or_query),
 ):
-    result = await db.execute(select(Track).where(Track.id == track_id))
-    track = result.scalar_one_or_none()
-    if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
-    
-    # Territory check
-    if track.allowed_territories:
-        if not current_user.country or current_user.country not in track.allowed_territories:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Track not available in your territory")
-
-    # Explicit content check
-    if current_user.is_child_account and track.is_explicit:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Explicit content is restricted for child accounts")
+    track = await _get_track_for_user(track_id, current_user, db)
 
     if not track.file_url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No audio file available")
@@ -245,19 +241,7 @@ async def download_track(
     current_user: User = Depends(get_current_user_from_header_or_query),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Track).where(Track.id == track_id))
-    track = result.scalar_one_or_none()
-    if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
-    
-    # Territory check
-    if track.allowed_territories:
-        if not current_user.country or current_user.country not in track.allowed_territories:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Track not available in your territory")
-
-    # Explicit content check
-    if current_user.is_child_account and track.is_explicit:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Explicit content is restricted for child accounts")
+    track = await _get_track_for_user(track_id, current_user, db)
 
     if not track.file_url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No audio file available")

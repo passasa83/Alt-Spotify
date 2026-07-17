@@ -71,7 +71,6 @@ async def import_from_jiosaavn(song_data: dict, db) -> uuid.UUID | None:
     Returns the track_id if successful, None otherwise.
     """
     from app.models.track import Track
-    from app.models.artist import Artist
     from sqlalchemy import select
 
     download_url = song_data.get("download_url")
@@ -98,15 +97,8 @@ async def import_from_jiosaavn(song_data: dict, db) -> uuid.UUID | None:
         if isinstance(artist_name, list):
             artist_name = ", ".join(artist_name)
 
-        result = await db.execute(
-            select(Artist).where(Artist.name.ilike(f"%{artist_name.split(',')[0].strip()}%"))
-        )
-        found_artist = result.scalars().first()
-        if not found_artist:
-            found_artist = Artist(name=artist_name.split(",")[0].strip())
-            db.add(found_artist)
-            await db.flush()
-        artist_id = found_artist.id
+        from app.utils.artist import ensure_artist
+        artist_id = await ensure_artist(db, artist_name.split(",")[0].strip())
 
         track = Track(
             id=track_id,

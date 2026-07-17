@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Search, Library, Plus, Heart, Radio, BarChart3, Upload, Headphones, Activity, Sparkles, Mail, Compass, History as HistoryIcon, ListMusic } from 'lucide-react';
+import { Home, Search, Library, Plus, Radio, BarChart3, Upload, Headphones, Activity, Sparkles, Mail, Compass, History as HistoryIcon, ListMusic } from 'lucide-react';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useEffect, useState } from 'react';
@@ -103,19 +103,6 @@ const Sidebar = () => {
           >
             <Plus size={20} aria-hidden="true" />
           </button>
-        </div>
-
-        <div className="mb-2 rounded-md p-2 hover:bg-gray-800">
-          <NavLink
-            to="/library"
-            className="flex items-center gap-3 text-sm text-gray-400 hover:text-white"
-            aria-label={t('nav.liked_songs')}
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-sm bg-gradient-to-br from-purple-700 to-blue-300">
-              <Heart size={12} className="text-white" aria-hidden="true" />
-            </div>
-            {t('nav.liked_songs')}
-          </NavLink>
         </div>
 
         <div className="space-y-1" role="list" aria-label="Your playlists">

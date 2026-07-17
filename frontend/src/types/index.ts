@@ -61,10 +61,12 @@ export interface Playlist {
   description?: string;
   owner_id: string;
   owner?: User;
+  owner_name?: string;
   is_public: boolean;
   is_collaborative: boolean;
   created_at: string;
   updated_at: string;
+  track_count?: number;
 }
 
 export interface PlaylistTrack {

@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { X, Music, Plus } from 'lucide-react';
+import { X, Music, Plus, Heart } from 'lucide-react';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useToastStore } from '@/stores/toastStore';
 import { addTrackToPlaylist } from '@/api/playlists';
+import { addFavorite } from '@/api/favorites';
 import type { Track } from '@/types';
 
 interface Props {
@@ -22,11 +23,14 @@ const AddToPlaylistModal = ({ isOpen, onClose, track, onCreateNew }: Props) => {
 
   if (!isOpen || !track) return null;
 
-  const handleAdd = async (playlistId: string) => {
+  const handleAdd = async (playlistId: string, title: string) => {
     try {
-      const playlist = playlists.find((p) => p.id === playlistId);
-      await addTrackToPlaylist(playlistId, String(track.id));
-      addToast(`Added to ${playlist?.title || 'playlist'}`);
+      if (title === 'Liked Songs') {
+        await addFavorite('track', String(track.id));
+      } else {
+        await addTrackToPlaylist(playlistId, String(track.id));
+      }
+      addToast(`Added to ${title}`);
       onClose();
     } catch (err) {
       console.error('Failed to add track to playlist', err);
@@ -64,18 +68,21 @@ const AddToPlaylistModal = ({ isOpen, onClose, track, onCreateNew }: Props) => {
         </button>
 
         <div className="max-h-60 overflow-y-auto">
-          {playlists.map((playlist) => (
-            <button
-              key={playlist.id}
-              onClick={() => handleAdd(playlist.id)}
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
-            >
-              <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-purple-700 to-blue-300">
-                <Music size={14} className="text-white" />
-              </div>
-              <span className="truncate">{playlist.title}</span>
-            </button>
-          ))}
+          {playlists.map((playlist) => {
+            const isLiked = playlist.title === 'Liked Songs';
+            return (
+              <button
+                key={playlist.id}
+                onClick={() => handleAdd(playlist.id, playlist.title)}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+              >
+                <div className={`flex h-8 w-8 items-center justify-center rounded ${isLiked ? 'bg-gradient-to-br from-purple-700 to-blue-300' : 'bg-gradient-to-br from-purple-700 to-blue-300'}`}>
+                  {isLiked ? <Heart size={14} className="text-white" fill="white" /> : <Music size={14} className="text-white" />}
+                </div>
+                <span className="truncate">{playlist.title}</span>
+              </button>
+            );
+          })}
           {playlists.length === 0 && (
             <p className="py-4 text-center text-sm text-gray-500">No playlists yet</p>
           )}

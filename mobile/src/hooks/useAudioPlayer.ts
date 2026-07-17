@@ -3,18 +3,7 @@ import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { usePlayerStore } from '../stores/playerStore';
 import { getTrackStreamUrl } from '../api/tracks';
 import { getOfflineTrackUri } from '../services/offlineStorage';
-
-export const configureBackgroundAudio = async () => {
-  await Audio.setAudioModeAsync({
-    allowsRecordingIOS: false,
-    staysActiveInBackground: true,
-    interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
-    playsInSilentModeIOS: true,
-    shouldDuckAndroid: true,
-    interruptionModeAndroid: InterruptionModeAndroid.MixWithOthers,
-    playThroughEarpieceAndroid: false,
-  });
-};
+import { configureBackgroundAudio } from '../services/backgroundAudio';
 
 export const useAudioPlayer = () => {
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -88,15 +77,7 @@ export const useAudioPlayer = () => {
       soundRef.current = sound;
       setDuration(currentTrack.duration_seconds);
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        staysActiveInBackground: true,
-        interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        interruptionModeAndroid: InterruptionModeAndroid.MixWithOthers,
-        playThroughEarpieceAndroid: false,
-      });
+      await configureBackgroundAudio();
     };
 
     loadAndPlay();

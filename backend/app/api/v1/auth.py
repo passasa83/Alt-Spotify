@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
@@ -63,6 +64,9 @@ async def register(
     db.add(user)
     await db.flush()
 
+    from app.utils.favorites import ensure_liked_playlist
+    await ensure_liked_playlist(db, user.id)
+
     if invite_token:
         invite.use_count += 1
         invite.used_by = user.id
@@ -85,15 +89,28 @@ async def login(body: UserLogin, request: Request, db: AsyncSession = Depends(ge
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
 
     logger.info("login_success", user_id=str(user.id), ip=client_ip)
+
+    from app.utils.favorites import ensure_liked_playlist
+    await ensure_liked_playlist(db, user.id)
+
     return TokenResponse(
         access_token=create_access_token(str(user.id)),
         refresh_token=create_refresh_token(str(user.id)),
     )
 
 
+class RefreshBody(BaseModel):
+    refresh_token: str
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(token: str, db: AsyncSession = Depends(get_db)):
-    user_id = verify_token(token, token_type="refresh")
+async def refresh(body: RefreshBody, db: AsyncSession = Depends(get_db)):
+    user_id = verify_token(body.refresh_token, token_type="refresh")
     if user_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
@@ -108,6 +125,4 @@ async def refresh(token: str, db: AsyncSession = Depends(get_db)):
     )
 
 
-@router.get("/me", response_model=UserResponse)
-async def me(current_user: User = Depends(get_current_user)):
-    return current_user
+

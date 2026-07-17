@@ -3,29 +3,12 @@ import type { Episode } from '@/types';
 import { usePlayerStore } from '@/stores/playerStore';
 import { getEpisodeStreamUrl } from '@/api/podcasts';
 import { useState } from 'react';
+import { formatDurationHms, formatDate } from '@/utils/formatTime';
 
 interface EpisodeItemProps {
   episode: Episode;
   onPlay?: (episode: Episode) => void;
 }
-
-const formatDuration = (seconds: number): string => {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  return `${minutes}m ${secs}s`;
-};
-
-const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-};
 
 const EpisodeItem = ({ episode, onPlay }: EpisodeItemProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -67,7 +50,7 @@ const EpisodeItem = ({ episode, onPlay }: EpisodeItemProps) => {
         {episode.episode_number && (
           <span>E{episode.episode_number}</span>
         )}
-        <span>{formatDuration(episode.duration_seconds)}</span>
+        <span>{formatDurationHms(episode.duration_seconds)}</span>
         {episode.published_at && (
           <span>{formatDate(episode.published_at)}</span>
         )}

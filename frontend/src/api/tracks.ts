@@ -30,16 +30,6 @@ export const getHlsStreamUrl = (trackId: string): string => {
   return `/api/v1/stream/${trackId}/master.m3u8${token ? `?token=${token}` : ''}`;
 };
 
-export const getTrackLyrics = async (trackId: string): Promise<string> => {
-  const response = await client.get(`/lyrics/${trackId}`);
-  return response.data.lyrics_lrc;
-};
-
-export const getTrackLyricsParsed = async (trackId: string): Promise<{ time_seconds: number; text: string }[]> => {
-  const response = await client.get(`/lyrics/${trackId}/parsed`);
-  return response.data.lines;
-};
-
 export const uploadTrack = async (file: File, metadata: Record<string, any>): Promise<Track> => {
   const formData = new FormData();
   formData.append('file', file);

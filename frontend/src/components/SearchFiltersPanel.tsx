@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SlidersHorizontal, X } from 'lucide-react';
 import type { SearchFilters } from '@/types';
+import { GENRES } from '@/constants/genres';
 
 const MUSICAL_KEYS = [
   'C', 'Cm', 'C#', 'C#m',
@@ -16,11 +17,6 @@ const MOODS = [
   'energetic', 'calm', 'sad', 'happy', 'angry',
   'romantic', 'chill', 'dark', 'uplifting', 'melancholic',
   'party', 'focus', 'sleep', 'workout', 'motivational',
-];
-
-const GENRES = [
-  'Pop', 'Hip-Hop', 'Rock', 'R&B', 'Jazz', 'Classical', 'Electronic',
-  'Country', 'Metal', 'Folk', 'Latin', 'Indie', 'Punk', 'Reggae',
 ];
 
 interface Props {

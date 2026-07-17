@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { client } from '../../api/client';
+import client from '../../api/client';
+import { getPodcast, getPodcastEpisodes } from '../../api/podcasts';
+import { formatDuration } from '../../utils/formatTime';
+import { colors } from '../../utils/theme';
 import type { Episode } from '../../types';
 
 export default function PodcastDetailScreen() {
@@ -15,21 +18,19 @@ export default function PodcastDetailScreen() {
 
   useEffect(() => {
     Promise.all([
-      client.get(`/podcasts/${id}`),
-      client.get(`/podcasts/${id}/episodes`),
+      getPodcast(id),
+      getPodcastEpisodes(id),
     ]).then(([p, e]) => {
-      setPodcast(p.data);
-      setEpisodes(e.data.items || e.data);
+      setPodcast(p);
+      setEpisodes(e.items || e);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [id]);
 
-  const formatDuration = (s: number) => `${Math.floor(s / 60)}m`;
-
-  if (loading) return <ActivityIndicator size="large" color="#1DB954" style={styles.loader} />;
+  if (loading) return <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />;
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}><Ionicons name="arrow-back" size={24} color="#fff" /></TouchableOpacity>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}><Ionicons name="arrow-back" size={24} color={colors.text} /></TouchableOpacity>
       {podcast?.image_url && <Image source={{ uri: podcast.image_url }} style={styles.cover} />}
       <Text style={styles.title}>{podcast?.title}</Text>
       <Text style={styles.author}>{podcast?.author}</Text>
@@ -50,15 +51,15 @@ export default function PodcastDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212', padding: 16 },
-  loader: { flex: 1, justifyContent: 'center', backgroundColor: '#121212' },
+  container: { flex: 1, backgroundColor: colors.bg, padding: 16 },
+  loader: { flex: 1, justifyContent: 'center', backgroundColor: colors.bg },
   back: { marginTop: 8, marginBottom: 8 },
   cover: { width: '100%', height: 200, borderRadius: 12, marginBottom: 16 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
-  author: { fontSize: 14, color: '#b3b3b3', marginBottom: 16 },
-  episode: { backgroundColor: '#181818', borderRadius: 8, padding: 14, marginBottom: 10 },
-  epTitle: { fontSize: 15, fontWeight: 'bold', color: '#fff' },
-  epMeta: { fontSize: 12, color: '#1DB954', marginTop: 4 },
-  epDesc: { fontSize: 12, color: '#b3b3b3', marginTop: 6 },
-  empty: { textAlign: 'center', color: '#b3b3b3', marginTop: 40 },
+  title: { fontSize: 22, fontWeight: 'bold', color: colors.text },
+  author: { fontSize: 14, color: colors.textSecondary, marginBottom: 16 },
+  episode: { backgroundColor: colors.surface, borderRadius: 8, padding: 14, marginBottom: 10 },
+  epTitle: { fontSize: 15, fontWeight: 'bold', color: colors.text },
+  epMeta: { fontSize: 12, color: colors.primary, marginTop: 4 },
+  epDesc: { fontSize: 12, color: colors.textSecondary, marginTop: 6 },
+  empty: { textAlign: 'center', color: colors.textSecondary, marginTop: 40 },
 });

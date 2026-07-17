@@ -44,3 +44,5 @@ class PlaylistResponse(BaseModel):
     last_refreshed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+    track_count: int = 0
+    owner_name: str | None = None

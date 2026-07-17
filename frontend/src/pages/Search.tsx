@@ -8,11 +8,7 @@ import ArtistCard from '@/components/ArtistCard';
 import AlbumCard from '@/components/AlbumCard';
 import PlaylistCard from '@/components/PlaylistCard';
 import type { SearchFilters } from '@/types';
-
-const GENRES = [
-  'Pop', 'Hip-Hop', 'Rock', 'R&B', 'Jazz', 'Classical', 'Electronic',
-  'Country', 'Metal', 'Folk', 'Latin', 'Indie', 'Punk', 'Reggae',
-];
+import { GENRES } from '@/constants/genres';
 
 const SearchPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();

@@ -4,14 +4,14 @@ import client from '@/api/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Clock, TrendingUp, Music, Play } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
+import TrackContextMenu from '@/components/TrackContextMenu';
+import AddToPlaylistModal from '@/components/AddToPlaylistModal';
+import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import type { Track } from '@/types';
+import { GENRES } from '@/constants/genres';
+import { usePlaylistModals } from '@/hooks/usePlaylistModals';
 
 type Tab = 'new' | 'trending' | 'genres';
-
-const GENRES = [
-  'Rock', 'Pop', 'Hip-Hop', 'Jazz', 'Classical', 'Electronic', 'R&B', 'Country',
-  'Metal', 'Folk', 'Reggae', 'Punk', 'Blues', 'Latin', 'K-Pop', 'Indie',
-];
 
 const Browse = () => {
   const { t } = useTranslation();
@@ -20,6 +20,7 @@ const Browse = () => {
   const [loading, setLoading] = useState(true);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const { setTrack } = usePlayerStore();
+  const { playlistModalTrack, showCreateModal, openAddToPlaylist, openCreatePlaylist, closeAddToPlaylist, closeCreatePlaylist } = usePlaylistModals();
 
   useEffect(() => {
     const fetchTracks = async () => {
@@ -95,16 +96,16 @@ const Browse = () => {
           <p>{tab === 'genres' && !selectedGenre ? t('browse.select_genre') : t('common.no_results')}</p>
         </div>
       ) : (
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {tracks.map((track, i) => (
             <div
               key={track.id}
-              className="flex items-center gap-4 rounded-md px-4 py-2 hover:bg-gray-800 group"
+              className="group flex items-center gap-4 rounded-md px-4 py-2 hover:bg-gray-800"
             >
-              <span className="w-8 text-right text-sm text-gray-500">{i + 1}</span>
+              <span className="w-8 text-right text-sm text-gray-500 group-hover:hidden">{i + 1}</span>
               <button
                 onClick={() => setTrack(track)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-black opacity-0 group-hover:opacity-100 transition-opacity"
+                className="hidden h-8 w-8 items-center justify-center rounded-full bg-green-500 text-black group-hover:flex"
                 aria-label={t('player.play')}
               >
                 <Play size={14} fill="black" />
@@ -120,10 +121,27 @@ const Browse = () => {
               <span className="text-sm text-gray-500">
                 {Math.floor(track.duration_seconds / 60)}:{String(track.duration_seconds % 60).padStart(2, '0')}
               </span>
+              <div className="opacity-0 group-hover:opacity-100">
+                <TrackContextMenu
+                  track={track}
+                  onAddToPlaylist={(t) => openAddToPlaylist(t)}
+                />
+              </div>
             </div>
           ))}
         </div>
       )}
+
+      <AddToPlaylistModal
+        isOpen={!!playlistModalTrack}
+        onClose={closeAddToPlaylist}
+        track={playlistModalTrack}
+        onCreateNew={openCreatePlaylist}
+      />
+      <CreatePlaylistModal
+        isOpen={showCreateModal}
+        onClose={closeCreatePlaylist}
+      />
     </div>
   );
 };

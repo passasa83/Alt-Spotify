@@ -8,6 +8,7 @@ import structlog
 
 from app.core.database import get_db
 from app.core.minio import upload_file
+from app.core.validation import ALLOWED_AUDIO_TYPES, ALLOWED_IMAGE_TYPES
 from app.models.track import Track
 from app.models.user import User
 from app.utils.deps import require_admin
@@ -16,8 +17,6 @@ logger = structlog.get_logger("app")
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
-ALLOWED_AUDIO_TYPES = {"audio/mpeg", "audio/wav", "audio/flac", "audio/ogg", "audio/mp4", "audio/x-m4a", "audio/opus", "audio/x-ms-wma", "audio/alac", "audio/x-aac", "video/mp4"}
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_AUDIO_SIZE = 100 * 1024 * 1024  # 100MB
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 
