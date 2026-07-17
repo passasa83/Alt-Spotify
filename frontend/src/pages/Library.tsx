@@ -7,7 +7,7 @@ import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import TrackContextMenu from '@/components/TrackContextMenu';
 import AddToPlaylistModal from '@/components/AddToPlaylistModal';
 import { Link } from 'react-router-dom';
-import { Plus, Upload, Play } from 'lucide-react';
+import { Plus, Upload, Play, Shuffle, Clock, Heart } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 import type { Track } from '@/types';
 
@@ -18,12 +18,29 @@ const Library = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
-  const { setTrack, currentTrack, isPlaying } = usePlayerStore();
+  const { setTrack, currentTrack, isPlaying, queue, setQueue } = usePlayerStore();
 
   useEffect(() => {
     loadPlaylists();
     loadFavorites();
   }, [loadPlaylists, loadFavorites]);
+
+  const handlePlayAll = () => {
+    if (favorites.length > 0) {
+      setTrack(favorites[0]);
+    }
+  };
+
+  const handleShufflePlay = () => {
+    if (favorites.length > 0) {
+      const idx = Math.floor(Math.random() * favorites.length);
+      setTrack(favorites[idx]);
+    }
+  };
+
+  const totalDuration = favorites.reduce((acc, track) => acc + (track.duration_seconds || 0), 0);
+  const hours = Math.floor(totalDuration / 3600);
+  const minutes = Math.floor((totalDuration % 3600) / 60);
 
   return (
     <div className="pb-24">
@@ -118,53 +135,98 @@ const Library = () => {
               </Link>
             </div>
           ) : (
-            <div className="space-y-0.5">
-              {favorites.map((track) => {
-                const isCurrentTrack = currentTrack?.id === track.id;
-                return (
-                  <div
-                    key={track.id}
-                    className="group flex items-center gap-4 rounded-md px-4 py-2 hover:bg-gray-800"
-                  >
-                    <div className="relative h-10 w-10">
-                      <img
-                        src={track.cover_url || track.album?.cover_url || '/placeholder-album.png'}
-                        alt={track.title}
-                        className="h-10 w-10 rounded object-cover"
-                      />
-                      <button
-                        onClick={() => setTrack(track)}
-                        className={`absolute inset-0 flex items-center justify-center rounded bg-black/50 transition-opacity ${
-                          isCurrentTrack && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                        }`}
-                      >
-                        <Play size={16} fill="white" className="text-white" />
-                      </button>
+            <>
+              <div className="mb-6 flex flex-col gap-6 md:flex-row md:items-end">
+                <div className="flex h-48 w-48 items-center justify-center rounded-md bg-gradient-to-br from-purple-700 to-blue-300 shadow-2xl md:h-56 md:w-56">
+                  <Heart size={64} className="text-white" fill="white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium uppercase text-white">Playlist</p>
+                  <h1 className="mt-2 text-4xl font-bold text-white md:text-6xl">Liked Songs</h1>
+                  <p className="mt-2 text-sm text-gray-400">
+                    {favorites.length} {t('playlist.songs')}
+                    {hours > 0 && `, ${hours} hr`}
+                    {minutes > 0 && ` ${minutes} min`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mb-6 flex items-center gap-6">
+                <button
+                  onClick={handlePlayAll}
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-black transition-transform hover:scale-105"
+                >
+                  <Play size={24} fill="currentColor" />
+                </button>
+                <button
+                  onClick={handleShufflePlay}
+                  className="text-gray-400 transition-colors hover:text-white"
+                >
+                  <Shuffle size={24} />
+                </button>
+              </div>
+
+              <div className="mb-2 grid grid-cols-[16px_4fr_3fr_minmax(80px,1fr)_32px] gap-4 border-b border-gray-700 px-4 py-2 text-xs uppercase tracking-wider text-gray-400 md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]">
+                <span className="text-right">#</span>
+                <span>Title</span>
+                <span className="hidden md:block">Album</span>
+                <span className="hidden md:block">Date Added</span>
+                <span className="flex justify-end">
+                  <Clock size={16} />
+                </span>
+                <span />
+              </div>
+
+              <div className="space-y-0.5">
+                {favorites.map((track, index) => {
+                  const isCurrentTrack = currentTrack?.id === track.id;
+                  return (
+                    <div
+                      key={track.id}
+                      className="group grid cursor-pointer items-center gap-4 rounded-md px-4 py-2 transition-colors hover:bg-gray-800 md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]"
+                      onDoubleClick={() => setTrack(track)}
+                    >
+                      <div className="flex items-center justify-end">
+                        <span className={`text-sm ${isCurrentTrack && isPlaying ? 'text-green-500' : 'text-gray-400 group-hover:hidden'}`}>
+                          {isCurrentTrack && isPlaying ? '♪' : index + 1}
+                        </span>
+                        <button
+                          onClick={() => setTrack(track)}
+                          className="hidden text-white group-hover:block"
+                        >
+                          <Play size={14} fill="currentColor" />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={track.cover_url || track.album?.cover_url || '/placeholder-album.png'}
+                          alt={track.title}
+                          className="h-10 w-10 rounded object-cover"
+                        />
+                        <div className="min-w-0">
+                          <p className={`truncate text-sm font-medium ${isCurrentTrack ? 'text-green-500' : 'text-white'}`}>{track.title}</p>
+                          <p className="truncate text-xs text-gray-400">{track.artist?.name || t('player.unknown_artist')}</p>
+                        </div>
+                      </div>
+                      <span className="hidden truncate text-sm text-gray-400 md:block">{track.album?.title || t('player.unknown_album')}</span>
+                      <span className="hidden text-sm text-gray-400 md:block">Recently</span>
+                      <span className="text-right text-sm text-gray-400">
+                        {Math.floor((track.duration_seconds || 0) / 60)}:{((track.duration_seconds || 0) % 60).toString().padStart(2, '0')}
+                      </span>
+                      <div className="flex justify-end">
+                        <div className="opacity-0 transition-all group-hover:opacity-100">
+                          <TrackContextMenu
+                            track={track}
+                            menuDirection="left"
+                            onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        to={`/track/${track.id}`}
-                        className={`block truncate text-sm font-medium hover:underline ${isCurrentTrack ? 'text-green-500' : 'text-white'}`}
-                      >
-                        {track.title}
-                      </Link>
-                      <Link
-                        to={`/artist/${track.artist_id}`}
-                        className="block truncate text-xs text-gray-400 hover:underline"
-                      >
-                        {track.artist?.name || 'Unknown Artist'}
-                      </Link>
-                    </div>
-                    <div className="opacity-0 group-hover:opacity-100">
-                      <TrackContextMenu
-                        track={track}
-                        onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       )}
