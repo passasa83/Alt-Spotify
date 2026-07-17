@@ -1,12 +1,15 @@
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from math import ceil
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select, func, update, text, cast, String, literal
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.responses import StreamingResponse
 import structlog
 
 from app.core.database import get_db
@@ -215,6 +218,7 @@ async def play_track(
 @router.get("/{track_id}/stream")
 async def stream_track(
     track_id: uuid.UUID, 
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_from_header_or_query),
 ):
@@ -227,14 +231,65 @@ async def stream_track(
         local_path = track.file_url[6:]
         if not os.path.isfile(local_path):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Local file not found")
-        from fastapi.responses import FileResponse
+
         ext = os.path.splitext(local_path)[1].lower()
         media_types = {
             ".mp3": "audio/mpeg", ".flac": "audio/flac", ".ogg": "audio/ogg",
             ".wav": "audio/wav", ".m4a": "audio/mp4", ".aac": "audio/aac",
             ".opus": "audio/opus",
         }
-        return FileResponse(local_path, media_type=media_types.get(ext, "application/octet-stream"))
+        content_type = media_types.get(ext, "application/octet-stream")
+        file_size = os.path.getsize(local_path)
+
+        range_header = request.headers.get("range")
+        if range_header:
+            range_start = 0
+            range_end = file_size - 1
+            match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+            if match:
+                range_start = int(match.group(1))
+                range_end = int(match.group(2)) if match.group(2) else file_size - 1
+            content_length = range_end - range_start + 1
+
+            def iter_range():
+                with open(local_path, "rb") as f:
+                    f.seek(range_start)
+                    remaining = content_length
+                    while remaining > 0:
+                        chunk_size = min(65536, remaining)
+                        data = f.read(chunk_size)
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+
+            return StreamingResponse(
+                iter_range(),
+                status_code=206,
+                media_type=content_type,
+                headers={
+                    "Content-Range": f"bytes {range_start}-{range_end}/{file_size}",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(content_length),
+                },
+            )
+
+        def iter_file():
+            with open(local_path, "rb") as f:
+                while True:
+                    data = f.read(65536)
+                    if not data:
+                        break
+                    yield data
+
+        return StreamingResponse(
+            iter_file(),
+            media_type=content_type,
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(file_size),
+            },
+        )
 
     url = get_file_url(track.file_url)
     return {"stream_url": url}
