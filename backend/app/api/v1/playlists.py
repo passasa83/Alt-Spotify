@@ -137,15 +137,27 @@ async def get_playlist(playlist_id: uuid.UUID, db: AsyncSession = Depends(get_db
     return playlist
 
 
-@router.get("/{playlist_id}/tracks", response_model=list[TrackResponse])
+@router.get("/{playlist_id}/tracks")
 async def get_playlist_tracks(playlist_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(Track)
-        .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+        select(PlaylistTrack, Track)
+        .join(Track, PlaylistTrack.track_id == Track.id)
         .where(PlaylistTrack.playlist_id == playlist_id)
         .order_by(PlaylistTrack.position)
     )
-    return list(result.scalars().all())
+    rows = result.all()
+    items = []
+    for pt, track in rows:
+        items.append({
+            "id": pt.track_id,
+            "playlist_id": str(pt.playlist_id),
+            "track_id": str(pt.track_id),
+            "position": pt.position,
+            "added_by": str(pt.added_by) if pt.added_by else None,
+            "added_at": pt.added_at.isoformat() if pt.added_at else None,
+            "track": TrackResponse.model_validate(track).model_dump(mode="json"),
+        })
+    return items
 
 
 @router.post("", response_model=PlaylistResponse, status_code=status.HTTP_201_CREATED)
