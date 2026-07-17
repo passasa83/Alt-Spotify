@@ -67,6 +67,12 @@ async def list_playlists(
         )
         counts = {row[0]: row[1] for row in count_res.all()}
 
+    owner_ids = list({p.owner_id for p in items})
+    owner_map = {}
+    if owner_ids:
+        owner_res = await db.execute(select(User.id, User.pseudo).where(User.id.in_(owner_ids)))
+        owner_map = {row[0]: row[1] for row in owner_res.all()}
+
     items_with_count = []
     for p in items:
         item_dict = {
@@ -84,6 +90,7 @@ async def list_playlists(
             "created_at": p.created_at,
             "updated_at": p.updated_at,
             "track_count": counts.get(p.id, 0),
+            "owner_name": owner_map.get(p.owner_id),
         }
         items_with_count.append(item_dict)
 
@@ -161,13 +168,32 @@ async def get_user_history(
     }
 
 
-@router.get("/{playlist_id}", response_model=PlaylistResponse)
+@router.get("/{playlist_id}")
 async def get_playlist(playlist_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Playlist).where(Playlist.id == playlist_id))
     playlist = result.scalar_one_or_none()
     if not playlist:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found")
-    return playlist
+
+    owner_result = await db.execute(select(User.pseudo).where(User.id == playlist.owner_id))
+    owner_name = owner_result.scalar_one_or_none()
+
+    return {
+        "id": playlist.id,
+        "title": playlist.title,
+        "owner_id": playlist.owner_id,
+        "description": playlist.description,
+        "is_public": playlist.is_public,
+        "is_collaborative": playlist.is_collaborative,
+        "is_smart": getattr(playlist, "is_smart", False),
+        "smart_rules": getattr(playlist, "smart_rules", None),
+        "max_tracks": getattr(playlist, "max_tracks", 50),
+        "auto_refresh": getattr(playlist, "auto_refresh", False),
+        "last_refreshed_at": getattr(playlist, "last_refreshed_at", None),
+        "created_at": playlist.created_at,
+        "updated_at": playlist.updated_at,
+        "owner_name": owner_name,
+    }
 
 
 @router.get("/{playlist_id}/tracks")

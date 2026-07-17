@@ -46,6 +46,7 @@ const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
       </div>
       <p className="block truncate text-sm font-semibold text-white">{playlist.title}</p>
       <p className="block truncate text-xs text-gray-400">
+        {playlist.owner_name && <>{playlist.owner_name} • </>}
         {playlist.track_count !== undefined ? `${playlist.track_count} ${t('playlist.songs')}` : t('playlist.playlist')}
       </p>
     </Link>

@@ -161,7 +161,7 @@ const PlaylistDetail = () => {
             <p className="mt-2 text-sm text-gray-400">{playlist.description}</p>
           )}
           <p className="mt-2 text-sm text-gray-400">
-            {playlist.owner?.pseudo || 'Unknown'} • {tracks.length} {t('playlist.songs')}
+            {playlist.owner_name || 'Unknown'} • {tracks.length} {t('playlist.songs')}
             {hours > 0 && `, ${hours} hr`}
             {minutes > 0 && ` ${minutes} min`}
           </p>
