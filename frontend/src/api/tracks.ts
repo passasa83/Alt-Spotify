@@ -21,11 +21,13 @@ export const searchTracks = async (query: string): Promise<Track[]> => {
 };
 
 export const getTrackStreamUrl = (trackId: string): string => {
-  return `/api/v1/tracks/${trackId}/stream`;
+  const token = localStorage.getItem('access_token');
+  return `/api/v1/tracks/${trackId}/stream${token ? `?token=${token}` : ''}`;
 };
 
 export const getHlsStreamUrl = (trackId: string): string => {
-  return `/api/v1/stream/${trackId}/master.m3u8`;
+  const token = localStorage.getItem('access_token');
+  return `/api/v1/stream/${trackId}/master.m3u8${token ? `?token=${token}` : ''}`;
 };
 
 export const getTrackLyrics = async (trackId: string): Promise<string> => {

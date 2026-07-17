@@ -15,7 +15,7 @@ from app.models.track import Track
 from app.models.listening_history import ListeningHistory
 from app.schemas.track import TrackCreate, TrackUpdate, TrackResponse
 from app.schemas.common import PaginatedResponse
-from app.utils.deps import get_current_user, require_admin
+from app.utils.deps import get_current_user, get_current_user_from_header_or_query, require_admin
 from app.models.user import User
 
 logger = structlog.get_logger("app")
@@ -202,7 +202,7 @@ async def play_track(
 async def stream_track(
     track_id: uuid.UUID, 
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_from_header_or_query),
 ):
     result = await db.execute(select(Track).where(Track.id == track_id))
     track = result.scalar_one_or_none()
@@ -242,7 +242,7 @@ async def stream_track(
 async def download_track(
     track_id: uuid.UUID,
     body: dict,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_from_header_or_query),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Track).where(Track.id == track_id))

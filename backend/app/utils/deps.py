@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 from uuid import UUID
 
 import structlog
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,11 +16,7 @@ logger = structlog.get_logger("app")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
-    request: Request = None,
-) -> User:
+async def _resolve_user(token: str, db: AsyncSession, request: Request = None) -> User:
     user_id = verify_token(token, token_type="access")
     if user_id is None:
         client_ip = request.client.host if request and request.client else "unknown"
@@ -39,6 +35,30 @@ async def get_current_user(
         logger.warning("auth_user_inactive", user_id=user_id)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
     return user
+
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+    request: Request = None,
+) -> User:
+    return await _resolve_user(token, db, request)
+
+
+async def get_current_user_from_header_or_query(
+    token_from_header: str | None = Depends(OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)),
+    token_from_query: str | None = Query(None, alias="token"),
+    db: AsyncSession = Depends(get_db),
+    request: Request = None,
+) -> User:
+    token = token_from_header or token_from_query
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return await _resolve_user(token, db, request)
 
 
 async def require_admin(current_user: User = Depends(get_current_user)) -> User:

@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,12 +9,17 @@ from app.core.database import get_db
 from app.core.minio import get_minio_client
 from app.core.config import settings
 from app.models.track import Track
+from app.utils.deps import get_current_user_from_header_or_query
 
 router = APIRouter(prefix="/stream", tags=["stream"])
 
 
 @router.get("/{track_id}/master.m3u8")
-async def get_master_playlist(track_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_master_playlist(
+    track_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(get_current_user_from_header_or_query),
+):
     result = await db.execute(select(Track).where(Track.id == track_id))
     track = result.scalar_one_or_none()
     if not track:
