@@ -91,7 +91,7 @@ services:
       LOG_FORMAT: ${LOG_FORMAT:-json}
       MUSIC_SCAN_DIR: /music
     volumes:
-      - /srv/dev-disk-by-uuid-b2ee3fd8-7a1f-4bb3-a820-1d3f63c51bb9/Jellyfin/Musique:/music:ro
+      - ${MUSIC_SCAN_DIR:-./music}:/music:ro
     depends_on:
       postgres:
         condition: service_healthy
