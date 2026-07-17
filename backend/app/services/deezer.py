@@ -1,4 +1,5 @@
 import re
+import io
 import httpx
 import structlog
 
@@ -90,3 +91,31 @@ async def search_deezer(query: str, limit: int = 20) -> list[dict]:
     except Exception as e:
         logger.error("deezer_search_failed", query=query, error=str(e))
         return []
+
+
+async def download_deezer_preview(preview_url: str, object_name: str) -> str | None:
+    """Download a Deezer preview MP3 and upload to MinIO. Returns the object key."""
+    if not preview_url:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(preview_url)
+            resp.raise_for_status()
+            content = resp.content
+
+        from app.core.minio import get_minio_client
+        from app.core.config import settings
+
+        minio_client = get_minio_client()
+        minio_client.put_object(
+            settings.MINIO_BUCKET,
+            object_name,
+            io.BytesIO(content),
+            length=len(content),
+            content_type="audio/mpeg",
+        )
+        logger.info("deezer_preview_downloaded", object_name=object_name, size=len(content))
+        return object_name
+    except Exception as e:
+        logger.error("deezer_preview_download_failed", preview_url=preview_url, error=str(e))
+        return None

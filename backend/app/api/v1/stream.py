@@ -1,9 +1,10 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import io
 
 from app.core.database import get_db
 from app.core.minio import get_minio_client
@@ -87,3 +88,40 @@ async def get_hls_segment(track_id: uuid.UUID, quality: str, segment: str, db: A
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Segment not found")
 
     return Response(content=content, media_type="video/mp2t")
+
+
+@router.get("/{track_id}/download")
+async def download_track(track_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Track).where(Track.id == track_id))
+    track = result.scalar_one_or_none()
+    if not track:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+    if not track.file_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track file not available")
+
+    client = get_minio_client()
+    try:
+        response = client.get_object(settings.MINIO_BUCKET, track.file_path)
+        content = response.read()
+        response.close()
+        response.release_conn()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track file not found")
+
+    file_ext = track.file_path.rsplit(".", 1)[-1] if "." in track.file_path else "mp3"
+    content_type = {
+        "mp3": "audio/mpeg",
+        "flac": "audio/flac",
+        "ogg": "audio/ogg",
+        "wav": "audio/wav",
+        "m4a": "audio/mp4",
+    }.get(file_ext, "audio/mpeg")
+
+    filename = f"{track.artist.name if track.artist else 'Unknown'} - {track.title}.{file_ext}"
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )

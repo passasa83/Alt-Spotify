@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, Bell, ChevronDown, Settings, LogOut, Globe } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import NotificationBell from './NotificationBell';
@@ -11,10 +11,12 @@ const TopBar = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuthStore();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
   const { t, locale, setLocale } = useTranslation();
+  const isSearchPage = location.pathname === '/search';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -38,17 +40,20 @@ const TopBar = () => {
 
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between bg-gray-900/80 px-6 py-3 backdrop-blur-md">
-      <form onSubmit={handleSearch} className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} aria-hidden="true" />
-        <input
-          type="text"
-          placeholder={t('search.placeholder')}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          aria-label={t('nav.search')}
-          className="w-64 rounded-full bg-gray-800 py-2 pl-10 pr-4 text-sm text-white placeholder-gray-400 outline-none focus:outline-2 focus:outline-green-500 lg:w-96"
-        />
-      </form>
+      {!isSearchPage && (
+        <form onSubmit={handleSearch} className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} aria-hidden="true" />
+          <input
+            type="text"
+            placeholder={t('search.placeholder')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label={t('nav.search')}
+            className="w-64 rounded-full bg-gray-800 py-2 pl-10 pr-4 text-sm text-white placeholder-gray-400 outline-none focus:outline-2 focus:outline-green-500 lg:w-96"
+          />
+        </form>
+      )}
+      {isSearchPage && <div />}
 
       <div className="flex items-center gap-4">
         <div className="relative" ref={langRef}>

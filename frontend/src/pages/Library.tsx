@@ -8,13 +8,14 @@ import { useTranslation } from '@/hooks/useTranslation';
 
 const Library = () => {
   const { t } = useTranslation();
-  const { playlists, favorites, loadPlaylists, isLoading } = useLibraryStore();
+  const { playlists, favorites, loadPlaylists, loadFavorites, isLoading } = useLibraryStore();
   const [activeTab, setActiveTab] = useState<'playlists' | 'favorites'>('playlists');
   const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     loadPlaylists();
-  }, [loadPlaylists]);
+    loadFavorites();
+  }, [loadPlaylists, loadFavorites]);
 
   return (
     <div className="pb-24">

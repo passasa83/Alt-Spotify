@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
@@ -14,7 +14,7 @@ from app.schemas.artist import ArtistResponse
 from app.schemas.album import AlbumResponse
 from app.schemas.track import TrackResponse, SearchTrackResponse
 from app.schemas.playlist import PlaylistResponse
-from app.services.deezer import search_deezer
+from app.services.deezer import search_deezer, download_deezer_preview
 from app.services.jiosaavn import search_jiosaavn, import_from_jiosaavn
 from app.services.meilisearch import search_meili
 from app.services.musicbrainz import search_recordings, search_artists
@@ -158,46 +158,48 @@ async def search(
                 artist_result = await db.execute(select(Artist).where(Artist.id == t.artist_id))
                 artist_obj = artist_result.scalar_one_or_none()
                 aname = artist_obj.name if artist_obj else ""
-                local_tracks_map[t.title.lower().strip()] = (t, aname)
+                dedup_key = f"{t.title.lower().strip()}|{aname.lower().strip()}"
+                local_tracks_map[dedup_key] = (t, aname)
 
             external_results = await search_deezer(q, limit=page_size)
 
             tracks = []
             seen_isrcs: set[str] = set()
-            seen_titles: set[str] = set()
+            seen_keys: set[str] = set()
 
             for ext in external_results:
                 ext_isrc = ext.get("isrc")
-                ext_title_key = ext["title"].lower().strip()
-                local_match = local_tracks_map.get(ext_title_key)
+                ext_dedup_key = f"{ext['title'].lower().strip()}|{ext['artist'].lower().strip()}"
+                local_match = local_tracks_map.get(ext_dedup_key)
 
                 if local_match:
                     tracks.append(_track_to_response(local_match[0], local_match[1]))
-                    seen_titles.add(ext_title_key)
+                    seen_keys.add(ext_dedup_key)
                     if ext_isrc:
                         seen_isrcs.add(ext_isrc)
                 else:
-                    artist_id = await _ensure_artist(db, ext["artist"])
-                    stub = Track(
-                        title=ext["title"],
-                        artist_id=artist_id,
-                        duration_seconds=ext.get("duration", 0),
-                        cover_url=ext.get("cover_url"),
-                        isrc=ext.get("isrc"),
-                        genre=genre,
-                        is_explicit=ext.get("explicit", False),
-                        file_url=None,
-                        hls_path=None,
-                    )
-                    db.add(stub)
-                    await db.flush()
-                    tracks.append(_track_to_response(stub, ext["artist"]))
-                    seen_titles.add(ext_title_key)
-                    if ext_isrc:
-                        seen_isrcs.add(ext_isrc)
+                    if ext_dedup_key not in seen_keys:
+                        artist_id = await _ensure_artist(db, ext["artist"])
+                        stub = Track(
+                            title=ext["title"],
+                            artist_id=artist_id,
+                            duration_seconds=ext.get("duration", 0),
+                            cover_url=ext.get("cover_url"),
+                            isrc=ext.get("isrc"),
+                            genre=genre,
+                            is_explicit=ext.get("explicit", False),
+                            file_url=None,
+                            hls_path=None,
+                        )
+                        db.add(stub)
+                        await db.flush()
+                        tracks.append(_track_to_response(stub, ext["artist"]))
+                        seen_keys.add(ext_dedup_key)
+                        if ext_isrc:
+                            seen_isrcs.add(ext_isrc)
 
-            for title_key, (t, aname) in local_tracks_map.items():
-                if title_key not in seen_titles:
+            for dedup_key, (t, aname) in local_tracks_map.items():
+                if dedup_key not in seen_keys:
                     tracks.append(_track_to_response(t, aname))
 
             await db.commit()
@@ -304,4 +306,52 @@ async def search_enriched(
         "query": q,
         "count": len(enriched),
         "results": enriched,
+    }
+
+
+@router.post("/download-deezer")
+async def download_deezer_track(
+    deezer_id: int,
+    title: str,
+    artist_name: str,
+    preview_url: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Download a Deezer preview to MinIO and create/update a local track."""
+    object_name = f"deezer/previews/{deezer_id}.mp3"
+    result = await download_deezer_preview(preview_url, object_name)
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to download from Deezer"
+        )
+    
+    from app.core.minio import get_file_url
+    file_url = get_file_url(object_name)
+    
+    artist_id = await _ensure_artist(db, artist_name)
+    
+    existing = await db.execute(
+        select(Track).where(Track.isrc.isnot(None), Track.isrc != "").limit(1)
+    )
+    
+    track = Track(
+        title=title,
+        artist_id=artist_id,
+        file_url=file_url,
+        file_path=object_name,
+        duration_seconds=30,
+        cover_url=None,
+    )
+    db.add(track)
+    await db.flush()
+    await db.refresh(track)
+    
+    return {
+        "track_id": str(track.id),
+        "title": title,
+        "artist": artist_name,
+        "file_url": file_url,
+        "message": "Downloaded and imported successfully"
     }

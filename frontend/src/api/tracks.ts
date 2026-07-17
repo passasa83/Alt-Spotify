@@ -52,9 +52,8 @@ export const uploadTrack = async (file: File, metadata: Record<string, any>): Pr
   return response.data;
 };
 
-export const getTrackDownloadUrl = async (trackId: string, deviceId: string): Promise<string> => {
-  const response = await client.post(`/tracks/${trackId}/download`, { device_id: deviceId });
-  return response.data.download_url;
+export const getTrackDownloadUrl = (trackId: string): string => {
+  return `/api/v1/stream/${trackId}/download`;
 };
 
 export const updateTrack = async (id: string, data: Record<string, any>): Promise<Track> => {
