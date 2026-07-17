@@ -2,23 +2,36 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getTrack } from '@/api/tracks';
 import { usePlayerStore } from '@/stores/playerStore';
-import { Play, Pause, Heart, MoreHorizontal } from 'lucide-react';
+import { useLibraryStore } from '@/stores/libraryStore';
+import { Play, Pause, Heart } from 'lucide-react';
 import type { Track } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
+
+interface LyricsLine {
+  time_seconds: number;
+  text: string;
+}
 
 const TrackDetail = () => {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [track, setTrackData] = useState<Track | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { setTrack, currentTrack, isPlaying, togglePlay } = usePlayerStore();
+  const [lyrics, setLyrics] = useState<LyricsLine[]>([]);
+  const { setTrack, currentTrack, isPlaying, togglePlay, progress } = usePlayerStore();
+  const { addToFavorites, removeFromFavorites, isFavorite } = useLibraryStore();
+  const liked = isFavorite(String(id));
 
   useEffect(() => {
     const loadTrack = async () => {
       if (!id) return;
       try {
-        const data = await getTrack(parseInt(id));
+        const data = await getTrack(id);
         setTrackData(data);
+        if (data.lyrics_lrc) {
+          const parsed = parseLrc(data.lyrics_lrc);
+          setLyrics(parsed);
+        }
       } catch {
         console.error('Failed to load track');
       } finally {
@@ -27,6 +40,29 @@ const TrackDetail = () => {
     };
     loadTrack();
   }, [id]);
+
+  const parseLrc = (lrc: string): LyricsLine[] => {
+    const regex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]\s*(.*)/g;
+    const lines: LyricsLine[] = [];
+    let match;
+    while ((match = regex.exec(lrc)) !== null) {
+      const minutes = parseInt(match[1]);
+      const seconds = parseInt(match[2]);
+      const frac = match[3].length === 2 ? match[3] + '0' : match[3];
+      const ms = parseInt(frac);
+      const time = minutes * 60 + seconds + ms / 1000;
+      const text = match[4].trim();
+      if (text) lines.push({ time_seconds: time, text });
+    }
+    return lines.sort((a, b) => a.time_seconds - b.time_seconds);
+  };
+
+  const activeLyricIndex = lyrics.length > 0
+    ? lyrics.findIndex((l, i) => {
+        const next = lyrics[i + 1];
+        return progress >= l.time_seconds && (!next || progress < next.time_seconds);
+      })
+    : -1;
 
   if (isLoading) {
     return (
@@ -69,12 +105,14 @@ const TrackDetail = () => {
             <Link to={`/artist/${track.artist_id}`} className="font-medium text-white hover:underline">
               {track.artist?.name || t('player.unknown_artist')}
             </Link>
-            <span>•</span>
-            <Link to={`/album/${track.album_id}`} className="hover:underline">
-              {track.album?.title || t('player.unknown_album')}
-            </Link>
-            <span>•</span>
-            <span>{track.release_year || new Date(track.created_at).getFullYear()}</span>
+            {track.album_id && (
+              <>
+                <span>•</span>
+                <Link to={`/album/${track.album_id}`} className="hover:underline">
+                  {track.album?.title || t('player.unknown_album')}
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -90,17 +128,46 @@ const TrackDetail = () => {
             <Play size={24} fill="currentColor" />
           )}
         </button>
-        <button className="text-gray-400 transition-colors hover:text-white">
-          <Heart size={24} />
-        </button>
-        <button className="text-gray-400 transition-colors hover:text-white">
-          <MoreHorizontal size={24} />
+        <button
+          onClick={() => {
+            if (liked) removeFromFavorites(String(track.id));
+            else addToFavorites(track);
+          }}
+          className="text-gray-400 transition-colors hover:text-white"
+        >
+          <Heart size={24} fill={liked ? 'currentColor' : 'none'} className={liked ? 'text-green-500' : ''} />
         </button>
       </div>
 
+      {(track.bpm || track.key || track.mood || track.genre) && (
+        <div className="mb-4 flex flex-wrap gap-4 text-sm text-gray-400">
+          {track.bpm && <span>BPM: <span className="text-white">{track.bpm}</span></span>}
+          {track.key && <span>Key: <span className="text-white">{track.key}</span></span>}
+          {track.mood && <span>Mood: <span className="text-white">{track.mood}</span></span>}
+          {track.genre && <span>Genre: <span className="text-white">{track.genre}</span></span>}
+        </div>
+      )}
+
       <div className="mt-8 rounded-lg bg-gray-900 p-6">
-        <h2 className="mb-4 text-xl font-bold text-white">Lyrics</h2>
-        <p className="text-gray-400">Lyrics not available for this track.</p>
+        <h2 className="mb-4 text-xl font-bold text-white">{t('track.lyrics')}</h2>
+        {lyrics.length > 0 ? (
+          <div className="max-h-96 space-y-2 overflow-y-auto">
+            {lyrics.map((line, i) => (
+              <p
+                key={i}
+                className={`transition-all duration-300 ${
+                  i === activeLyricIndex
+                    ? 'text-lg font-bold text-white'
+                    : 'text-sm text-gray-500'
+                }`}
+              >
+                {line.text}
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-400">{t('track.lyrics_not_available')}</p>
+        )}
       </div>
 
       <div className="mt-8 rounded-lg bg-gray-900 p-6">
@@ -108,9 +175,6 @@ const TrackDetail = () => {
         <Link to={`/artist/${track.artist_id}`} className="text-green-500 hover:underline">
           {track.artist?.name || t('player.unknown_artist')}
         </Link>
-        <p className="mt-2 text-sm text-gray-400">
-          Artist information not available.
-        </p>
       </div>
     </div>
   );

@@ -200,7 +200,7 @@ const PlaylistDetail = () => {
         {tracks.map((pt, index) => (
           pt.track && (
             <div
-              key={pt.id}
+              key={pt.track_id}
               className="group grid cursor-pointer items-center gap-4 rounded-md px-4 py-2 transition-colors hover:bg-gray-800 md:grid-cols-[16px_4fr_2fr_3fr_minmax(120px,1fr)]"
               onDoubleClick={() => pt.track && setTrack(pt.track)}
             >

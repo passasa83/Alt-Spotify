@@ -64,3 +64,12 @@ export const updateTrack = async (id: string, data: Record<string, any>): Promis
 export const deleteTrack = async (id: string): Promise<void> => {
   await client.delete(`/tracks/${id}`);
 };
+
+export const uploadLyrics = async (trackId: string, file: File): Promise<{ message: string; lines_count: number }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await client.post(`/upload/lyrics/${trackId}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};

@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
-import { uploadTrack } from '@/api/tracks';
+import { uploadTrack, uploadLyrics, getTracks } from '@/api/tracks';
 import { useTranslation } from '@/hooks/useTranslation';
-import { Upload, CheckCircle, AlertCircle, Music } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Music, FileText } from 'lucide-react';
+import type { Track } from '@/types';
 
 const AdminUpload = () => {
   const { t } = useTranslation();
@@ -18,6 +19,13 @@ const AdminUpload = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [lyricsFile, setLyricsFile] = useState<File | null>(null);
+  const [uploadedTrackId, setUploadedTrackId] = useState<string | null>(null);
+  const [lyricsSuccess, setLyricsSuccess] = useState(false);
+  const [trackSearchQuery, setTrackSearchQuery] = useState('');
+  const [trackSearchResults, setTrackSearchResults] = useState<Track[]>([]);
+  const [selectedTrackForLyrics, setSelectedTrackForLyrics] = useState<Track | null>(null);
+  const lyricsInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -54,6 +62,8 @@ const AdminUpload = () => {
     setUploading(true);
     setProgress(0);
     setError(null);
+    setLyricsSuccess(false);
+    setUploadedTrackId(null);
 
     try {
       const interval = setInterval(() => {
@@ -66,7 +76,7 @@ const AdminUpload = () => {
         });
       }, 200);
 
-      await uploadTrack(file, { 
+      const result = await uploadTrack(file, { 
         title, 
         artist, 
         album, 
@@ -75,10 +85,23 @@ const AdminUpload = () => {
         allowed_territories: allowedTerritories || undefined
       });
 
+      const trackId = result?.track_id || (result as any)?.id;
+      if (trackId) setUploadedTrackId(trackId);
+
+      if (lyricsFile && trackId) {
+        try {
+          await uploadLyrics(trackId, lyricsFile);
+          setLyricsSuccess(true);
+        } catch {
+          console.error('Lyrics upload failed');
+        }
+      }
+
       clearInterval(interval);
       setProgress(100);
       setSuccess(true);
       setFile(null);
+      setLyricsFile(null);
       setTitle('');
       setArtist('');
       setAlbum('');
@@ -87,6 +110,34 @@ const AdminUpload = () => {
       setError('Upload failed. Please try again.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleSearchTracks = async (query: string) => {
+    setTrackSearchQuery(query);
+    if (query.length < 2) {
+      setTrackSearchResults([]);
+      return;
+    }
+    try {
+      const res = await getTracks(1, 10);
+      const filtered = res.items.filter((t: Track) =>
+        t.title.toLowerCase().includes(query.toLowerCase())
+      );
+      setTrackSearchResults(filtered);
+    } catch {
+      console.error('Search failed');
+    }
+  };
+
+  const handleUploadLyricsForTrack = async (trackId: string) => {
+    if (!lyricsFile) return;
+    try {
+      await uploadLyrics(trackId, lyricsFile);
+      setLyricsSuccess(true);
+      setLyricsFile(null);
+    } catch {
+      setError('Lyrics upload failed');
     }
   };
 
@@ -233,6 +284,68 @@ const AdminUpload = () => {
           {uploading ? t('upload.uploading') : t('upload.upload_track')}
         </button>
       </form>
+
+      <div className="border-t border-gray-800 pt-8">
+        <h2 className="mb-4 text-xl font-bold text-white">Upload Lyrics (.lrc)</h2>
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-400">Search track</label>
+            <input
+              value={trackSearchQuery}
+              onChange={(e) => handleSearchTracks(e.target.value)}
+              className="w-full rounded-lg bg-gray-800 px-4 py-3 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Type track title..."
+            />
+          </div>
+          {trackSearchResults.length > 0 && (
+            <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg bg-gray-800 p-2">
+              {trackSearchResults.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    setSelectedTrackForLyrics(t);
+                    setTrackSearchQuery(t.title);
+                    setTrackSearchResults([]);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-gray-200 hover:bg-gray-700"
+                >
+                  <img src={t.cover_url || '/placeholder-album.png'} className="h-8 w-8 rounded object-cover" />
+                  <div>
+                    <p className="font-medium text-white">{t.title}</p>
+                    <p className="text-xs text-gray-400">{t.artist?.name || 'Unknown'}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-400">Lyrics file (.lrc)</label>
+            <input
+              ref={lyricsInputRef}
+              type="file"
+              accept=".lrc,.txt"
+              onChange={(e) => {
+                if (e.target.files?.[0]) setLyricsFile(e.target.files[0]);
+              }}
+              className="w-full rounded-lg bg-gray-800 px-4 py-3 text-white file:mr-3 file:rounded file:border-0 file:bg-green-500 file:px-3 file:py-1 file:text-sm file:font-medium file:text-black"
+            />
+          </div>
+          {selectedTrackForLyrics && lyricsFile && (
+            <button
+              onClick={() => handleUploadLyricsForTrack(selectedTrackForLyrics.id)}
+              className="w-full rounded-full bg-green-500 py-3 font-bold text-black hover:bg-green-400"
+            >
+              Upload Lyrics for "{selectedTrackForLyrics.title}"
+            </button>
+          )}
+          {lyricsSuccess && (
+            <div className="flex items-center gap-2 rounded-lg bg-green-500/10 p-4 text-green-400">
+              <CheckCircle size={20} />
+              Lyrics uploaded successfully!
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

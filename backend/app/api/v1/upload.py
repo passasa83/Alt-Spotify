@@ -209,3 +209,46 @@ async def get_upload_status(task_id: str):
             "status": "UNKNOWN",
             "result": None,
         }
+
+
+ALLOWED_LYRICS_TYPES = {"text/plain", "application/octet-stream", "application/x-subrip"}
+
+
+@router.post("/lyrics/{track_id}", status_code=status.HTTP_201_CREATED)
+async def upload_lyrics(
+    track_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    result = await db.execute(select(Track).where(Track.id == track_id))
+    track = result.scalar_one_or_none()
+    if not track:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+
+    file_data = await file.read()
+    if len(file_data) > 512 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Lyrics file too large (max 512KB)",
+        )
+
+    try:
+        lrc_text = file_data.decode("utf-8")
+    except UnicodeDecodeError:
+        try:
+            lrc_text = file_data.decode("latin-1")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot decode lyrics file. Please use UTF-8 or Latin-1 encoded .lrc files.",
+            )
+
+    track.lyrics_lrc = lrc_text
+    await db.flush()
+
+    return {
+        "track_id": str(track.id),
+        "message": "Lyrics uploaded successfully",
+        "lines_count": len([l for l in lrc_text.splitlines() if l.strip().startswith("[")]),
+    }

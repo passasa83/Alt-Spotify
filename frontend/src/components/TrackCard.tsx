@@ -50,7 +50,7 @@ const TrackCard = ({ track }: TrackCardProps) => {
                 addToFavorites(track);
               }
             }}
-            className={`absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full transition-all ${
+            className={`absolute top-2 right-10 flex h-8 w-8 items-center justify-center rounded-full transition-all ${
               liked
                 ? 'text-green-500 opacity-100'
                 : 'text-gray-400 opacity-0 group-hover:opacity-100 hover:text-white'
@@ -58,7 +58,7 @@ const TrackCard = ({ track }: TrackCardProps) => {
           >
             <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
           </button>
-          <div className="absolute top-2 left-2 opacity-0 transition-all group-hover:opacity-100">
+          <div className="absolute top-2 right-2 z-10 opacity-0 transition-all group-hover:opacity-100">
             <TrackContextMenu
               track={track}
               onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
