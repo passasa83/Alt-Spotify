@@ -133,7 +133,23 @@ async def search(
         result = await db.execute(
             select(Artist).where(Artist.name.ilike(like_pattern)).offset(offset).limit(page_size)
         )
-        results["artists"] = [ArtistResponse.model_validate(a) for a in result.scalars().all()]
+        artists_list = list(result.scalars().all())
+        deezer_artists = await search_deezer(q, limit=10)
+        deezer_pic_map: dict[str, str] = {}
+        for ext in deezer_artists:
+            aname = ext.get("artist", "")
+            pic = ext.get("artist_picture", "")
+            if aname and pic and aname not in deezer_pic_map:
+                deezer_pic_map[aname] = pic
+        artist_responses = []
+        for a in artists_list:
+            if not a.image_url:
+                for dname, dpic in deezer_pic_map.items():
+                    if a.name.lower() == dname.lower():
+                        a.image_url = dpic
+                        break
+            artist_responses.append(ArtistResponse.model_validate(a))
+        results["artists"] = artist_responses
 
     if "albums" in types:
         result = await db.execute(
@@ -183,6 +199,7 @@ async def search(
             )
             local_tracks_map: dict[str, tuple[Track, str]] = {}
             local_artist_images: dict[str, str | None] = {}
+            local_artist_ids: dict[str, str] = {}
             for t in local_result.scalars().all():
                 artist_result = await db.execute(select(Artist).where(Artist.id == t.artist_id))
                 artist_obj = artist_result.scalar_one_or_none()
@@ -192,6 +209,8 @@ async def search(
                 local_tracks_map[dedup_key] = (t, aname)
                 if aimg:
                     local_artist_images[dedup_key] = aimg
+                if artist_obj:
+                    local_artist_ids[aname.lower()] = str(artist_obj.id)
 
             external_results = await search_deezer(q, limit=page_size)
 
@@ -213,6 +232,14 @@ async def search(
                     seen_keys.add(ext_dedup_key)
                     if ext_isrc:
                         seen_isrcs.add(ext_isrc)
+                    artist_picture = ext.get("artist_picture")
+                    if artist_picture and not aimg:
+                        ext_artist_id = local_artist_ids.get(ext["artist"].lower())
+                        if ext_artist_id:
+                            artist_row = await db.execute(select(Artist).where(Artist.id == ext_artist_id))
+                            artist_obj = artist_row.scalar_one_or_none()
+                            if artist_obj and not artist_obj.image_url:
+                                artist_obj.image_url = artist_picture
                 else:
                     if ext_dedup_key not in seen_keys:
                         artist_picture = ext.get("artist_picture")
