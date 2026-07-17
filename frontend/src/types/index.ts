@@ -51,6 +51,7 @@ export interface Track {
   is_explicit: boolean;
   track_gain?: number;
   track_peak?: number;
+  tidal_id?: number;
   play_count: number;
   created_at: string;
 }

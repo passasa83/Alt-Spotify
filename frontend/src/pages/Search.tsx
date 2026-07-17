@@ -7,12 +7,13 @@ import TrackCard from '@/components/TrackCard';
 import ArtistCard from '@/components/ArtistCard';
 import AlbumCard from '@/components/AlbumCard';
 import PlaylistCard from '@/components/PlaylistCard';
+import { Globe, HardDrive } from 'lucide-react';
 import type { SearchFilters } from '@/types';
 import { GENRES } from '@/constants/genres';
 
 const SearchPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { query, setQuery, filters, setFilters, results, isLoading } = useSearch();
+  const { query, setQuery, filters, setFilters, source, setSource, results, isLoading } = useSearch();
   const hasResults =
     results.tracks.length > 0 ||
     results.artists.length > 0 ||
@@ -66,6 +67,38 @@ const SearchPage = () => {
       <div className="mb-8 max-w-xl">
         <SearchBar value={query} onChange={handleSearch} placeholder="What do you want to listen to?" />
       </div>
+
+      {query && (
+        <div className="mb-4 flex gap-2">
+          <button
+            onClick={() => setSource('local')}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition ${
+              source === 'local' ? 'bg-white text-black' : 'bg-zinc-800 text-white hover:bg-zinc-700'
+            }`}
+          >
+            <HardDrive className="h-3.5 w-3.5" />
+            Local
+          </button>
+          <button
+            onClick={() => setSource('all')}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition ${
+              source === 'all' ? 'bg-white text-black' : 'bg-zinc-800 text-white hover:bg-zinc-700'
+            }`}
+          >
+            <Globe className="h-3.5 w-3.5" />
+            All
+          </button>
+          <button
+            onClick={() => setSource('tidal')}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition ${
+              source === 'tidal' ? 'bg-white text-black' : 'bg-zinc-800 text-white hover:bg-zinc-700'
+            }`}
+          >
+            <Globe className="h-3.5 w-3.5" />
+            Tidal
+          </button>
+        </div>
+      )}
 
       {query && (
         <SearchFiltersPanel filters={filters} onChange={handleFiltersChange} />

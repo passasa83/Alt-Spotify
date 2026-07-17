@@ -18,6 +18,7 @@ from app.services.deezer import search_deezer, download_deezer_preview
 from app.services.jiosaavn import search_jiosaavn, import_from_jiosaavn
 from app.services.meilisearch import search_meili
 from app.services.musicbrainz import search_recordings, search_artists
+from app.services.tidal import tidal_client
 from app.utils.artist import ensure_artist
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -97,6 +98,7 @@ async def _find_local_track(db: AsyncSession, isrc: str | None, title: str, arti
 async def search(
     q: str = Query(..., min_length=1),
     type: str = Query("tracks,artists,albums,playlists,podcasts"),
+    source: str = Query("local", description="Search source: local, tidal, all"),
     genre: str | None = None,
     year: int | None = None,
     min_duration: int | None = None,
@@ -115,160 +117,276 @@ async def search(
     results: dict = {}
     like_pattern = f"%{q}%"
 
-    if "artists" in types:
-        result = await db.execute(
-            select(Artist).where(Artist.name.ilike(like_pattern)).offset(offset).limit(page_size)
-        )
-        artists_list = list(result.scalars().all())
-        deezer_artists = await search_deezer(q, limit=10)
-        deezer_pic_map: dict[str, str] = {}
-        for ext in deezer_artists:
-            aname = ext.get("artist", "")
-            pic = ext.get("artist_picture", "")
-            if aname and pic and aname not in deezer_pic_map:
-                deezer_pic_map[aname] = pic
-        artist_responses = []
-        for a in artists_list:
-            if not a.image_url:
-                for dname, dpic in deezer_pic_map.items():
-                    if a.name.lower() == dname.lower():
-                        a.image_url = dpic
-                        break
-            artist_responses.append(ArtistResponse.model_validate(a))
-        results["artists"] = artist_responses
+    tidal_only = source == "tidal"
+    include_tidal = source in ("tidal", "all")
 
-    if "albums" in types:
-        result = await db.execute(
-            select(Album).where(Album.title.ilike(like_pattern)).offset(offset).limit(page_size)
-        )
-        results["albums"] = [AlbumResponse.model_validate(a) for a in result.scalars().all()]
-
-    if "tracks" in types:
-        has_advanced_filters = any([genre, year, min_duration, max_duration, min_bpm, max_bpm, key, mood, lyrics])
-
-        if has_advanced_filters:
-            artist_ids_subq = select(Artist.id).where(Artist.name.ilike(like_pattern)).scalar_subquery()
-            query_stmt = select(Track).where(
-                or_(Track.title.ilike(like_pattern), Track.artist_id.in_(artist_ids_subq))
+    if tidal_only and "tracks" in types:
+        tidal_tracks = await tidal_client.search_tracks(q, limit=page_size)
+        results["tracks"] = [
+            SearchTrackResponse(
+                id=None,
+                title=t["title"],
+                album_id=None,
+                artist_id=None,
+                artist={"name": t["artist"], "image_url": t.get("artist_picture")} if t.get("artist") else None,
+                duration_seconds=t.get("duration", 0),
+                file_url=None,
+                hls_path=None,
+                cover_url=t.get("cover_url"),
+                genre=None,
+                bpm=t.get("bpm"),
+                key=t.get("key"),
+                mood=None,
+                lyrics_lrc=None,
+                track_gain=t.get("replay_gain"),
+                track_peak=t.get("peak"),
+                album_gain=None,
+                isrc=t.get("isrc"),
+                allowed_territories=None,
+                is_explicit=t.get("explicit", False),
+                play_count=0,
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
             )
-            if genre:
-                query_stmt = query_stmt.where(Track.genre.ilike(genre))
-            if year:
-                query_stmt = query_stmt.where(Track.created_at >= f"{year}-01-01", Track.created_at < f"{year+1}-01-01")
-            if min_duration is not None:
-                query_stmt = query_stmt.where(Track.duration_seconds >= min_duration)
-            if max_duration is not None:
-                query_stmt = query_stmt.where(Track.duration_seconds <= max_duration)
-            if min_bpm is not None:
-                query_stmt = query_stmt.where(Track.bpm >= min_bpm)
-            if max_bpm is not None:
-                query_stmt = query_stmt.where(Track.bpm <= max_bpm)
-            if key:
-                query_stmt = query_stmt.where(Track.key.ilike(key))
-            if mood:
-                query_stmt = query_stmt.where(Track.mood.ilike(f"%{mood}%"))
-            if lyrics:
-                query_stmt = query_stmt.where(Track.lyrics_lrc.ilike(f"%{lyrics}%"))
-            result = await db.execute(query_stmt.offset(offset).limit(page_size))
-            tracks = []
-            for t in result.scalars().all():
-                artist_result = await db.execute(select(Artist).where(Artist.id == t.artist_id))
-                artist_obj = artist_result.scalar_one_or_none()
-                tracks.append(_track_to_response(t, artist_obj.name if artist_obj else "", artist_obj.image_url if artist_obj else None))
-            results["tracks"] = tracks
-        else:
-            artist_ids_subq = select(Artist.id).where(Artist.name.ilike(like_pattern)).scalar_subquery()
-            local_result = await db.execute(
-                select(Track).where(
+            for t in tidal_tracks
+        ]
+
+    if tidal_only and "artists" in types:
+        tidal_artists = await tidal_client.search_artists(q, limit=page_size)
+        results["artists"] = [
+            {
+                "id": None,
+                "name": a["name"],
+                "image_url": a.get("picture_url"),
+                "bio": a.get("bio"),
+                "tidal_id": a.get("id"),
+            }
+            for a in tidal_artists
+        ]
+
+    if tidal_only and "albums" in types:
+        tidal_albums = await tidal_client.search_albums(q, limit=page_size)
+        results["albums"] = [
+            {
+                "id": None,
+                "title": a["title"],
+                "artist": a.get("artist"),
+                "artist_id": None,
+                "cover_url": a.get("cover_url"),
+                "release_date": a.get("release_date"),
+                "track_count": a.get("track_count", 0),
+                "tidal_id": a.get("id"),
+            }
+            for a in tidal_albums
+        ]
+
+    if not tidal_only:
+        if "artists" in types:
+            result = await db.execute(
+                select(Artist).where(Artist.name.ilike(like_pattern)).offset(offset).limit(page_size)
+            )
+            artists_list = list(result.scalars().all())
+            deezer_artists = await search_deezer(q, limit=10)
+            deezer_pic_map: dict[str, str] = {}
+            for ext in deezer_artists:
+                aname = ext.get("artist", "")
+                pic = ext.get("artist_picture", "")
+                if aname and pic and aname not in deezer_pic_map:
+                    deezer_pic_map[aname] = pic
+            artist_responses = []
+            for a in artists_list:
+                if not a.image_url:
+                    for dname, dpic in deezer_pic_map.items():
+                        if a.name.lower() == dname.lower():
+                            a.image_url = dpic
+                            break
+                artist_responses.append(ArtistResponse.model_validate(a))
+            if include_tidal:
+                tidal_artists = await tidal_client.search_artists(q, limit=min(10, page_size))
+                for ta in tidal_artists:
+                    already = any(
+                        (getattr(a, 'name', '') or '').lower() == (ta.get('artist', '') or '').lower()
+                        for a in artist_responses
+                    )
+                    if not already:
+                        artist_responses.append({
+                            "id": None,
+                            "name": ta["name"],
+                            "image_url": ta.get("picture_url"),
+                            "bio": ta.get("bio"),
+                            "tidal_id": ta.get("id"),
+                        })
+            results["artists"] = artist_responses
+
+        if "albums" in types:
+            result = await db.execute(
+                select(Album).where(Album.title.ilike(like_pattern)).offset(offset).limit(page_size)
+            )
+            results["albums"] = [AlbumResponse.model_validate(a) for a in result.scalars().all()]
+
+        if "tracks" in types:
+            has_advanced_filters = any([genre, year, min_duration, max_duration, min_bpm, max_bpm, key, mood, lyrics])
+
+            if has_advanced_filters:
+                artist_ids_subq = select(Artist.id).where(Artist.name.ilike(like_pattern)).scalar_subquery()
+                query_stmt = select(Track).where(
                     or_(Track.title.ilike(like_pattern), Track.artist_id.in_(artist_ids_subq))
-                ).limit(page_size)
-            )
-            local_tracks_map: dict[str, tuple[Track, str]] = {}
-            local_artist_images: dict[str, str | None] = {}
-            local_artist_ids: dict[str, str] = {}
-            for t in local_result.scalars().all():
-                artist_result = await db.execute(select(Artist).where(Artist.id == t.artist_id))
-                artist_obj = artist_result.scalar_one_or_none()
-                aname = artist_obj.name if artist_obj else ""
-                aimg = artist_obj.image_url if artist_obj else None
-                dedup_key = f"{_normalize_title(t.title)}|{_normalize_title(aname)}"
-                local_tracks_map[dedup_key] = (t, aname)
-                if aimg:
-                    local_artist_images[dedup_key] = aimg
-                if artist_obj:
-                    local_artist_ids[aname.lower()] = str(artist_obj.id)
+                )
+                if genre:
+                    query_stmt = query_stmt.where(Track.genre.ilike(genre))
+                if year:
+                    query_stmt = query_stmt.where(Track.created_at >= f"{year}-01-01", Track.created_at < f"{year+1}-01-01")
+                if min_duration is not None:
+                    query_stmt = query_stmt.where(Track.duration_seconds >= min_duration)
+                if max_duration is not None:
+                    query_stmt = query_stmt.where(Track.duration_seconds <= max_duration)
+                if min_bpm is not None:
+                    query_stmt = query_stmt.where(Track.bpm >= min_bpm)
+                if max_bpm is not None:
+                    query_stmt = query_stmt.where(Track.bpm <= max_bpm)
+                if key:
+                    query_stmt = query_stmt.where(Track.key.ilike(key))
+                if mood:
+                    query_stmt = query_stmt.where(Track.mood.ilike(f"%{mood}%"))
+                if lyrics:
+                    query_stmt = query_stmt.where(Track.lyrics_lrc.ilike(f"%{lyrics}%"))
+                result = await db.execute(query_stmt.offset(offset).limit(page_size))
+                tracks = []
+                for t in result.scalars().all():
+                    artist_result = await db.execute(select(Artist).where(Artist.id == t.artist_id))
+                    artist_obj = artist_result.scalar_one_or_none()
+                    tracks.append(_track_to_response(t, artist_obj.name if artist_obj else "", artist_obj.image_url if artist_obj else None))
+                results["tracks"] = tracks
+            else:
+                artist_ids_subq = select(Artist.id).where(Artist.name.ilike(like_pattern)).scalar_subquery()
+                local_result = await db.execute(
+                    select(Track).where(
+                        or_(Track.title.ilike(like_pattern), Track.artist_id.in_(artist_ids_subq))
+                    ).limit(page_size)
+                )
+                local_tracks_map: dict[str, tuple[Track, str]] = {}
+                local_artist_images: dict[str, str | None] = {}
+                local_artist_ids: dict[str, str] = {}
+                for t in local_result.scalars().all():
+                    artist_result = await db.execute(select(Artist).where(Artist.id == t.artist_id))
+                    artist_obj = artist_result.scalar_one_or_none()
+                    aname = artist_obj.name if artist_obj else ""
+                    aimg = artist_obj.image_url if artist_obj else None
+                    dedup_key = f"{_normalize_title(t.title)}|{_normalize_title(aname)}"
+                    local_tracks_map[dedup_key] = (t, aname)
+                    if aimg:
+                        local_artist_images[dedup_key] = aimg
+                    if artist_obj:
+                        local_artist_ids[aname.lower()] = str(artist_obj.id)
 
-            external_results = await search_deezer(q, limit=page_size)
+                external_results = await search_deezer(q, limit=page_size)
 
-            tracks = []
-            seen_isrcs: set[str] = set()
-            seen_keys: set[str] = set()
-            seen_track_ids: set[str] = set()
-            seen_deezer_ids: set[int] = set()
+                tracks = []
+                seen_isrcs: set[str] = set()
+                seen_keys: set[str] = set()
+                seen_track_ids: set[str] = set()
+                seen_deezer_ids: set[int] = set()
 
-            for ext in external_results:
-                ext_isrc = ext.get("isrc")
-                ext_deezer_id = ext.get("deezer_id")
-                ext_dedup_key = f"{_normalize_title(ext['title'])}|{_normalize_title(ext['artist'])}"
-                local_match = local_tracks_map.get(ext_dedup_key)
+                for ext in external_results:
+                    ext_isrc = ext.get("isrc")
+                    ext_deezer_id = ext.get("deezer_id")
+                    ext_dedup_key = f"{_normalize_title(ext['title'])}|{_normalize_title(ext['artist'])}"
+                    local_match = local_tracks_map.get(ext_dedup_key)
 
-                if ext_isrc and ext_isrc in seen_isrcs:
-                    continue
-                if ext_deezer_id and ext_deezer_id in seen_deezer_ids:
-                    continue
-                if ext_deezer_id:
-                    seen_deezer_ids.add(ext_deezer_id)
-
-                if local_match:
-                    local_track_id = str(local_match[0].id)
-                    if local_track_id in seen_track_ids:
+                    if ext_isrc and ext_isrc in seen_isrcs:
                         continue
-                    aimg = local_artist_images.get(ext_dedup_key)
-                    tracks.append(_track_to_response(local_match[0], local_match[1], aimg))
-                    seen_keys.add(ext_dedup_key)
-                    seen_track_ids.add(local_track_id)
-                    if ext_isrc:
-                        seen_isrcs.add(ext_isrc)
-                    artist_picture = ext.get("artist_picture")
-                    if artist_picture and not aimg:
-                        ext_artist_id = local_artist_ids.get(ext["artist"].lower())
-                        if ext_artist_id:
-                            artist_row = await db.execute(select(Artist).where(Artist.id == ext_artist_id))
-                            artist_obj = artist_row.scalar_one_or_none()
-                            if artist_obj and not artist_obj.image_url:
-                                artist_obj.image_url = artist_picture
-                else:
-                    if ext_dedup_key not in seen_keys:
-                        artist_picture = ext.get("artist_picture")
-                        artist_id = await ensure_artist(db, ext["artist"], artist_picture)
-                        stub = Track(
-                            title=ext["title"],
-                            artist_id=artist_id,
-                            duration_seconds=ext.get("duration", 0),
-                            cover_url=ext.get("cover_url"),
-                            isrc=ext.get("isrc"),
-                            genre=genre,
-                            is_explicit=ext.get("explicit", False),
-                            file_url=None,
-                            hls_path=None,
-                        )
-                        db.add(stub)
-                        await db.flush()
-                        tracks.append(_track_to_response(stub, ext["artist"], artist_picture))
+                    if ext_deezer_id and ext_deezer_id in seen_deezer_ids:
+                        continue
+                    if ext_deezer_id:
+                        seen_deezer_ids.add(ext_deezer_id)
+
+                    if local_match:
+                        local_track_id = str(local_match[0].id)
+                        if local_track_id in seen_track_ids:
+                            continue
+                        aimg = local_artist_images.get(ext_dedup_key)
+                        tracks.append(_track_to_response(local_match[0], local_match[1], aimg))
                         seen_keys.add(ext_dedup_key)
+                        seen_track_ids.add(local_track_id)
                         if ext_isrc:
                             seen_isrcs.add(ext_isrc)
+                        artist_picture = ext.get("artist_picture")
+                        if artist_picture and not aimg:
+                            ext_artist_id = local_artist_ids.get(ext["artist"].lower())
+                            if ext_artist_id:
+                                artist_row = await db.execute(select(Artist).where(Artist.id == ext_artist_id))
+                                artist_obj = artist_row.scalar_one_or_none()
+                                if artist_obj and not artist_obj.image_url:
+                                    artist_obj.image_url = artist_picture
+                    else:
+                        if ext_dedup_key not in seen_keys:
+                            artist_picture = ext.get("artist_picture")
+                            artist_id = await ensure_artist(db, ext["artist"], artist_picture)
+                            stub = Track(
+                                title=ext["title"],
+                                artist_id=artist_id,
+                                duration_seconds=ext.get("duration", 0),
+                                cover_url=ext.get("cover_url"),
+                                isrc=ext.get("isrc"),
+                                genre=genre,
+                                is_explicit=ext.get("explicit", False),
+                                file_url=None,
+                                hls_path=None,
+                            )
+                            db.add(stub)
+                            await db.flush()
+                            tracks.append(_track_to_response(stub, ext["artist"], artist_picture))
+                            seen_keys.add(ext_dedup_key)
+                            if ext_isrc:
+                                seen_isrcs.add(ext_isrc)
 
-            for dedup_key, (t, aname) in local_tracks_map.items():
-                if dedup_key not in seen_keys:
-                    local_track_id = str(t.id)
-                    if local_track_id not in seen_track_ids:
-                        aimg = local_artist_images.get(dedup_key)
-                        tracks.append(_track_to_response(t, aname, aimg))
-                        seen_track_ids.add(local_track_id)
+                for dedup_key, (t, aname) in local_tracks_map.items():
+                    if dedup_key not in seen_keys:
+                        local_track_id = str(t.id)
+                        if local_track_id not in seen_track_ids:
+                            aimg = local_artist_images.get(dedup_key)
+                            tracks.append(_track_to_response(t, aname, aimg))
+                            seen_track_ids.add(local_track_id)
 
-            await db.commit()
-            results["tracks"] = tracks
+                if include_tidal:
+                    tidal_tracks = await tidal_client.search_tracks(q, limit=min(10, page_size))
+                    for tt in tidal_tracks:
+                        tt_isrc = tt.get("isrc")
+                        tt_dedup = f"{_normalize_title(tt['title'])}|{_normalize_title(tt.get('artist', ''))}"
+                        if tt_isrc and tt_isrc in seen_isrcs:
+                            continue
+                        if tt_dedup in seen_keys:
+                            continue
+                        tracks.append({
+                            "id": None,
+                            "title": tt["title"],
+                            "album_id": None,
+                            "artist_id": None,
+                            "artist": {"name": tt["artist"], "image_url": tt.get("artist_picture")} if tt.get("artist") else None,
+                            "duration_seconds": tt.get("duration", 0),
+                            "file_url": None,
+                            "hls_path": None,
+                            "cover_url": tt.get("cover_url"),
+                            "genre": None,
+                            "bpm": tt.get("bpm"),
+                            "key": tt.get("key"),
+                            "mood": None,
+                            "lyrics_lrc": None,
+                            "track_gain": tt.get("replay_gain"),
+                            "track_peak": tt.get("peak"),
+                            "album_gain": None,
+                            "isrc": tt.get("isrc"),
+                            "allowed_territories": None,
+                            "is_explicit": tt.get("explicit", False),
+                            "play_count": 0,
+                            "created_at": None,
+                            "tidal_id": tt.get("id"),
+                        })
+                        seen_keys.add(tt_dedup)
+                        if tt_isrc:
+                            seen_isrcs.add(tt_isrc)
+
+                await db.commit()
+                results["tracks"] = tracks
 
     if "playlists" in types:
         result = await db.execute(

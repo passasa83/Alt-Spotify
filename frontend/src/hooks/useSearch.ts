@@ -5,6 +5,7 @@ import type { SearchResults, SearchFilters } from '@/types';
 export const useSearch = (debounceMs = 300) => {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<SearchFilters>({});
+  const [source, setSource] = useState<'local' | 'tidal' | 'all'>('local');
   const [results, setResults] = useState<SearchResults>({
     tracks: [],
     artists: [],
@@ -14,7 +15,7 @@ export const useSearch = (debounceMs = 300) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const search = useCallback(async (searchQuery: string, searchFilters: SearchFilters) => {
+  const search = useCallback(async (searchQuery: string, searchFilters: SearchFilters, searchSource: 'local' | 'tidal' | 'all') => {
     if (!searchQuery.trim()) {
       setResults({ tracks: [], artists: [], albums: [], playlists: [] });
       return;
@@ -22,7 +23,7 @@ export const useSearch = (debounceMs = 300) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await searchApi(searchQuery, searchFilters);
+      const data = await searchApi(searchQuery, searchFilters, searchSource);
       setResults(data);
     } catch {
       setError('Failed to search');
@@ -33,17 +34,19 @@ export const useSearch = (debounceMs = 300) => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      search(query, filters);
+      search(query, filters, source);
     }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [query, filters, debounceMs, search]);
+  }, [query, filters, source, debounceMs, search]);
 
   return {
     query,
     setQuery,
     filters,
     setFilters,
+    source,
+    setSource,
     results,
     isLoading,
     error,

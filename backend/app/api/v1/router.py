@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import auth, users, artists, albums, tracks, playlists, search, upload, stream, lyrics, jam, social, notifications, podcasts, monitoring, import_export, push, admin, recommendations, favorites, admin_invites, devices, music_scanner
+from app.api.v1 import auth, users, artists, albums, tracks, playlists, search, upload, stream, lyrics, jam, social, notifications, podcasts, monitoring, import_export, push, admin, recommendations, favorites, admin_invites, devices, music_scanner, tidal
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
@@ -26,3 +26,4 @@ api_router.include_router(favorites.router)
 api_router.include_router(admin_invites.router)
 api_router.include_router(devices.router)
 api_router.include_router(music_scanner.router)
+api_router.include_router(tidal.router)

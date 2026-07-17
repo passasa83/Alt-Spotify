@@ -1,8 +1,8 @@
 import client from './client';
 import type { SearchResults, SearchFilters } from '@/types';
 
-export const search = async (query: string, filters: SearchFilters = {}): Promise<SearchResults> => {
-  const params: Record<string, string | number> = { q: query };
+export const search = async (query: string, filters: SearchFilters = {}, source: 'local' | 'tidal' | 'all' = 'local'): Promise<SearchResults> => {
+  const params: Record<string, string | number> = { q: query, source };
   if (filters.genre) params.genre = filters.genre;
   if (filters.year) params.year = filters.year;
   if (filters.min_duration) params.min_duration = filters.min_duration;
