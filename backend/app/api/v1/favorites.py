@@ -110,17 +110,34 @@ async def list_favorites(
     entities = []
 
     if entity_ids and entity_type == "track":
-        res = await db.execute(select(Track).where(Track.id.in_(entity_ids)))
-        entities = res.scalars().all()
+        res = await db.execute(
+            select(Track, Artist)
+            .join(Artist, Track.artist_id == Artist.id)
+            .where(Track.id.in_(entity_ids))
+        )
+        rows = res.all()
+        for track, artist in rows:
+            entities.append({
+                "id": str(track.id),
+                "title": track.title,
+                "artist_id": str(track.artist_id),
+                "duration": track.duration_seconds,
+                "cover_url": track.cover_url,
+                "file_url": track.file_url,
+                "hls_path": track.hls_path,
+                "genre": track.genre,
+                "is_explicit": track.is_explicit,
+                "artist": {"id": str(artist.id), "name": artist.name},
+            })
     elif entity_ids and entity_type == "album":
         res = await db.execute(select(Album).where(Album.id.in_(entity_ids)))
-        entities = res.scalars().all()
+        entities = [{"id": str(a.id), "title": a.title, "cover_url": a.cover_url} for a in res.scalars().all()]
     elif entity_ids and entity_type == "artist":
         res = await db.execute(select(Artist).where(Artist.id.in_(entity_ids)))
-        entities = res.scalars().all()
+        entities = [{"id": str(a.id), "name": a.name, "image_url": a.image_url} for a in res.scalars().all()]
     elif entity_ids and entity_type == "podcast":
         res = await db.execute(select(Podcast).where(Podcast.id.in_(entity_ids)))
-        entities = res.scalars().all()
+        entities = [{"id": str(p.id), "title": p.title, "cover_url": p.cover_url} for p in res.scalars().all()]
 
     from math import ceil
     return {

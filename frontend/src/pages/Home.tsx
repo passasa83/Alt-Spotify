@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getTracks } from '@/api/tracks';
 import { getArtists } from '@/api/artists';
 import { getPlaylists } from '@/api/playlists';
+import { usePlayerStore } from '@/stores/playerStore';
 import TrackCard from '@/components/TrackCard';
 import ArtistCard from '@/components/ArtistCard';
 import PlaylistCard from '@/components/PlaylistCard';
@@ -13,6 +15,7 @@ const Home = () => {
   const [topArtists, setTopArtists] = useState<Artist[]>([]);
   const [featuredPlaylists, setFeaturedPlaylists] = useState<Playlist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -52,6 +55,10 @@ const Home = () => {
             <div
               key={track.id}
               className="flex items-center gap-4 rounded-md bg-white/10 p-2 transition-colors hover:bg-white/20"
+              onClick={() => {
+                const { setTrack } = usePlayerStore.getState();
+                setTrack(track);
+              }}
             >
               <img
                 src={track.cover_url || track.album?.cover_url || '/placeholder-album.svg'}
@@ -67,7 +74,7 @@ const Home = () => {
       <section>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white">{t('stats.top_tracks')}</h2>
-          <button className="text-sm font-semibold text-gray-400 hover:underline focus-visible:outline-2 focus-visible:outline-green-500">{t('action.show_all')}</button>
+          <button onClick={() => navigate('/search')} className="text-sm font-semibold text-gray-400 hover:underline focus-visible:outline-2 focus-visible:outline-green-500">{t('action.show_all')}</button>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {recentTracks.map((track) => (
@@ -79,7 +86,7 @@ const Home = () => {
       <section>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white">{t('stats.top_artists')}</h2>
-          <button className="text-sm font-semibold text-gray-400 hover:underline focus-visible:outline-2 focus-visible:outline-green-500">{t('action.show_all')}</button>
+          <button onClick={() => navigate('/search')} className="text-sm font-semibold text-gray-400 hover:underline focus-visible:outline-2 focus-visible:outline-green-500">{t('action.show_all')}</button>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {topArtists.map((artist) => (
@@ -91,7 +98,7 @@ const Home = () => {
       <section>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white">{t('nav.playlists')}</h2>
-          <button className="text-sm font-semibold text-gray-400 hover:underline focus-visible:outline-2 focus-visible:outline-green-500">{t('action.show_all')}</button>
+          <button onClick={() => navigate('/library')} className="text-sm font-semibold text-gray-400 hover:underline focus-visible:outline-2 focus-visible:outline-green-500">{t('action.show_all')}</button>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {featuredPlaylists.map((playlist) => (

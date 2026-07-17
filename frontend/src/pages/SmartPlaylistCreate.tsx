@@ -59,15 +59,18 @@ const SmartPlaylistCreate = () => {
     if (!title.trim()) return;
     setSaving(true);
     try {
-      const params = new URLSearchParams({
-        title,
-        max_tracks: String(maxTracks),
-        rules: JSON.stringify(buildRulesPayload()),
-      });
       const token = localStorage.getItem('access_token');
-      const resp = await fetch(`/api/v1/playlists/smart?${params}`, {
+      const resp = await fetch('/api/v1/playlists/smart', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title,
+          max_tracks: maxTracks,
+          rules: buildRulesPayload(),
+        }),
       });
       if (resp.ok) {
         const data = await resp.json();

@@ -17,7 +17,7 @@ const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
     'from-indigo-700 to-purple-300',
   ];
 
-  const colorIndex = playlist.id % colors.length;
+  const colorIndex = playlist.title ? playlist.title.charCodeAt(0) % colors.length : 0;
 
   return (
     <Link
@@ -28,7 +28,7 @@ const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
         {playlist.cover_url ? (
           <img
             src={playlist.cover_url}
-            alt={playlist.name}
+            alt={playlist.title}
             className="h-40 w-full rounded-md object-cover shadow-lg"
           />
         ) : (
@@ -39,7 +39,7 @@ const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
           </div>
         )}
       </div>
-      <p className="block truncate text-sm font-semibold text-white">{playlist.name}</p>
+      <p className="block truncate text-sm font-semibold text-white">{playlist.title}</p>
       <p className="block truncate text-xs text-gray-400">
         By {playlist.owner?.pseudo || t('playlist.owner')} • {t('playlist.playlist')}
       </p>

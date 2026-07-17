@@ -54,9 +54,8 @@ export const uploadTrack = async (file: File, metadata: Record<string, any>): Pr
   return response.data;
 };
 
-export const getTrackDownloadUrl = async (trackId: string, deviceId: string): Promise<string> => {
-  const response = await client.post(`/tracks/${trackId}/download`, { device_id: deviceId });
-  return response.data.download_url;
+export const getTrackDownloadUrl = (trackId: string): string => {
+  return `/api/v1/stream/${trackId}/download`;
 };
 
 export const updateTrack = async (id: string, data: Record<string, any>): Promise<Track> => {
@@ -66,4 +65,13 @@ export const updateTrack = async (id: string, data: Record<string, any>): Promis
 
 export const deleteTrack = async (id: string): Promise<void> => {
   await client.delete(`/tracks/${id}`);
+};
+
+export const uploadLyrics = async (trackId: string, file: File): Promise<{ message: string; lines_count: number }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await client.post(`/upload/lyrics/${trackId}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
 };

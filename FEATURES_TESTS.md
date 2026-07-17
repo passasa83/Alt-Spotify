@@ -232,6 +232,63 @@
 
 ---
 
+## P.2 — Création de playlist
+
+| # | Test | Résultat |
+|---|------|----------|
+| 1 | Cliquer "Create playlist" dans la Library → un prompt demande le nom | ☐ |
+| 2 | Entrer un nom et valider → la playlist apparaît dans la liste | ☐ |
+| 3 | Cliquer "+" dans la Sidebar → un prompt demande le nom | ☐ |
+| 4 | Entrer un nom et valider → la playlist apparaît dans la sidebar | ☐ |
+| 5 | Cliquer "Create your first playlist" (empty state) → le prompt s'ouvre | ☐ |
+| 6 | Annuler le prompt → aucune playlist créée | ☐ |
+| 7 | Entrer un nom vide ou espaces → aucune playlist créée | ☐ |
+| 8 | Cliquer sur une playlist créée → la page detail s'affiche avec le bon titre | ☐ |
+| 9 | La sidebar affiche le titre (pas vide/undefined) | ☐ |
+| 10 | La PlaylistCard affiche le titre (pas vide/undefined) | ☐ |
+| 11 | Supprimer une playlist → elle disparaît de la sidebar et de la library | ☐ |
+
+---
+
+## P.3 — Photos de profil artistes
+
+| # | Test | Résultat |
+|---|------|----------|
+| 1 | Rechercher un artiste connu (ex: "Queen") → la photo artiste s'affiche dans les résultats | ☐ |
+| 2 | La photo s'affiche dans la TrackCard à côté du nom d'artiste | ☐ |
+| 3 | La photo s'affiche dans l'ArtistCard (section Artists) | ☐ |
+| 4 | Un artiste sans photo affiche le placeholder par défaut | ☐ |
+| 5 | Rechercher un morceau → l'artiste associé a sa photo si disponible | ☐ |
+| 6 | La photo est un cercle (border-radius 50%) et non carrée | ☐ |
+
+---
+
+## S.1 — Deduplication des recherches
+
+| # | Test | Résultat |
+|---|------|----------|
+| 1 | Rechercher "Bohemian Rhapsody" → pas de doublons identiques | ☐ |
+| 2 | Rechercher un titre avec "(Remastered 2011)" → un seul résultat | ☐ |
+| 3 | Rechercher un titre avec "(Radio Edit)" → un seul résultat | ☐ |
+| 4 | Deux morceaux avec le même titre mais artistes différents → tous deux affichés | ☐ |
+| 5 | Un morceau avec "feat. Artist" et le même sans feat → tous deux affichés | ☐ |
+| 6 | Rechercher plusieurs fois le même titre → pas de création en double en BDD | ☐ |
+| 7 | Un morceau déjà en local et trouvé sur Deezer → la version locale est retournée | ☐ |
+
+---
+
+## S.2 — Nombre de résultats de recherche
+
+| # | Test | Résultat |
+|---|------|----------|
+| 1 | Rechercher un terme populaire → au moins 12 morceaux affichés (pas 6) | ☐ |
+| 2 | Les 12 morceaux sont tous différents (pas de doublons) | ☐ |
+| 3 | Les artistes, albums, playlists restent à 6 max par section | ☐ |
+| 4 | Si moins de 12 résultats → tous sont affichés sans erreur | ☐ |
+| 5 | La grille s'adapte responsive (2 cols mobile, 6 cols desktop) | ☐ |
+
+---
+
 ## Tests transversaux
 
 | # | Test | Résultat |

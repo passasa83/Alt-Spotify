@@ -13,11 +13,17 @@ const ArtistCard = ({ artist }: ArtistCardProps) => {
       className="group relative cursor-pointer rounded-md bg-gray-900 p-3 transition-colors hover:bg-gray-800"
     >
       <div className="relative mb-3">
-        <img
-          src={artist.image_url || '/placeholder-artist.svg'}
-          alt={artist.name}
-          className="h-40 w-full rounded-full object-cover shadow-lg"
-        />
+        {artist.image_url ? (
+          <img
+            src={artist.image_url}
+            alt={artist.name}
+            className="h-40 w-full rounded-full object-cover shadow-lg"
+          />
+        ) : (
+          <div className="flex h-40 w-full items-center justify-center rounded-full bg-gradient-to-br from-purple-700 to-blue-300 shadow-lg">
+            <span className="text-4xl font-bold text-white/80">{artist.name.charAt(0).toUpperCase()}</span>
+          </div>
+        )}
         <button
           className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-black shadow-xl transition-all ${
             'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'

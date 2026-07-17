@@ -104,7 +104,7 @@ const SearchPage = () => {
             <section>
               <h2 className="mb-4 text-2xl font-bold text-white">Songs</h2>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                {results.tracks.slice(0, 6).map((track) => (
+                {results.tracks.slice(0, 12).map((track) => (
                   <TrackCard key={track.id} track={track} />
                 ))}
               </div>

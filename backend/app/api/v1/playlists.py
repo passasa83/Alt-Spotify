@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select, func, update, delete, and_, extract
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -137,15 +138,29 @@ async def get_playlist(playlist_id: uuid.UUID, db: AsyncSession = Depends(get_db
     return playlist
 
 
-@router.get("/{playlist_id}/tracks", response_model=list[TrackResponse])
+@router.get("/{playlist_id}/tracks")
 async def get_playlist_tracks(playlist_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(Track)
-        .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+        select(PlaylistTrack)
         .where(PlaylistTrack.playlist_id == playlist_id)
+        .options(selectinload(PlaylistTrack.track).selectinload(Track.artist))
+        .options(selectinload(PlaylistTrack.track).selectinload(Track.album))
         .order_by(PlaylistTrack.position)
     )
-    return list(result.scalars().all())
+    pts = result.scalars().all()
+    items = []
+    for pt in pts:
+        if pt.track:
+            items.append({
+                "id": pt.track_id,
+                "playlist_id": str(pt.playlist_id),
+                "track_id": str(pt.track_id),
+                "position": pt.position,
+                "added_by": str(pt.added_by) if pt.added_by else None,
+                "added_at": pt.added_at.isoformat() if pt.added_at else None,
+                "track": TrackResponse.model_validate(pt.track).model_dump(mode="json"),
+            })
+    return items
 
 
 @router.post("", response_model=PlaylistResponse, status_code=status.HTTP_201_CREATED)
