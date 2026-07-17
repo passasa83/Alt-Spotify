@@ -55,9 +55,18 @@ const TrackCard = ({ track }: TrackCardProps) => {
       <Link to={`/track/${track.id}`} className="block truncate text-sm font-semibold text-white hover:underline">
         {track.title}
       </Link>
-      <Link to={`/artist/${track.artist_id}`} className="block truncate text-xs text-gray-400 hover:underline">
-        {track.artist?.name || t('player.unknown_artist')}
-      </Link>
+      <div className="flex items-center gap-1.5">
+        {track.artist?.image_url && (
+          <img
+            src={track.artist.image_url}
+            alt={track.artist.name}
+            className="h-4 w-4 rounded-full object-cover"
+          />
+        )}
+        <Link to={`/artist/${track.artist_id}`} className="block truncate text-xs text-gray-400 hover:underline">
+          {track.artist?.name || t('player.unknown_artist')}
+        </Link>
+      </div>
     </div>
   );
 };

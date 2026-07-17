@@ -93,7 +93,20 @@ const Sidebar = () => {
       <div className="flex-1 overflow-y-auto rounded-lg bg-gray-900 p-2">
         <div className="mb-2 flex items-center justify-between px-2">
           <span className="text-sm font-semibold text-gray-400">{t('nav.playlists')}</span>
-          <button className="rounded-full p-1 text-gray-400 hover:text-white" aria-label={t('library.create_playlist')}>
+          <button
+            onClick={async () => {
+              const name = prompt(t('library.playlist_name_placeholder') || 'Playlist name');
+              if (name && name.trim()) {
+                try {
+                  await useLibraryStore.getState().createPlaylist(name.trim());
+                } catch (err) {
+                  console.error('Failed to create playlist', err);
+                }
+              }
+            }}
+            className="rounded-full p-1 text-gray-400 hover:text-white"
+            aria-label={t('library.create_playlist')}
+          >
             <Plus size={20} aria-hidden="true" />
           </button>
         </div>
@@ -123,7 +136,7 @@ const Sidebar = () => {
               }
               aria-current={({ isActive }: { isActive: boolean }) => isActive ? 'page' : undefined}
             >
-              {playlist.name}
+              {playlist.title}
             </NavLink>
           ))}
         </div>

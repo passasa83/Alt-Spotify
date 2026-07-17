@@ -8,9 +8,20 @@ import { useTranslation } from '@/hooks/useTranslation';
 
 const Library = () => {
   const { t } = useTranslation();
-  const { playlists, favorites, loadPlaylists, loadFavorites, isLoading } = useLibraryStore();
+  const { playlists, favorites, loadPlaylists, loadFavorites, createPlaylist, isLoading } = useLibraryStore();
   const [activeTab, setActiveTab] = useState<'playlists' | 'favorites'>('playlists');
   const [showImportModal, setShowImportModal] = useState(false);
+
+  const handleCreatePlaylist = async () => {
+    const name = prompt(t('library.playlist_name_placeholder') || 'Playlist name');
+    if (name && name.trim()) {
+      try {
+        await createPlaylist(name.trim());
+      } catch (err) {
+        console.error('Failed to create playlist', err);
+      }
+    }
+  };
 
   useEffect(() => {
     loadPlaylists();
@@ -29,7 +40,10 @@ const Library = () => {
             <Upload size={16} />
             {t('library.import_playlist')}
           </button>
-          <button className="flex items-center gap-2 rounded-full bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700">
+          <button
+            onClick={handleCreatePlaylist}
+            className="flex items-center gap-2 rounded-full bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+          >
             <Plus size={16} />
             {t('library.create_playlist')}
           </button>
@@ -74,7 +88,10 @@ const Library = () => {
             <div className="flex flex-col items-center justify-center py-16">
               <p className="text-xl font-bold text-white">Create your first playlist</p>
               <p className="mt-2 text-gray-400">It's easy, we'll help you</p>
-              <button className="mt-4 rounded-full bg-white px-6 py-3 font-bold text-black hover:scale-105">
+              <button
+                onClick={handleCreatePlaylist}
+                className="mt-4 rounded-full bg-white px-6 py-3 font-bold text-black hover:scale-105"
+              >
                 {t('library.create_button')}
               </button>
             </div>

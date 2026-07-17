@@ -10,7 +10,7 @@ interface LibraryState {
   loadPlaylists: () => Promise<void>;
   loadFavorites: () => Promise<void>;
   createPlaylist: (name: string, description?: string) => Promise<Playlist>;
-  deletePlaylist: (id: number) => Promise<void>;
+  deletePlaylist: (id: string) => Promise<void>;
   addToFavorites: (track: Track) => Promise<void>;
   removeFromFavorites: (trackId: string) => Promise<void>;
   isFavorite: (trackId: string) => boolean;
@@ -52,7 +52,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   },
 
   deletePlaylist: async (id) => {
-    await playlistsApi.deletePlaylist(String(id));
+    await playlistsApi.deletePlaylist(id);
     const { playlists } = get();
     set({ playlists: playlists.filter((p) => p.id !== id) });
   },

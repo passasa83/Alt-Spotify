@@ -36,19 +36,24 @@ def _normalize_title(title: str) -> str:
     t = re.sub(r"\s*\(.*?live.*?\)", "", t, flags=re.IGNORECASE)
     t = re.sub(r"\s*\(.*?acoustic.*?\)", "", t, flags=re.IGNORECASE)
     t = re.sub(r"\s*\(.*?version.*?\)", "", t, flags=re.IGNORECASE)
-    t = re.sub(r"\s*feat\.?.*", "", t, flags=re.IGNORECASE)
-    t = re.sub(r"\s*ft\.?.*", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(feat\.?.*?\)", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(ft\.?.*?\)", "", t, flags=re.IGNORECASE)
     t = re.sub(r"\s+", " ", t).strip()
     return t
 
 
-def _track_to_response(track: Track, artist_name: str = "") -> SearchTrackResponse:
+def _track_to_response(track: Track, artist_name: str = "", artist_image_url: str | None = None) -> SearchTrackResponse:
+    artist_data = None
+    if artist_name:
+        artist_data = {"id": str(track.artist_id), "name": artist_name}
+        if artist_image_url:
+            artist_data["image_url"] = artist_image_url
     return SearchTrackResponse(
         id=track.id,
         title=track.title,
         album_id=track.album_id,
         artist_id=track.artist_id,
-        artist={"id": str(track.artist_id), "name": artist_name} if artist_name else None,
+        artist=artist_data,
         duration_seconds=track.duration_seconds,
         file_url=track.file_url,
         hls_path=track.hls_path,
@@ -87,13 +92,16 @@ async def _find_local_track(db: AsyncSession, isrc: str | None, title: str, arti
     return result.scalars().first()
 
 
-async def _ensure_artist(db: AsyncSession, name: str) -> UUID:
+async def _ensure_artist(db: AsyncSession, name: str, image_url: str | None = None) -> UUID:
     """Find or create an artist by name, return artist_id."""
     result = await db.execute(select(Artist).where(Artist.name.ilike(f"%{name}%")))
     artist = result.scalars().first()
     if artist:
+        if image_url and not artist.image_url:
+            artist.image_url = image_url
+            await db.flush()
         return artist.id
-    artist = Artist(name=name)
+    artist = Artist(name=name, image_url=image_url)
     db.add(artist)
     await db.flush()
     return artist.id
@@ -164,7 +172,7 @@ async def search(
             for t in result.scalars().all():
                 artist_result = await db.execute(select(Artist).where(Artist.id == t.artist_id))
                 artist_obj = artist_result.scalar_one_or_none()
-                tracks.append(_track_to_response(t, artist_obj.name if artist_obj else ""))
+                tracks.append(_track_to_response(t, artist_obj.name if artist_obj else "", artist_obj.image_url if artist_obj else None))
             results["tracks"] = tracks
         else:
             artist_ids_subq = select(Artist.id).where(Artist.name.ilike(like_pattern)).scalar_subquery()
@@ -174,12 +182,16 @@ async def search(
                 ).limit(page_size)
             )
             local_tracks_map: dict[str, tuple[Track, str]] = {}
+            local_artist_images: dict[str, str | None] = {}
             for t in local_result.scalars().all():
                 artist_result = await db.execute(select(Artist).where(Artist.id == t.artist_id))
                 artist_obj = artist_result.scalar_one_or_none()
                 aname = artist_obj.name if artist_obj else ""
+                aimg = artist_obj.image_url if artist_obj else None
                 dedup_key = f"{_normalize_title(t.title)}|{_normalize_title(aname)}"
                 local_tracks_map[dedup_key] = (t, aname)
+                if aimg:
+                    local_artist_images[dedup_key] = aimg
 
             external_results = await search_deezer(q, limit=page_size)
 
@@ -196,13 +208,15 @@ async def search(
                     continue
 
                 if local_match:
-                    tracks.append(_track_to_response(local_match[0], local_match[1]))
+                    aimg = local_artist_images.get(ext_dedup_key)
+                    tracks.append(_track_to_response(local_match[0], local_match[1], aimg))
                     seen_keys.add(ext_dedup_key)
                     if ext_isrc:
                         seen_isrcs.add(ext_isrc)
                 else:
                     if ext_dedup_key not in seen_keys:
-                        artist_id = await _ensure_artist(db, ext["artist"])
+                        artist_picture = ext.get("artist_picture")
+                        artist_id = await _ensure_artist(db, ext["artist"], artist_picture)
                         stub = Track(
                             title=ext["title"],
                             artist_id=artist_id,
@@ -216,14 +230,15 @@ async def search(
                         )
                         db.add(stub)
                         await db.flush()
-                        tracks.append(_track_to_response(stub, ext["artist"]))
+                        tracks.append(_track_to_response(stub, ext["artist"], artist_picture))
                         seen_keys.add(ext_dedup_key)
                         if ext_isrc:
                             seen_isrcs.add(ext_isrc)
 
             for dedup_key, (t, aname) in local_tracks_map.items():
                 if dedup_key not in seen_keys:
-                    tracks.append(_track_to_response(t, aname))
+                    aimg = local_artist_images.get(dedup_key)
+                    tracks.append(_track_to_response(t, aname, aimg))
 
             await db.commit()
             results["tracks"] = tracks
@@ -353,7 +368,7 @@ async def download_deezer_track(
     from app.core.minio import get_file_url
     file_url = get_file_url(object_name)
     
-    artist_id = await _ensure_artist(db, artist_name)
+    artist_id = await _ensure_artist(db, artist_name, None)
     
     existing = await db.execute(
         select(Track).where(Track.isrc.isnot(None), Track.isrc != "").limit(1)

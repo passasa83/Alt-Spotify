@@ -20,8 +20,8 @@ const PlaylistDetail = () => {
       if (!id) return;
       try {
         const [playlistData, tracksData] = await Promise.all([
-          getPlaylist(parseInt(id)),
-          getPlaylistTracks(parseInt(id)),
+          getPlaylist(id),
+          getPlaylistTracks(id),
         ]);
         setPlaylist(playlistData);
         setTracks(tracksData);
@@ -64,7 +64,7 @@ const PlaylistDetail = () => {
     );
   }
 
-  const totalDuration = tracks.reduce((acc, pt) => acc + (pt.track?.duration || 0), 0);
+  const totalDuration = tracks.reduce((acc, pt) => acc + (pt.track?.duration_seconds || 0), 0);
   const hours = Math.floor(totalDuration / 3600);
   const minutes = Math.floor((totalDuration % 3600) / 60);
 
@@ -74,7 +74,7 @@ const PlaylistDetail = () => {
         {playlist.cover_url ? (
           <img
             src={playlist.cover_url}
-            alt={playlist.name}
+            alt={playlist.title}
             className="h-48 w-48 rounded-md object-cover shadow-2xl md:h-56 md:w-56"
           />
         ) : (
@@ -84,7 +84,7 @@ const PlaylistDetail = () => {
         )}
         <div>
           <p className="text-sm font-medium uppercase text-white">{t('playlist.playlist')}</p>
-          <h1 className="mt-2 text-4xl font-bold text-white md:text-6xl">{playlist.name}</h1>
+          <h1 className="mt-2 text-4xl font-bold text-white md:text-6xl">{playlist.title}</h1>
           {playlist.description && (
             <p className="mt-2 text-sm text-gray-400">{playlist.description}</p>
           )}
@@ -155,7 +155,7 @@ const PlaylistDetail = () => {
               <span className="hidden truncate text-sm text-gray-400 md:block">{pt.track.album?.title || 'Unknown Album'}</span>
               <span className="hidden text-sm text-gray-400 md:block">{pt.added_at ? new Date(pt.added_at).toLocaleDateString() : 'Recently'}</span>
               <span className="text-right text-sm text-gray-400">
-                {Math.floor(pt.track.duration / 60)}:{(pt.track.duration % 60).toString().padStart(2, '0')}
+                {Math.floor(pt.track.duration_seconds / 60)}:{(pt.track.duration_seconds % 60).toString().padStart(2, '0')}
               </span>
             </div>
           )
