@@ -121,7 +121,7 @@ const Sidebar = () => {
         </div>
 
         <div className="space-y-1" role="list" aria-label="Your playlists">
-          {playlists.map((playlist) => (
+          {playlists.filter((p) => p.title !== 'Liked Songs').map((playlist) => (
             <NavLink
               key={playlist.id}
               to={`/playlist/${playlist.id}`}

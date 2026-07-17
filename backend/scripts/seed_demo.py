@@ -20,6 +20,7 @@ from app.core.security import hash_password
 from app.models.user import User, UserRole
 from app.models.artist import Artist
 from app.models.track import Track
+from app.models.playlist import Playlist
 from sqlalchemy import select
 
 
@@ -123,6 +124,30 @@ async def seed(dry_run=False):
         if not dry_run:
             await db.commit()
             print("\nDemo data seeded successfully!")
+        else:
+            print("\n(dry run — nothing was created)")
+
+        # Ensure Liked Songs playlist for all users
+        all_users = await db.execute(select(User))
+        for u in all_users.scalars().all():
+            check = await db.execute(
+                select(Playlist).where(Playlist.owner_id == u.id, Playlist.title == "Liked Songs")
+            )
+            if not check.scalar_one_or_none():
+                if not dry_run:
+                    db.add(Playlist(
+                        title="Liked Songs",
+                        owner_id=u.id,
+                        description="Your liked songs",
+                        is_public=False,
+                    ))
+                print(f"[create] Liked Songs playlist for {u.pseudo}")
+            else:
+                print(f"[skip] Liked Songs playlist for {u.pseudo}")
+
+        if not dry_run:
+            await db.commit()
+            print("\nLiked Songs playlists ensured!")
         else:
             print("\n(dry run — nothing was created)")
 

@@ -13,7 +13,6 @@ from app.models.playlist import Playlist
 from app.models.playlist_track import PlaylistTrack
 from app.models.track import Track
 from app.models.listening_history import ListeningHistory
-from app.models.favorite import Favorite
 from app.schemas.playlist import (
     PlaylistCreate,
     PlaylistUpdate,
@@ -29,64 +28,6 @@ from app.models.user import User
 
 router = APIRouter(prefix="/playlists", tags=["playlists"])
 
-LIKED_SONGS_TITLE = "Liked Songs"
-
-
-async def ensure_liked_songs_playlist(user_id: uuid.UUID, db: AsyncSession) -> None:
-    result = await db.execute(
-        select(Playlist).where(
-            Playlist.owner_id == user_id,
-            Playlist.title == LIKED_SONGS_TITLE,
-        )
-    )
-    playlist = result.scalar_one_or_none()
-    if not playlist:
-        playlist = Playlist(
-            title=LIKED_SONGS_TITLE,
-            owner_id=user_id,
-            description="Your liked songs",
-            is_public=False,
-        )
-        db.add(playlist)
-        await db.flush()
-        await db.refresh(playlist)
-
-    fav_result = await db.execute(
-        select(Favorite.entity_id)
-        .where(Favorite.user_id == user_id, Favorite.entity_type == "track")
-        .order_by(Favorite.created_at.desc())
-    )
-    fav_track_ids = [row[0] for row in fav_result.all()]
-
-    existing_result = await db.execute(
-        select(PlaylistTrack.track_id).where(PlaylistTrack.playlist_id == playlist.id)
-    )
-    existing_ids = {row[0] for row in existing_result.all()}
-
-    for track_id in fav_track_ids:
-        if track_id not in existing_ids:
-            max_pos = await db.execute(
-                select(func.max(PlaylistTrack.position)).where(PlaylistTrack.playlist_id == playlist.id)
-            )
-            position = (max_pos.scalar() or 0) + 1
-            db.add(PlaylistTrack(
-                playlist_id=playlist.id,
-                track_id=track_id,
-                position=position,
-                added_by=user_id,
-            ))
-
-    for track_id in existing_ids:
-        if track_id not in set(fav_track_ids):
-            await db.execute(
-                delete(PlaylistTrack).where(
-                    PlaylistTrack.playlist_id == playlist.id,
-                    PlaylistTrack.track_id == track_id,
-                )
-            )
-
-    await db.flush()
-
 
 @router.get("", response_model=PaginatedResponse[PlaylistResponse])
 async def list_playlists(
@@ -97,8 +38,6 @@ async def list_playlists(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await ensure_liked_songs_playlist(current_user.id, db)
-
     query = select(Playlist).where(
         (Playlist.is_public == True) | (Playlist.owner_id == current_user.id)
     )

@@ -63,6 +63,16 @@ async def register(
     db.add(user)
     await db.flush()
 
+    from app.models.playlist import Playlist
+    liked_playlist = Playlist(
+        title="Liked Songs",
+        owner_id=user.id,
+        description="Your liked songs",
+        is_public=False,
+    )
+    db.add(liked_playlist)
+    await db.flush()
+
     if invite_token:
         invite.use_count += 1
         invite.used_by = user.id
@@ -85,6 +95,21 @@ async def login(body: UserLogin, request: Request, db: AsyncSession = Depends(ge
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
 
     logger.info("login_success", user_id=str(user.id), ip=client_ip)
+
+    from app.models.playlist import Playlist
+    from sqlalchemy import select as sel
+    existing = await db.execute(
+        sel(Playlist).where(Playlist.owner_id == user.id, Playlist.title == "Liked Songs")
+    )
+    if not existing.scalar_one_or_none():
+        db.add(Playlist(
+            title="Liked Songs",
+            owner_id=user.id,
+            description="Your liked songs",
+            is_public=False,
+        ))
+        await db.flush()
+
     return TokenResponse(
         access_token=create_access_token(str(user.id)),
         refresh_token=create_refresh_token(str(user.id)),
