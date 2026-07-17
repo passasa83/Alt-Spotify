@@ -97,9 +97,13 @@ async def login(body: UserLogin, request: Request, db: AsyncSession = Depends(ge
     )
 
 
+class RefreshBody(BaseModel):
+    refresh_token: str
+
+
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(token: str, db: AsyncSession = Depends(get_db)):
-    user_id = verify_token(token, token_type="refresh")
+async def refresh(body: RefreshBody, db: AsyncSession = Depends(get_db)):
+    user_id = verify_token(body.refresh_token, token_type="refresh")
     if user_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
