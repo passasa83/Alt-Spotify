@@ -68,8 +68,7 @@ services:
       - backend-net
 
   backend:
-    build:
-      context: https://github.com/passasa83/Alt-Spotify.git#main:backend
+    build: ./backend
     ports:
       - "8000:8000"
     environment:
@@ -107,8 +106,7 @@ services:
       - frontend-net
 
   worker:
-    build:
-      context: https://github.com/passasa83/Alt-Spotify.git#main:worker
+    build: ./worker
     environment:
       REDIS_URL: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
@@ -123,8 +121,7 @@ services:
       - backend-net
 
   frontend:
-    build:
-      context: https://github.com/passasa83/Alt-Spotify.git#main:frontend
+    build: ./frontend
     ports:
       - "3000:80"
     labels:
