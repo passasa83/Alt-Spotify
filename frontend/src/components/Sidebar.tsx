@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Search, Library, Plus, Radio, BarChart3, Upload, Headphones, Activity, Sparkles, Mail, Compass, History as HistoryIcon, ListMusic } from 'lucide-react';
+import { Home, Search, Library, Plus, Radio, BarChart3, Upload, Headphones, Activity, Sparkles, Mail, Compass, History as HistoryIcon, ListMusic, HardDrive } from 'lucide-react';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useEffect, useState } from 'react';
@@ -67,6 +67,10 @@ const Sidebar = () => {
           <NavLink to="/history" className={navLinkClass} aria-label={t('history.title')}>
             <HistoryIcon size={24} aria-hidden="true" />
             {t('history.title')}
+          </NavLink>
+          <NavLink to="/local" className={navLinkClass} aria-label={t('local.title')}>
+            <HardDrive size={24} aria-hidden="true" />
+            {t('local.title')}
           </NavLink>
           <NavLink to="/smart-playlist/new" className={navLinkClass} aria-label={t('smart.create_title')}>
             <ListMusic size={24} aria-hidden="true" />

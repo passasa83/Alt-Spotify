@@ -7,10 +7,15 @@ vi.mock('@/api/auth', () => ({
   getMe: vi.fn(),
 }));
 
+vi.mock('@/api/users', () => ({
+  getMe: vi.fn(),
+}));
+
 import * as authApi from '@/api/auth';
+import * as usersApi from '@/api/users';
 
 const mockLogin = vi.mocked(authApi.login);
-const mockGetMe = vi.mocked(authApi.getMe);
+const mockGetMe = vi.mocked(usersApi.getMe);
 
 beforeEach(() => {
   useAuthStore.setState({

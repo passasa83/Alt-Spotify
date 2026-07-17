@@ -51,6 +51,7 @@ async def list_tracks(
     artist_id: uuid.UUID | None = None,
     album_id: uuid.UUID | None = None,
     genre: str | None = None,
+    local_only: bool = False,
     min_duration: int | None = None,
     max_duration: int | None = None,
     min_bpm: float | None = None,
@@ -107,6 +108,11 @@ async def list_tracks(
     if mood:
         query = query.where(Track.mood.ilike(f"%{mood}%"))
         count_query = count_query.where(Track.mood.ilike(f"%{mood}%"))
+
+    if local_only:
+        local_filter = Track.file_url.like("local:%")
+        query = query.where(local_filter)
+        count_query = count_query.where(local_filter)
 
     total = (await db.execute(count_query)).scalar() or 0
     result = await db.execute(

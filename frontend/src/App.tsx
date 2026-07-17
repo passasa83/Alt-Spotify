@@ -29,6 +29,7 @@ import AdminDevices from '@/pages/AdminDevices';
 import Browse from '@/pages/Browse';
 import History from '@/pages/History';
 import SmartPlaylistCreate from '@/pages/SmartPlaylistCreate';
+import LocalMusic from '@/pages/LocalMusic';
 import ToastContainer from '@/components/ToastContainer';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -100,6 +101,7 @@ const App = () => {
         <Route path="admin/invites" element={<AdminInvites />} />
         <Route path="admin/devices" element={<AdminDevices />} />
         <Route path="history" element={<History />} />
+        <Route path="local" element={<LocalMusic />} />
         <Route path="smart-playlist/new" element={<SmartPlaylistCreate />} />
       </Route>
       <Route path="*" element={<NotFound />} />

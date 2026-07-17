@@ -44,6 +44,14 @@ const en = {
   'history.genre_filter': 'Filter by genre...',
   'history.empty': 'No listening history',
 
+  // Local Music
+  'local.title': 'My Music',
+  'local.track': 'track',
+  'local.tracks': 'tracks',
+  'local.empty': 'No local music found',
+  'local.empty_hint': 'Add music files to your scan directory to see them here',
+  'local.load_more': 'Load more',
+
   // Smart Playlists
   'smart.create_title': 'Create Smart Playlist',
   'smart.playlist_name': 'Playlist name',
