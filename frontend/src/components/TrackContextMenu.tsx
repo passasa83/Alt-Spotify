@@ -38,7 +38,7 @@ const TrackContextMenu = ({ track, onAddToPlaylist }: Props) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 opacity-0 transition-all hover:text-white group-hover:opacity-100"
+        className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-all hover:text-white"
       >
         <MoreHorizontal size={16} />
       </button>
