@@ -115,7 +115,7 @@ const History = () => {
               }`}
             >
               <img
-                src={item.cover_url || '/placeholder-album.png'}
+                src={item.cover_url || '/placeholder-album.svg'}
                 alt={item.title}
                 className="h-10 w-10 rounded object-cover"
               />

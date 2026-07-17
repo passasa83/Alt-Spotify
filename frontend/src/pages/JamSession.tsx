@@ -171,7 +171,7 @@ const JamSession = () => {
             <p className="mb-2 text-xs text-gray-400">{t('jam.now_playing')}</p>
             <div className="flex items-center gap-4">
               <img
-                src={currentTrack.cover_url || '/placeholder-album.png'}
+                src={currentTrack.cover_url || '/placeholder-album.svg'}
                 alt={currentTrack.title}
                 className="h-16 w-16 rounded object-cover"
               />
@@ -200,7 +200,7 @@ const JamSession = () => {
                 className="flex items-center gap-3 rounded bg-gray-700 p-2"
               >
                 <img
-                  src={track.cover_url || '/placeholder-album.png'}
+                  src={track.cover_url || '/placeholder-album.svg'}
                   alt={track.title}
                   className="h-10 w-10 rounded object-cover"
                 />

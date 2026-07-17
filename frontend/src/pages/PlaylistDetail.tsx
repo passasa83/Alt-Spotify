@@ -143,7 +143,7 @@ const PlaylistDetail = () => {
               </div>
               <div className="flex items-center gap-3">
                 <img
-                  src={pt.track.cover_url || pt.track.album?.cover_url || '/placeholder-album.png'}
+                  src={pt.track.cover_url || pt.track.album?.cover_url || '/placeholder-album.svg'}
                   alt={pt.track.title}
                   className="h-10 w-10 rounded object-cover"
                 />

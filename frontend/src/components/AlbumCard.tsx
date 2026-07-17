@@ -33,7 +33,7 @@ const AlbumCard = ({ album }: AlbumCardProps) => {
     >
       <div className="relative mb-3">
         <img
-          src={album.cover_url || '/placeholder-album.png'}
+          src={album.cover_url || '/placeholder-album.svg'}
           alt={album.title}
           className="h-40 w-full rounded-md object-cover shadow-lg"
         />

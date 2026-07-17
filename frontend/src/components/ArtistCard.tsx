@@ -14,7 +14,7 @@ const ArtistCard = ({ artist }: ArtistCardProps) => {
     >
       <div className="relative mb-3">
         <img
-          src={artist.image_url || '/placeholder-artist.png'}
+          src={artist.image_url || '/placeholder-artist.svg'}
           alt={artist.name}
           className="h-40 w-full rounded-full object-cover shadow-lg"
         />

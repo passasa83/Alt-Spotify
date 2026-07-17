@@ -54,7 +54,7 @@ const Home = () => {
               className="flex items-center gap-4 rounded-md bg-white/10 p-2 transition-colors hover:bg-white/20"
             >
               <img
-                src={track.cover_url || track.album?.cover_url || '/placeholder-album.png'}
+                src={track.cover_url || track.album?.cover_url || '/placeholder-album.svg'}
                 alt={track.title}
                 className="h-12 w-12 rounded object-cover"
               />

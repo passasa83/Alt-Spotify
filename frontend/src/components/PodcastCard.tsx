@@ -16,7 +16,7 @@ const PodcastCard = ({ podcast }: PodcastCardProps) => {
     >
       <div className="relative mb-3">
         <img
-          src={podcast.image_url || '/placeholder-podcast.png'}
+          src={podcast.image_url || '/placeholder-podcast.svg'}
           alt={podcast.title}
           className="h-40 w-full rounded-md object-cover shadow-lg"
         />

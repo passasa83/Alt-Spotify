@@ -106,7 +106,7 @@ const Library = () => {
                   className="flex items-center gap-4 rounded-md px-4 py-2 hover:bg-gray-800"
                 >
                   <img
-                    src={track.cover_url || track.album?.cover_url || '/placeholder-album.png'}
+                    src={track.cover_url || track.album?.cover_url || '/placeholder-album.svg'}
                     alt={track.title}
                     className="h-10 w-10 rounded object-cover"
                   />

@@ -97,7 +97,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
                   </button>
                 )}
                 <img
-                  src={track.cover_url || track.album?.cover_url || '/placeholder-album.png'}
+                  src={track.cover_url || track.album?.cover_url || '/placeholder-album.svg'}
                   alt={track.title}
                   className="h-10 w-10 rounded object-cover"
                 />
