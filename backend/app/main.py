@@ -40,6 +40,19 @@ async def lifespan(app: FastAPI):
         logger.info("meilisearch_reindex_complete")
     except Exception as e:
         logger.warning("meilisearch_init_failed", error=str(e))
+
+    import os
+    from app.core.database import async_session
+    music_dir = os.environ.get("MUSIC_SCAN_DIR", "")
+    if music_dir and os.path.isdir(music_dir):
+        try:
+            from app.api.v1.music_scanner import scan_directory_internal
+            async with async_session() as db:
+                result = await scan_directory_internal(music_dir, db)
+                logger.info("auto_scan_complete", **result)
+        except Exception as e:
+            logger.warning("auto_scan_failed", error=str(e))
+
     logger.info("application_started", project=settings.PROJECT_NAME)
     yield
     logger.info("application_shutting_down")
