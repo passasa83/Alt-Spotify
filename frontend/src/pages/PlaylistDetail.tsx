@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/authStore';
 import TrackContextMenu from '@/components/TrackContextMenu';
 import AddToPlaylistModal from '@/components/AddToPlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
-import { Play, Shuffle, Clock, Trash2, Pencil } from 'lucide-react';
+import { Play, Shuffle, Clock, Trash2, Pencil, Heart } from 'lucide-react';
 import type { Playlist, PlaylistTrack, Track } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -30,6 +30,7 @@ const PlaylistDetail = () => {
   const addToast = useToastStore((s) => s.addToast);
   const { user } = useAuthStore();
   const isOwner = playlist?.owner_id === user?.id;
+  const isLikedSongs = playlist?.title === 'Liked Songs';
 
   useEffect(() => {
     const loadPlaylist = async () => {
@@ -67,7 +68,12 @@ const PlaylistDetail = () => {
   const handleRemoveTrack = async (trackId: string) => {
     if (!id) return;
     try {
-      await removeTrackFromPlaylist(id, trackId);
+      if (isLikedSongs) {
+        const { removeFavorite } = await import('@/api/favorites');
+        await removeFavorite('track', trackId);
+      } else {
+        await removeTrackFromPlaylist(id, trackId);
+      }
       setTracks((prev) => prev.filter((pt) => pt.track_id !== trackId));
       addToast('Track removed from playlist');
     } catch {
@@ -139,6 +145,10 @@ const PlaylistDetail = () => {
             alt={playlist.title}
             className="h-48 w-48 rounded-md object-cover shadow-2xl md:h-56 md:w-56"
           />
+        ) : isLikedSongs ? (
+          <div className="flex h-48 w-48 items-center justify-center rounded-md bg-gradient-to-br from-purple-700 to-blue-300 shadow-2xl md:h-56 md:w-56">
+            <Heart size={64} className="text-white" fill="white" />
+          </div>
         ) : (
           <div className="flex h-48 w-48 items-center justify-center rounded-md bg-gradient-to-br from-purple-700 to-blue-300 shadow-2xl md:h-56 md:w-56">
             <span className="text-6xl">♫</span>
@@ -171,7 +181,7 @@ const PlaylistDetail = () => {
         >
           <Shuffle size={24} />
         </button>
-        {isOwner && (
+        {isOwner && !isLikedSongs && (
           <>
             <button
               onClick={openEditModal}

@@ -16,6 +16,7 @@ from app.models.listening_history import ListeningHistory
 from app.schemas.track import TrackCreate, TrackUpdate, TrackResponse
 from app.schemas.common import PaginatedResponse
 from app.utils.deps import get_current_user, require_admin
+from app.utils.track_serializer import serialize_track
 from app.models.user import User
 
 logger = structlog.get_logger("app")
@@ -93,11 +94,11 @@ async def list_tracks(
     )
     items = result.scalars().all()
     return PaginatedResponse(
-        items=items, total=total, page=page, page_size=page_size, pages=ceil(total / page_size) if total else 0
+        items=[serialize_track(t) for t in items], total=total, page=page, page_size=page_size, pages=ceil(total / page_size) if total else 0
     )
 
 
-@router.get("/{track_id}", response_model=TrackResponse)
+@router.get("/{track_id}")
 async def get_track(
     track_id: uuid.UUID, 
     db: AsyncSession = Depends(get_db),
@@ -121,7 +122,7 @@ async def get_track(
     if current_user.is_child_account and track.is_explicit:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Explicit content is restricted for child accounts")
 
-    return track
+    return serialize_track(track)
 
 
 @router.post("", response_model=TrackResponse, status_code=status.HTTP_201_CREATED)

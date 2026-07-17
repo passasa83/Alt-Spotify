@@ -2,7 +2,7 @@ import uuid
 from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,10 +12,36 @@ from app.models.track import Track
 from app.models.album import Album
 from app.models.artist import Artist
 from app.models.podcast import Podcast
+from app.models.playlist import Playlist
+from app.models.playlist_track import PlaylistTrack
 from app.models.user import User
 from app.utils.deps import get_current_user
+from app.utils.track_serializer import serialize_track
 
 router = APIRouter(prefix="/favorites", tags=["favorites"])
+
+LIKED_SONGS_TITLE = "Liked Songs"
+
+
+async def get_or_create_liked_playlist(user_id: uuid.UUID, db: AsyncSession) -> Playlist:
+    result = await db.execute(
+        select(Playlist).where(
+            Playlist.owner_id == user_id,
+            Playlist.title == LIKED_SONGS_TITLE,
+        )
+    )
+    playlist = result.scalar_one_or_none()
+    if not playlist:
+        playlist = Playlist(
+            title=LIKED_SONGS_TITLE,
+            owner_id=user_id,
+            description="Your liked songs",
+            is_public=False,
+        )
+        db.add(playlist)
+        await db.flush()
+        await db.refresh(playlist)
+    return playlist
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -45,6 +71,28 @@ async def add_favorite(
         entity_type=entity_type,
     )
     db.add(fav)
+
+    if entity_type == "track":
+        playlist = await get_or_create_liked_playlist(current_user.id, db)
+        existing_pt = await db.execute(
+            select(PlaylistTrack).where(
+                PlaylistTrack.playlist_id == playlist.id,
+                PlaylistTrack.track_id == entity_id,
+            )
+        )
+        if not existing_pt.scalar_one_or_none():
+            max_pos = await db.execute(
+                select(func.max(PlaylistTrack.position)).where(PlaylistTrack.playlist_id == playlist.id)
+            )
+            position = (max_pos.scalar() or 0) + 1
+            pt = PlaylistTrack(
+                playlist_id=playlist.id,
+                track_id=entity_id,
+                position=position,
+                added_by=current_user.id,
+            )
+            db.add(pt)
+
     await db.flush()
     return {"message": "Added to favorites"}
 
@@ -63,6 +111,23 @@ async def remove_favorite(
             Favorite.entity_type == entity_type,
         ).delete()
     )
+
+    if entity_type == "track":
+        result = await db.execute(
+            select(Playlist).where(
+                Playlist.owner_id == current_user.id,
+                Playlist.title == LIKED_SONGS_TITLE,
+            )
+        )
+        playlist = result.scalar_one_or_none()
+        if playlist:
+            await db.execute(
+                select(PlaylistTrack).where(
+                    PlaylistTrack.playlist_id == playlist.id,
+                    PlaylistTrack.track_id == entity_id,
+                ).delete()
+            )
+
     await db.flush()
 
 
@@ -121,30 +186,7 @@ async def list_favorites(
         for fav in favorites:
             track = tracks.get(str(fav.entity_id))
             if track:
-                entities.append({
-                    "id": str(track.id),
-                    "title": track.title,
-                    "album_id": str(track.album_id) if track.album_id else None,
-                    "artist_id": str(track.artist_id),
-                    "duration_seconds": track.duration_seconds,
-                    "cover_url": track.cover_url,
-                    "file_url": track.file_url,
-                    "hls_path": track.hls_path,
-                    "genre": track.genre,
-                    "bpm": track.bpm,
-                    "key": track.key,
-                    "mood": track.mood,
-                    "lyrics_lrc": track.lyrics_lrc,
-                    "track_gain": track.track_gain,
-                    "track_peak": track.track_peak,
-                    "album_gain": track.album_gain,
-                    "isrc": track.isrc,
-                    "is_explicit": track.is_explicit,
-                    "play_count": track.play_count,
-                    "created_at": track.created_at.isoformat() if track.created_at else None,
-                    "artist": {"id": str(track.artist.id), "name": track.artist.name, "image_url": track.artist.image_url} if track.artist else None,
-                    "album": {"id": str(track.album.id), "title": track.album.title, "cover_url": track.album.cover_url} if track.album else None,
-                })
+                entities.append(serialize_track(track))
     elif entity_ids and entity_type == "album":
         res = await db.execute(select(Album).where(Album.id.in_(entity_ids)))
         entities = [{"id": str(a.id), "title": a.title, "cover_url": a.cover_url} for a in res.scalars().all()]
@@ -155,7 +197,6 @@ async def list_favorites(
         res = await db.execute(select(Podcast).where(Podcast.id.in_(entity_ids)))
         entities = [{"id": str(p.id), "title": p.title, "cover_url": p.cover_url} for p in res.scalars().all()]
 
-    from math import ceil
     return {
         "items": entities,
         "total": total,

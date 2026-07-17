@@ -107,7 +107,9 @@ const Sidebar = () => {
 
         <div className="mb-2 rounded-md p-2 hover:bg-gray-800">
           <NavLink
-            to="/library"
+            to={playlists.find((p) => p.title === 'Liked Songs')
+              ? `/playlist/${playlists.find((p) => p.title === 'Liked Songs')!.id}`
+              : '/library'}
             className="flex items-center gap-3 text-sm text-gray-400 hover:text-white"
             aria-label={t('nav.liked_songs')}
           >
