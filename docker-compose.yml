@@ -170,10 +170,6 @@ services:
       - backend-net
 
 volumes:
-  postgres_data:
-  redis_data:
-  minio_data:
-  meilisearch_data:
   traefik_certs:
 
 networks:
