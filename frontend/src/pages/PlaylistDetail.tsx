@@ -11,6 +11,7 @@ import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import { Play, Shuffle, Clock, Trash2, Pencil, Heart } from 'lucide-react';
 import type { Playlist, PlaylistTrack, Track } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
+import { resolveCoverUrl } from '@/api/tracks';
 
 const PlaylistDetail = () => {
   const { t } = useTranslation();
@@ -141,7 +142,7 @@ const PlaylistDetail = () => {
       <div className="mb-6 flex flex-col gap-6 md:flex-row md:items-end">
         {playlist.cover_url ? (
           <img
-            src={playlist.cover_url}
+            src={resolveCoverUrl(playlist.cover_url)}
             alt={playlist.title}
             className="h-48 w-48 rounded-md object-cover shadow-2xl md:h-56 md:w-56"
           />
@@ -231,7 +232,7 @@ const PlaylistDetail = () => {
               </div>
               <div className="flex items-center gap-3">
                 <img
-                  src={pt.track.cover_url || pt.track.album?.cover_url || '/placeholder-album.svg'}
+                  src={resolveCoverUrl(pt.track.cover_url || pt.track.album?.cover_url)}
                   alt={pt.track.title}
                   className="h-10 w-10 rounded object-cover"
                 />

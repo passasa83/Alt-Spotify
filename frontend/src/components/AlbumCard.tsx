@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { getAlbumTracks } from '@/api/albums';
 import { useTranslation } from '@/hooks/useTranslation';
+import { resolveCoverUrl } from '@/api/tracks';
 
 interface AlbumCardProps {
   album: Album;
@@ -33,7 +34,7 @@ const AlbumCard = ({ album }: AlbumCardProps) => {
     >
       <div className="relative mb-3">
         <img
-          src={album.cover_url || '/placeholder-album.svg'}
+          src={resolveCoverUrl(album.cover_url)}
           alt={album.title}
           className="h-40 w-full rounded-md object-cover shadow-lg"
         />

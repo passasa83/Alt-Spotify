@@ -2,6 +2,7 @@ import { Music, Heart } from 'lucide-react';
 import type { Playlist } from '@/types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
+import { resolveCoverUrl } from '@/api/tracks';
 
 interface PlaylistCardProps {
   playlist: Playlist;
@@ -28,7 +29,7 @@ const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
       <div className="relative mb-3">
         {playlist.cover_url ? (
           <img
-            src={playlist.cover_url}
+            src={resolveCoverUrl(playlist.cover_url)}
             alt={playlist.title}
             className="h-40 w-full rounded-md object-cover shadow-lg"
           />

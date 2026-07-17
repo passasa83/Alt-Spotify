@@ -8,7 +8,7 @@ import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import type { Track } from '@/types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
-import { deleteTrack } from '@/api/tracks';
+import { deleteTrack, resolveCoverUrl } from '@/api/tracks';
 import { formatTime } from '@/utils/formatTime';
 import { usePlaylistModals } from '@/hooks/usePlaylistModals';
 
@@ -99,7 +99,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
                   </button>
                 )}
                 <img
-                  src={track.cover_url || track.album?.cover_url || '/placeholder-album.svg'}
+                  src={resolveCoverUrl(track.cover_url || track.album?.cover_url)}
                   alt={track.title}
                   className="h-10 w-10 rounded object-cover"
                 />

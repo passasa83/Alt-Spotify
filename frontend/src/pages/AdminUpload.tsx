@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { uploadTrack, uploadLyrics, getTracks } from '@/api/tracks';
+import { uploadTrack, uploadLyrics, getTracks, resolveCoverUrl } from '@/api/tracks';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Upload, CheckCircle, AlertCircle, Music, FileText } from 'lucide-react';
 import type { Track } from '@/types';
@@ -309,7 +309,7 @@ const AdminUpload = () => {
                   }}
                   className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-gray-200 hover:bg-gray-700"
                 >
-                  <img src={t.cover_url || '/placeholder-album.svg'} className="h-8 w-8 rounded object-cover" />
+                  <img src={resolveCoverUrl(t.cover_url)} className="h-8 w-8 rounded object-cover" />
                   <div>
                     <p className="font-medium text-white">{t.title}</p>
                     <p className="text-xs text-gray-400">{t.artist?.name || 'Unknown'}</p>

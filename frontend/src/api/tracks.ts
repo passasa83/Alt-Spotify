@@ -1,6 +1,16 @@
 import client from './client';
 import type { Track, PaginatedResponse } from '@/types';
 
+export const resolveCoverUrl = (url: string | null | undefined): string => {
+  if (!url) return '/placeholder-album.svg';
+  if (url.startsWith('local_cover:')) {
+    const token = localStorage.getItem('access_token');
+    const path = url.substring('local_cover:'.length);
+    return `/api/v1/local/covers${path.startsWith('/') ? path : `/${path}`}${token ? `?token=${token}` : ''}`;
+  }
+  return url;
+};
+
 export const getTracks = async (page = 1, pageSize = 20): Promise<PaginatedResponse<Track>> => {
   const response = await client.get('/tracks', { params: { page, page_size: pageSize } });
   return response.data;

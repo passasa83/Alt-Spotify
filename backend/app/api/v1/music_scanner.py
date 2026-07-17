@@ -3,7 +3,8 @@ import re
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from mutagen import File as MutagenFile
@@ -14,13 +15,14 @@ from app.models.track import Track
 from app.models.artist import Artist
 from app.models.album import Album
 from app.models.user import User
-from app.utils.deps import require_admin
+from app.utils.deps import require_admin, get_current_user_from_header_or_query
 
 logger = structlog.get_logger("app")
 
-router = APIRouter(prefix="/scan", tags=["scan"])
+router = APIRouter(tags=["local"])
 
 AUDIO_EXTENSIONS = {".mp3", ".flac", ".ogg", ".wav", ".m4a", ".aac", ".opus", ".wma", ".alac"}
+COVER_NAMES = {"cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "front.png", "album.jpg", "album.png"}
 
 
 def parse_lrc(content: str) -> str:
@@ -69,6 +71,31 @@ def find_lrc_for_audio(audio_path: str) -> str | None:
     return None
 
 
+def find_cover_in_dir(directory: str) -> str | None:
+    """Find cover image in a directory."""
+    dir_path = Path(directory)
+    for name in COVER_NAMES:
+        candidate = dir_path / name
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def parse_filename(filename: str) -> dict:
+    """Parse 'NN - Artist - Title.ext' or 'Artist - Title.ext' patterns."""
+    stem = Path(filename).stem
+
+    match = re.match(r"^\d+\s*-\s*(.+)\s+-\s+(.+)$", stem)
+    if match:
+        return {"artist": match.group(1).strip(), "title": match.group(2).strip()}
+
+    parts = stem.split(" - ", 1)
+    if len(parts) == 2:
+        return {"artist": parts[0].strip(), "title": parts[1].strip()}
+
+    return {}
+
+
 async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
     """Internal scan function called at startup (no auth required)."""
     if not os.path.isdir(scan_dir):
@@ -102,25 +129,28 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
                 continue
 
             metadata = extract_metadata(file_path)
-            title = metadata.get("title") or Path(filename).stem
             duration = int(metadata.get("duration", 0)) if metadata.get("duration") else 0
 
             artist_name = metadata.get("artist")
-            if not artist_name:
-                parts = Path(filename).stem
-                if " - " in parts:
-                    artist_name, title = parts.split(" - ", 1)
+            title = metadata.get("title")
+            album_name = metadata.get("album")
 
-            artist = None
-            if artist_name:
-                artist = await find_or_create_artist(db, artist_name.strip())
-            else:
-                artist = await find_or_create_artist(db, "Unknown Artist")
+            parsed = parse_filename(filename)
+            if not artist_name and parsed.get("artist"):
+                artist_name = parsed["artist"]
+            if not title and parsed.get("title"):
+                title = parsed["title"]
+            if not title:
+                title = Path(filename).stem
+
+            artist = await find_or_create_artist(db, (artist_name or "Unknown Artist").strip())
 
             album = None
-            album_name = metadata.get("album")
             if album_name:
-                album = await find_or_create_album(db, album_name.strip(), artist.id, metadata)
+                album = await find_or_create_album(db, album_name.strip(), artist.id)
+
+            track_dir = str(Path(file_path).parent)
+            cover_path = find_cover_in_dir(track_dir)
 
             lrc_content = find_lrc_for_audio(file_path)
 
@@ -131,6 +161,7 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
                 album_id=album.id if album else None,
                 duration_seconds=duration,
                 file_url=f"local:{file_path}",
+                cover_url=f"local_cover:{cover_path}" if cover_path else None,
                 genre=metadata.get("genre"),
                 track_gain=metadata.get("replay_gain"),
                 track_peak=metadata.get("track_peak"),
@@ -213,24 +244,21 @@ async def find_or_create_artist(db: AsyncSession, name: str) -> Artist:
     return artist
 
 
-async def find_or_create_album(db: AsyncSession, name: str, artist_id: uuid.UUID, metadata: dict) -> Album:
+async def find_or_create_album(db: AsyncSession, name: str, artist_id: uuid.UUID) -> Album:
     result = await db.execute(
         select(Album).where(Album.title.ilike(name), Album.artist_id == artist_id)
     )
     album = result.scalars().first()
     if not album:
-        album = Album(
-            title=name,
-            artist_id=artist_id,
-        )
+        album = Album(title=name, artist_id=artist_id)
         db.add(album)
         await db.flush()
     return album
 
 
-@router.post("")
+@router.post("/scan")
 async def scan_directory(
-    directory: str | None = None,
+    directory: str | None = Query(None, description="Directory to scan for music files"),
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -242,3 +270,14 @@ async def scan_directory(
             detail=result["error"],
         )
     return result
+
+
+@router.get("/local/covers/{cover_path:path}")
+async def serve_local_cover(
+    cover_path: str,
+    _user: User = Depends(get_current_user_from_header_or_query),
+):
+    full_path = os.path.normpath(f"/{cover_path}")
+    if not os.path.isfile(full_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover not found")
+    return FileResponse(full_path, media_type="image/jpeg")

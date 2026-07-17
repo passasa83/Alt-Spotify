@@ -8,6 +8,7 @@ import type { Track } from '@/types';
 import { formatTime, formatDate } from '@/utils/formatTime';
 import { Clock, Filter, Calendar, Play } from 'lucide-react';
 import client from '@/api/client';
+import { resolveCoverUrl } from '@/api/tracks';
 import { usePlaylistModals } from '@/hooks/usePlaylistModals';
 
 interface HistoryItem {
@@ -127,7 +128,7 @@ const History = () => {
               >
                 <div className="relative h-10 w-10">
                   <img
-                    src={item.cover_url || '/placeholder-album.svg'}
+                    src={resolveCoverUrl(item.cover_url)}
                     alt={item.title}
                     className="h-10 w-10 rounded object-cover"
                   />

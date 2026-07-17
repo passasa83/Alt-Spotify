@@ -9,6 +9,7 @@ import type { Track } from '@/types';
 vi.mock('@/stores/playerStore');
 vi.mock('@/api/tracks', () => ({
   getTrackStreamUrl: (id: string) => `/api/v1/tracks/${id}/stream`,
+  resolveCoverUrl: (url: string | null | undefined) => url || '/placeholder-album.svg',
 }));
 vi.mock('@/components/SynchronizedLyrics', () => ({
   default: () => <div data-testid="lyrics">Lyrics</div>,

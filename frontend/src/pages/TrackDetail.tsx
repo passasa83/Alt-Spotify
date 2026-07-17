@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getTrack } from '@/api/tracks';
+import { getTrack, resolveCoverUrl } from '@/api/tracks';
 import { getParsedLyrics } from '@/api/lyrics';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
@@ -79,7 +79,7 @@ const TrackDetail = () => {
     <div className="pb-24">
       <div className="mb-6 flex flex-col gap-6 md:flex-row md:items-end">
         <img
-          src={track.cover_url || track.album?.cover_url || '/placeholder-album.svg'}
+          src={resolveCoverUrl(track.cover_url || track.album?.cover_url)}
           alt={track.title}
           className="h-48 w-48 rounded-md object-cover shadow-2xl md:h-56 md:w-56"
         />

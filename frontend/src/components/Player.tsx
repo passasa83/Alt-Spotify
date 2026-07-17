@@ -1,5 +1,5 @@
 import { usePlayerStore, type RepeatMode } from '@/stores/playerStore';
-import { getTrackStreamUrl } from '@/api/tracks';
+import { getTrackStreamUrl, resolveCoverUrl } from '@/api/tracks';
 import { addFavorite, removeFavorite, checkFavorite } from '@/api/favorites';
 import {
   Play,
@@ -268,7 +268,7 @@ const Player = () => {
       <div className="flex w-1/4 items-center gap-3">
         <Link to={`/track/${currentTrack.id}`}>
           <img
-            src={currentTrack.cover_url || '/placeholder-album.svg'}
+            src={resolveCoverUrl(currentTrack.cover_url)}
             alt={currentTrack.title}
             className="h-14 w-14 rounded object-cover"
           />

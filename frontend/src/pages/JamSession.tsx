@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useJamStore } from '@/stores/jamStore';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useAuthStore } from '@/stores/authStore';
-import { getTrackStreamUrl } from '@/api/tracks';
+import { getTrackStreamUrl, resolveCoverUrl } from '@/api/tracks';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
   Users,
@@ -171,7 +171,7 @@ const JamSession = () => {
             <p className="mb-2 text-xs text-gray-400">{t('jam.now_playing')}</p>
             <div className="flex items-center gap-4">
               <img
-                src={currentTrack.cover_url || '/placeholder-album.svg'}
+                src={resolveCoverUrl(currentTrack.cover_url)}
                 alt={currentTrack.title}
                 className="h-16 w-16 rounded object-cover"
               />
@@ -200,7 +200,7 @@ const JamSession = () => {
                 className="flex items-center gap-3 rounded bg-gray-700 p-2"
               >
                 <img
-                  src={track.cover_url || '/placeholder-album.svg'}
+                  src={resolveCoverUrl(track.cover_url)}
                   alt={track.title}
                   className="h-10 w-10 rounded object-cover"
                 />

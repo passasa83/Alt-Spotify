@@ -6,6 +6,7 @@ import TrackList from '@/components/TrackList';
 import { Play, Heart, MoreHorizontal, Shuffle } from 'lucide-react';
 import type { Album, Track } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
+import { resolveCoverUrl } from '@/api/tracks';
 
 const AlbumDetail = () => {
   const { t } = useTranslation();
@@ -63,7 +64,7 @@ const AlbumDetail = () => {
     <div className="pb-24">
       <div className="mb-6 flex flex-col gap-6 md:flex-row md:items-end">
         <img
-          src={album.cover_url || '/placeholder-album.svg'}
+          src={resolveCoverUrl(album.cover_url)}
           alt={album.title}
           className="h-48 w-48 rounded-md object-cover shadow-2xl md:h-56 md:w-56"
         />
