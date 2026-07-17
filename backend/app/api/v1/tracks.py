@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime, timezone
 from math import ceil
@@ -219,6 +220,20 @@ async def stream_track(
 
     if not track.file_url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No audio file available")
+
+    if track.file_url.startswith("local:"):
+        local_path = track.file_url[6:]
+        if not os.path.isfile(local_path):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Local file not found")
+        from fastapi.responses import FileResponse
+        ext = os.path.splitext(local_path)[1].lower()
+        media_types = {
+            ".mp3": "audio/mpeg", ".flac": "audio/flac", ".ogg": "audio/ogg",
+            ".wav": "audio/wav", ".m4a": "audio/mp4", ".aac": "audio/aac",
+            ".opus": "audio/opus",
+        }
+        return FileResponse(local_path, media_type=media_types.get(ext, "application/octet-stream"))
+
     url = get_file_url(track.file_url)
     return {"stream_url": url}
 
