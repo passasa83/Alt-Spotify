@@ -8,13 +8,10 @@ import TrackContextMenu from '@/components/TrackContextMenu';
 import AddToPlaylistModal from '@/components/AddToPlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import type { Track } from '@/types';
+import { GENRES } from '@/constants/genres';
+import { usePlaylistModals } from '@/hooks/usePlaylistModals';
 
 type Tab = 'new' | 'trending' | 'genres';
-
-const GENRES = [
-  'Rock', 'Pop', 'Hip-Hop', 'Jazz', 'Classical', 'Electronic', 'R&B', 'Country',
-  'Metal', 'Folk', 'Reggae', 'Punk', 'Blues', 'Latin', 'K-Pop', 'Indie',
-];
 
 const Browse = () => {
   const { t } = useTranslation();
@@ -23,8 +20,7 @@ const Browse = () => {
   const [loading, setLoading] = useState(true);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const { setTrack } = usePlayerStore();
-  const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const { playlistModalTrack, showCreateModal, openAddToPlaylist, openCreatePlaylist, closeAddToPlaylist, closeCreatePlaylist } = usePlaylistModals();
 
   useEffect(() => {
     const fetchTracks = async () => {
@@ -128,7 +124,7 @@ const Browse = () => {
               <div className="opacity-0 group-hover:opacity-100">
                 <TrackContextMenu
                   track={track}
-                  onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
+                  onAddToPlaylist={(t) => openAddToPlaylist(t)}
                 />
               </div>
             </div>
@@ -138,16 +134,13 @@ const Browse = () => {
 
       <AddToPlaylistModal
         isOpen={!!playlistModalTrack}
-        onClose={() => setPlaylistModalTrack(null)}
+        onClose={closeAddToPlaylist}
         track={playlistModalTrack}
-        onCreateNew={() => {
-          setPlaylistModalTrack(null);
-          setShowCreateModal(true);
-        }}
+        onCreateNew={openCreatePlaylist}
       />
       <CreatePlaylistModal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={closeCreatePlaylist}
       />
     </div>
   );

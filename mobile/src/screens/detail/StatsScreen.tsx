@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import { getUserStats } from '../../api/users';
+import { formatDuration } from '../../utils/formatTime';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import type { UserStats } from '../../types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -31,12 +32,6 @@ export default function StatsScreen({ navigation }: Props) {
     }
   };
 
-  const formatHours = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${mins}m`;
-  };
-
   if (loading) return <LoadingSpinner />;
   if (!stats) return <LoadingSpinner />;
 
@@ -60,7 +55,7 @@ export default function StatsScreen({ navigation }: Props) {
         <View style={styles.card}>
           <Ionicons name="time" size={32} color={colors.primary} />
           <Text style={styles.cardTitle}>Time Listened</Text>
-          <Text style={styles.cardValue}>{formatHours(stats.total_listening_seconds)}</Text>
+          <Text style={styles.cardValue}>{formatDuration(stats.total_listening_seconds)}</Text>
         </View>
 
         <View style={styles.card}>

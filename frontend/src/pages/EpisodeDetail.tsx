@@ -4,23 +4,8 @@ import { getPodcast, playEpisode, getEpisodeStreamUrl } from '@/api/podcasts';
 import type { Podcast, Episode } from '@/types';
 import { ArrowLeft, Play, Pause, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-const formatDuration = (seconds: number): string => {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  return `${minutes}m`;
-};
-
-const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-};
+import { formatDurationHm, formatDate } from '@/utils/formatTime';
+import client from '@/api/client';
 
 const EpisodeDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -36,8 +21,8 @@ const EpisodeDetail = () => {
     const loadEpisode = async () => {
       setLoading(true);
       try {
-        const podcastsRes = await fetch('/api/v1/podcasts?page_size=100');
-        const podcastsData = await podcastsRes.json();
+        const podcastsRes = await client.get('/podcasts', { params: { page_size: 100 } });
+        const podcastsData = podcastsRes.data;
 
         for (const p of podcastsData.items) {
           const podcastData = await getPodcast(p.id);
@@ -111,7 +96,7 @@ const EpisodeDetail = () => {
           <div className="mt-3 flex items-center gap-4 text-sm text-gray-500">
             {episode.season_number && <span>Season {episode.season_number}</span>}
             {episode.episode_number && <span>Episode {episode.episode_number}</span>}
-            <span>{formatDuration(episode.duration_seconds)}</span>
+            <span>{formatDurationHm(episode.duration_seconds)}</span>
             {episode.published_at && <span>{formatDate(episode.published_at)}</span>}
           </div>
         </div>

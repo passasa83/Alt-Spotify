@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.redis import get_redis
 from app.utils.deps import get_current_user
 from app.models.user import User
 from app.models.device_session import DeviceSession
@@ -143,14 +144,11 @@ async def transfer_playback(
     target.last_active_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     try:
-        import redis.asyncio as aioredis
-        from app.core.config import settings
-        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        r = await get_redis()
         await r.publish(
             f"user:{current_user.id}:devices",
             f'{{"type":"transfer_playback","target_device":"{device_id}"}}',
         )
-        await r.aclose()
     except Exception:
         pass
 

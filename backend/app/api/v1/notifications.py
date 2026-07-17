@@ -84,9 +84,7 @@ async def notifications_websocket(websocket: WebSocket):
         await websocket.close(code=4001, reason="Invalid token")
         return
 
-    import redis.asyncio as aioredis
-    from app.core.config import settings
-    r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    r = await get_redis()
     pubsub = r.pubsub()
     await pubsub.subscribe(f"notifications:{user_id}")
 

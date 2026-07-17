@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getTrack } from '@/api/tracks';
+import { getParsedLyrics } from '@/api/lyrics';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { Play, Pause, Heart } from 'lucide-react';
-import type { Track } from '@/types';
+import type { Track, LyricsLine } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
 
 interface LyricsLine {
@@ -29,7 +30,7 @@ const TrackDetail = () => {
         const data = await getTrack(id);
         setTrackData(data);
         if (data.lyrics_lrc) {
-          const parsed = parseLrc(data.lyrics_lrc);
+          const parsed = await getParsedLyrics(id);
           setLyrics(parsed);
         }
       } catch {
@@ -40,22 +41,6 @@ const TrackDetail = () => {
     };
     loadTrack();
   }, [id]);
-
-  const parseLrc = (lrc: string): LyricsLine[] => {
-    const regex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]\s*(.*)/g;
-    const lines: LyricsLine[] = [];
-    let match;
-    while ((match = regex.exec(lrc)) !== null) {
-      const minutes = parseInt(match[1]);
-      const seconds = parseInt(match[2]);
-      const frac = match[3].length === 2 ? match[3] + '0' : match[3];
-      const ms = parseInt(frac);
-      const time = minutes * 60 + seconds + ms / 1000;
-      const text = match[4].trim();
-      if (text) lines.push({ time_seconds: time, text });
-    }
-    return lines.sort((a, b) => a.time_seconds - b.time_seconds);
-  };
 
   const activeLyricIndex = lyrics.length > 0
     ? lyrics.findIndex((l, i) => {

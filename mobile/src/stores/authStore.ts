@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { User } from '../types';
 import * as authApi from '../api/auth';
+import { getMe } from '../api/users';
 
 interface AuthState {
   user: User | null;
@@ -24,7 +25,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const token = await AsyncStorage.getItem('access_token');
       if (token) {
-        const user = await authApi.getMe();
+        const user = await getMe();
         set({ user, isAuthenticated: true });
       }
     } catch {
@@ -38,7 +39,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const tokens = await authApi.login(email, password);
       await AsyncStorage.setItem('access_token', tokens.access_token);
       await AsyncStorage.setItem('refresh_token', tokens.refresh_token);
-      const user = await authApi.getMe();
+      const user = await getMe();
       set({ user, isAuthenticated: true, isLoading: false });
     } catch (error) {
       set({ isLoading: false });
@@ -64,7 +65,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   refreshAuth: async () => {
     try {
-      const user = await authApi.getMe();
+      const user = await getMe();
       set({ user, isAuthenticated: true });
     } catch {
       await AsyncStorage.multiRemove(['access_token', 'refresh_token']);

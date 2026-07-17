@@ -17,7 +17,6 @@ from app.core.security import (
 from app.models.admin_invite import AdminInviteToken
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse, TokenResponse
-from app.utils.deps import get_current_user
 
 logger = structlog.get_logger("app")
 
@@ -63,15 +62,8 @@ async def register(
     db.add(user)
     await db.flush()
 
-    from app.models.playlist import Playlist
-    liked_playlist = Playlist(
-        title="Liked Songs",
-        owner_id=user.id,
-        description="Your liked songs",
-        is_public=False,
-    )
-    db.add(liked_playlist)
-    await db.flush()
+    from app.utils.favorites import ensure_liked_playlist
+    await ensure_liked_playlist(db, user.id)
 
     if invite_token:
         invite.use_count += 1
@@ -96,19 +88,8 @@ async def login(body: UserLogin, request: Request, db: AsyncSession = Depends(ge
 
     logger.info("login_success", user_id=str(user.id), ip=client_ip)
 
-    from app.models.playlist import Playlist
-    from sqlalchemy import select as sel
-    existing = await db.execute(
-        sel(Playlist).where(Playlist.owner_id == user.id, Playlist.title == "Liked Songs")
-    )
-    if not existing.scalar_one_or_none():
-        db.add(Playlist(
-            title="Liked Songs",
-            owner_id=user.id,
-            description="Your liked songs",
-            is_public=False,
-        ))
-        await db.flush()
+    from app.utils.favorites import ensure_liked_playlist
+    await ensure_liked_playlist(db, user.id)
 
     return TokenResponse(
         access_token=create_access_token(str(user.id)),
@@ -133,6 +114,4 @@ async def refresh(token: str, db: AsyncSession = Depends(get_db)):
     )
 
 
-@router.get("/me", response_model=UserResponse)
-async def me(current_user: User = Depends(get_current_user)):
-    return current_user
+

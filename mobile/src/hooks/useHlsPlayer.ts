@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { usePlayerStore } from '../stores/playerStore';
 import { getTrackStreamUrl, getHlsStreamUrl } from '../api/tracks';
-import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
+import { Audio } from 'expo-av';
+import { configureBackgroundAudio } from '../services/backgroundAudio';
 
 export const useHlsPlayer = () => {
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -45,15 +46,7 @@ export const useHlsPlayer = () => {
 
       soundRef.current = sound;
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        staysActiveInBackground: true,
-        interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        interruptionModeAndroid: InterruptionModeAndroid.MixWithOthers,
-        playThroughEarpieceAndroid: false,
-      });
+      await configureBackgroundAudio();
     };
 
     loadTrack();

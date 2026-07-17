@@ -9,6 +9,8 @@ import type { Track } from '@/types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
 import { deleteTrack } from '@/api/tracks';
+import { formatTime } from '@/utils/formatTime';
+import { usePlaylistModals } from '@/hooks/usePlaylistModals';
 
 interface TrackListProps {
   tracks: Track[];
@@ -22,8 +24,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
   const { t } = useTranslation();
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
-  const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const { playlistModalTrack, showCreateModal, openAddToPlaylist, openCreatePlaylist, closeAddToPlaylist, closeCreatePlaylist } = usePlaylistModals();
 
   const handleDelete = async (e: React.MouseEvent, trackId: string) => {
     e.stopPropagation();
@@ -35,12 +36,6 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
         console.error("Delete failed", err);
       }
     }
-  };
-
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, track: Track) => {
@@ -135,7 +130,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
               <span className="hidden text-sm text-gray-400 md:block">{t('playlist.track_added')}</span>
 
               <div className="flex items-center justify-end gap-2">
-                <span className="text-sm text-gray-400">{formatDuration(track.duration_seconds)}</span>
+                <span className="text-sm text-gray-400">{formatTime(track.duration_seconds)}</span>
                 {isAdmin && (
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100">
                     <Link 
@@ -156,7 +151,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
                 <div className="opacity-0 group-hover:opacity-100">
                   <TrackContextMenu
                     track={track}
-                    onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
+                    onAddToPlaylist={(t) => openAddToPlaylist(t)}
                   />
                 </div>
               </div>
@@ -167,16 +162,13 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
 
       <AddToPlaylistModal
         isOpen={!!playlistModalTrack}
-        onClose={() => setPlaylistModalTrack(null)}
+        onClose={closeAddToPlaylist}
         track={playlistModalTrack}
-        onCreateNew={() => {
-          setPlaylistModalTrack(null);
-          setShowCreateModal(true);
-        }}
+        onCreateNew={openCreatePlaylist}
       />
       <CreatePlaylistModal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={closeCreatePlaylist}
       />
     </div>
   );

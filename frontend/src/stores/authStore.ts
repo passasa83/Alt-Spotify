@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { User } from '@/types';
 import * as authApi from '@/api/auth';
+import { getMe } from '@/api/users';
 
 interface AuthState {
   user: User | null;
@@ -24,7 +25,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const tokens = await authApi.login(email, password);
       localStorage.setItem('access_token', tokens.access_token);
       localStorage.setItem('refresh_token', tokens.refresh_token);
-      const user = await authApi.getMe();
+      const user = await getMe();
       set({ user, isAuthenticated: true, isLoading: false });
     } catch (error) {
       set({ isLoading: false });
@@ -51,7 +52,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   refreshAuth: async () => {
     try {
-      const user = await authApi.getMe();
+      const user = await getMe();
       set({ user, isAuthenticated: true });
     } catch {
       localStorage.removeItem('access_token');

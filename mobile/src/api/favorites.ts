@@ -1,4 +1,4 @@
-import { client } from './client';
+import client from './client';
 import type { PaginatedResponse } from './types';
 
 export const addFavorite = async (entityType: string, entityId: string): Promise<void> => {

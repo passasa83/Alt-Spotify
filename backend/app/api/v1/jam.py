@@ -23,6 +23,29 @@ def generate_session_code() -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
 
+def _serialize_jam_session(session, participants, users_map) -> dict:
+    return {
+        "id": str(session.id),
+        "code": session.code,
+        "host_id": str(session.host_id),
+        "current_track_id": str(session.current_track_id) if session.current_track_id else None,
+        "position_ms": session.position_ms,
+        "status": session.status.value,
+        "queue": [],
+        "participants": [
+            {
+                "user_id": str(p.user_id),
+                "username": users_map[p.user_id].pseudo if p.user_id in users_map else "Unknown",
+                "avatar_url": users_map[p.user_id].avatar_url if p.user_id in users_map else None,
+                "role": p.role.lower(),
+                "joined_at": p.joined_at.isoformat(),
+            }
+            for p in participants
+        ],
+        "created_at": session.created_at.isoformat(),
+    }
+
+
 @router.post("/create", status_code=status.HTTP_201_CREATED)
 async def create_session(
     current_user: User = Depends(get_current_user),
@@ -53,26 +76,7 @@ async def create_session(
     users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
     users_map = {u.id: u for u in users_result.scalars().all()}
 
-    return {
-        "id": str(session.id),
-        "code": session.code,
-        "host_id": str(current_user.id),
-        "current_track_id": None,
-        "position_ms": 0,
-        "status": session.status.value,
-        "queue": [],
-        "participants": [
-            {
-                "user_id": str(p.user_id),
-                "username": users_map[p.user_id].pseudo if p.user_id in users_map else "Unknown",
-                "avatar_url": users_map[p.user_id].avatar_url if p.user_id in users_map else None,
-                "role": p.role.lower(),
-                "joined_at": p.joined_at.isoformat(),
-            }
-            for p in all_participants
-        ],
-        "created_at": session.created_at.isoformat(),
-    }
+    return _serialize_jam_session(session, all_participants, users_map)
 
 
 @router.get("/qr/{session_id}")
@@ -146,14 +150,11 @@ async def join_session(
 
     # Broadcast join via Redis
     try:
-        import redis.asyncio as aioredis
-        from app.core.config import settings
-        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        r = await get_redis()
         await r.publish(
             f"jam:{session.id}",
             json.dumps({"type": "participant_joined", "user_id": str(current_user.id)}),
         )
-        await r.aclose()
     except Exception:
         pass
 
@@ -166,26 +167,7 @@ async def join_session(
     users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
     users_map = {u.id: u for u in users_result.scalars().all()}
 
-    return {
-        "id": str(session.id),
-        "code": session.code,
-        "host_id": str(session.host_id),
-        "current_track_id": str(session.current_track_id) if session.current_track_id else None,
-        "position_ms": session.position_ms,
-        "status": session.status.value,
-        "queue": [],
-        "participants": [
-            {
-                "user_id": str(p.user_id),
-                "username": users_map[p.user_id].pseudo if p.user_id in users_map else "Unknown",
-                "avatar_url": users_map[p.user_id].avatar_url if p.user_id in users_map else None,
-                "role": p.role.lower(),
-                "joined_at": p.joined_at.isoformat(),
-            }
-            for p in all_participants
-        ],
-        "created_at": session.created_at.isoformat(),
-    }
+    return _serialize_jam_session(session, all_participants, users_map)
 
 
 @router.post("/leave/{session_id}")
@@ -208,14 +190,11 @@ async def leave_session(
     await db.flush()
 
     try:
-        import redis.asyncio as aioredis
-        from app.core.config import settings
-        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        r = await get_redis()
         await r.publish(
             f"jam:{session_id}",
             json.dumps({"type": "participant_left", "user_id": str(current_user.id)}),
         )
-        await r.aclose()
     except Exception:
         pass
 
@@ -241,26 +220,7 @@ async def get_session(
     users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
     users_map = {u.id: u for u in users_result.scalars().all()}
 
-    return {
-        "id": str(session.id),
-        "code": session.code,
-        "host_id": str(session.host_id),
-        "current_track_id": str(session.current_track_id) if session.current_track_id else None,
-        "position_ms": session.position_ms,
-        "status": session.status.value,
-        "queue": [],
-        "participants": [
-            {
-                "user_id": str(p.user_id),
-                "username": users_map[p.user_id].pseudo if p.user_id in users_map else "Unknown",
-                "avatar_url": users_map[p.user_id].avatar_url if p.user_id in users_map else None,
-                "role": p.role.lower(),
-                "joined_at": p.joined_at.isoformat(),
-            }
-            for p in participants
-        ],
-        "created_at": session.created_at.isoformat(),
-    }
+    return _serialize_jam_session(session, participants, users_map)
 
 
 @router.websocket("/{session_id}/ws")
@@ -280,10 +240,8 @@ async def jam_websocket(websocket: WebSocket, session_id: uuid.UUID):
         return
 
     # Subscribe to Redis pub/sub for this session
-    import redis.asyncio as aioredis
-    from app.core.config import settings
     from app.core.database import async_session
-    r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    r = await get_redis()
     pubsub = r.pubsub()
     await pubsub.subscribe(f"jam:{session_id}")
 

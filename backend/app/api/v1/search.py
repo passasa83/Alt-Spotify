@@ -18,6 +18,7 @@ from app.services.deezer import search_deezer, download_deezer_preview
 from app.services.jiosaavn import search_jiosaavn, import_from_jiosaavn
 from app.services.meilisearch import search_meili
 from app.services.musicbrainz import search_recordings, search_artists
+from app.utils.artist import ensure_artist
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -90,21 +91,6 @@ async def _find_local_track(db: AsyncSession, isrc: str | None, title: str, arti
         ).limit(1)
     )
     return result.scalars().first()
-
-
-async def _ensure_artist(db: AsyncSession, name: str, image_url: str | None = None) -> UUID:
-    """Find or create an artist by name, return artist_id."""
-    result = await db.execute(select(Artist).where(Artist.name.ilike(f"%{name}%")))
-    artist = result.scalars().first()
-    if artist:
-        if image_url and not artist.image_url:
-            artist.image_url = image_url
-            await db.flush()
-        return artist.id
-    artist = Artist(name=name, image_url=image_url)
-    db.add(artist)
-    await db.flush()
-    return artist.id
 
 
 @router.get("")
@@ -254,7 +240,7 @@ async def search(
                 else:
                     if ext_dedup_key not in seen_keys:
                         artist_picture = ext.get("artist_picture")
-                        artist_id = await _ensure_artist(db, ext["artist"], artist_picture)
+                        artist_id = await ensure_artist(db, ext["artist"], artist_picture)
                         stub = Track(
                             title=ext["title"],
                             artist_id=artist_id,
@@ -409,7 +395,7 @@ async def download_deezer_track(
     from app.core.minio import get_file_url
     file_url = get_file_url(object_name)
     
-    artist_id = await _ensure_artist(db, artist_name, None)
+    artist_id = await ensure_artist(db, artist_name, None)
     
     existing = await db.execute(
         select(Track).where(Track.isrc.isnot(None), Track.isrc != "").limit(1)

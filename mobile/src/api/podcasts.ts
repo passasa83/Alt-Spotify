@@ -1,4 +1,4 @@
-import { client } from './client';
+import client from './client';
 
 export const getPodcasts = async (page = 1, pageSize = 20) => {
   const response = await client.get('/podcasts', { params: { page, page_size: pageSize } });

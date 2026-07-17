@@ -5,7 +5,10 @@ import TrackContextMenu from '@/components/TrackContextMenu';
 import AddToPlaylistModal from '@/components/AddToPlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import type { Track } from '@/types';
+import { formatTime, formatDate } from '@/utils/formatTime';
 import { Clock, Filter, Calendar, Play } from 'lucide-react';
+import client from '@/api/client';
+import { usePlaylistModals } from '@/hooks/usePlaylistModals';
 
 interface HistoryItem {
   id: string;
@@ -29,8 +32,7 @@ const History = () => {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [genre, setGenre] = useState('');
-  const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const { playlistModalTrack, showCreateModal, openAddToPlaylist, openCreatePlaylist, closeAddToPlaylist, closeCreatePlaylist } = usePlaylistModals();
 
   const fetchHistory = async (p: number) => {
     setLoading(true);
@@ -40,11 +42,8 @@ const History = () => {
       if (toDate) params.set('to_date', toDate);
       if (genre) params.set('genre', genre);
 
-      const token = localStorage.getItem('access_token');
-      const resp = await fetch(`/api/v1/playlists/user/history?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await resp.json();
+      const resp = await client.get(`/playlists/user/history?${params}`);
+      const data = resp.data;
       setItems(data.items || []);
       setTotalPages(data.pages || 1);
     } catch {
@@ -58,15 +57,8 @@ const History = () => {
     fetchHistory(page);
   }, [page, fromDate, toDate, genre]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const formatHistoryDate = (iso: string) => {
+    return formatDate(iso, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
   const itemToTrack = (item: HistoryItem): Track => ({
@@ -157,11 +149,11 @@ const History = () => {
                       : ` • ${formatTime(item.duration_seconds)}`}
                   </p>
                 </div>
-                <span className="text-xs text-gray-500">{formatDate(item.played_at)}</span>
+                <span className="text-xs text-gray-500">{formatHistoryDate(item.played_at)}</span>
                 <div className="opacity-0 group-hover:opacity-100">
                   <TrackContextMenu
                     track={itemToTrack(item)}
-                    onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
+                    onAddToPlaylist={(t) => openAddToPlaylist(t)}
                   />
                 </div>
               </div>
@@ -192,16 +184,13 @@ const History = () => {
 
       <AddToPlaylistModal
         isOpen={!!playlistModalTrack}
-        onClose={() => setPlaylistModalTrack(null)}
+        onClose={closeAddToPlaylist}
         track={playlistModalTrack}
-        onCreateNew={() => {
-          setPlaylistModalTrack(null);
-          setShowCreateModal(true);
-        }}
+        onCreateNew={openCreatePlaylist}
       />
       <CreatePlaylistModal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={closeCreatePlaylist}
       />
     </div>
   );
