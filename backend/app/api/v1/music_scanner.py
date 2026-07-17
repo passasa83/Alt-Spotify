@@ -1,9 +1,10 @@
 import os
+import re
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select, func
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from mutagen import File as MutagenFile
 import structlog
@@ -11,6 +12,7 @@ import structlog
 from app.core.database import get_db
 from app.models.track import Track
 from app.models.artist import Artist
+from app.models.album import Album
 from app.models.user import User
 from app.utils.deps import require_admin
 
@@ -21,9 +23,56 @@ router = APIRouter(prefix="/scan", tags=["scan"])
 AUDIO_EXTENSIONS = {".mp3", ".flac", ".ogg", ".wav", ".m4a", ".aac", ".opus", ".wma", ".alac"}
 
 
+def parse_lrc(content: str) -> str:
+    """Convert LRC content to simple [mm:ss.xx] text format for storage."""
+    lines = []
+    for line in content.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        match = re.match(r"\[(\d+):(\d+)\.(\d+)\](.*)", line)
+        if match:
+            minutes, seconds, hundredths, text = match.groups()
+            if text.strip():
+                lines.append(f"[{int(minutes):02d}:{int(seconds):02d}.{hundredths}]{text.strip()}")
+    return "\n".join(lines)
+
+
+def find_lrc_for_audio(audio_path: str) -> str | None:
+    """Find and read a .lrc file that corresponds to an audio file."""
+    audio_stem = Path(audio_path).stem
+    audio_dir = Path(audio_path).parent
+
+    for candidate in [
+        audio_dir / f"{audio_stem}.lrc",
+        audio_dir / f"{audio_stem}.LRC",
+    ]:
+        if candidate.is_file():
+            try:
+                content = candidate.read_text(encoding="utf-8", errors="replace")
+                parsed = parse_lrc(content)
+                if parsed:
+                    return parsed
+            except Exception:
+                pass
+
+    for f in audio_dir.iterdir():
+        if f.suffix.lower() == ".lrc" and f.stem.lower() == audio_stem.lower():
+            try:
+                content = f.read_text(encoding="utf-8", errors="replace")
+                parsed = parse_lrc(content)
+                if parsed:
+                    return parsed
+            except Exception:
+                pass
+
+    return None
+
+
 async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
     """Internal scan function called at startup (no auth required)."""
     if not os.path.isdir(scan_dir):
+        logger.warning("scan_dir_not_found", path=scan_dir)
         return {"scanned": 0, "imported": 0, "skipped": 0, "error": f"Directory not found: {scan_dir}"}
 
     audio_files = []
@@ -32,60 +81,83 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
             if Path(f).suffix.lower() in AUDIO_EXTENSIONS:
                 audio_files.append(os.path.join(root, f))
 
+    logger.info("scan_found_files", count=len(audio_files), scan_dir=scan_dir)
+
     if not audio_files:
         return {"scanned": 0, "imported": 0, "skipped": 0, "message": "No audio files found"}
 
     imported = 0
     skipped = 0
+    errors = 0
 
     for file_path in audio_files:
-        filename = os.path.basename(file_path)
+        try:
+            filename = os.path.basename(file_path)
 
-        existing = await db.execute(
-            select(Track).where(Track.file_url == f"local:{file_path}")
-        )
-        if existing.scalar_one_or_none():
-            skipped += 1
-            continue
+            existing = await db.execute(
+                select(Track).where(Track.file_url == f"local:{file_path}")
+            )
+            if existing.scalar_one_or_none():
+                skipped += 1
+                continue
 
-        metadata = extract_metadata(file_path)
-        title = metadata.get("title") or Path(filename).stem
-        duration = int(metadata.get("duration", 0)) if metadata.get("duration") else 0
+            metadata = extract_metadata(file_path)
+            title = metadata.get("title") or Path(filename).stem
+            duration = int(metadata.get("duration", 0)) if metadata.get("duration") else 0
 
-        artist_name = metadata.get("artist")
-        if not artist_name:
-            parts = filename.rsplit(".", 1)[0]
-            if " - " in parts:
-                artist_name, title = parts.split(" - ", 1)
+            artist_name = metadata.get("artist")
+            if not artist_name:
+                parts = Path(filename).stem
+                if " - " in parts:
+                    artist_name, title = parts.split(" - ", 1)
 
-        artist = None
-        if artist_name:
-            artist = await find_or_create_artist(db, artist_name)
-        else:
-            artist = await find_or_create_artist(db, "Unknown Artist")
+            artist = None
+            if artist_name:
+                artist = await find_or_create_artist(db, artist_name.strip())
+            else:
+                artist = await find_or_create_artist(db, "Unknown Artist")
 
-        track = Track(
-            id=uuid.uuid4(),
-            title=title.strip(),
-            artist_id=artist.id,
-            duration_seconds=duration,
-            file_url=f"local:{file_path}",
-            genre=metadata.get("genre"),
-            track_gain=metadata.get("replay_gain"),
-            track_peak=metadata.get("track_peak"),
-            is_explicit=False,
-        )
-        db.add(track)
-        imported += 1
+            album = None
+            album_name = metadata.get("album")
+            if album_name:
+                album = await find_or_create_album(db, album_name.strip(), artist.id, metadata)
+
+            lrc_content = find_lrc_for_audio(file_path)
+
+            track = Track(
+                id=uuid.uuid4(),
+                title=title.strip(),
+                artist_id=artist.id,
+                album_id=album.id if album else None,
+                duration_seconds=duration,
+                file_url=f"local:{file_path}",
+                genre=metadata.get("genre"),
+                track_gain=metadata.get("replay_gain"),
+                track_peak=metadata.get("track_peak"),
+                lyrics_lrc=lrc_content,
+                is_explicit=False,
+            )
+            db.add(track)
+            imported += 1
+        except Exception as e:
+            errors += 1
+            logger.warning("scan_file_error", file=file_path, error=str(e))
 
     await db.commit()
 
-    logger.info("music_scan_completed", scanned=len(audio_files), imported=imported, skipped=skipped)
+    logger.info(
+        "music_scan_completed",
+        scanned=len(audio_files),
+        imported=imported,
+        skipped=skipped,
+        errors=errors,
+    )
 
     return {
         "scanned": len(audio_files),
         "imported": imported,
         "skipped": skipped,
+        "errors": errors,
         "directory": scan_dir,
     }
 
@@ -141,6 +213,21 @@ async def find_or_create_artist(db: AsyncSession, name: str) -> Artist:
     return artist
 
 
+async def find_or_create_album(db: AsyncSession, name: str, artist_id: uuid.UUID, metadata: dict) -> Album:
+    result = await db.execute(
+        select(Album).where(Album.title.ilike(name), Album.artist_id == artist_id)
+    )
+    album = result.scalars().first()
+    if not album:
+        album = Album(
+            title=name,
+            artist_id=artist_id,
+        )
+        db.add(album)
+        await db.flush()
+    return album
+
+
 @router.post("")
 async def scan_directory(
     directory: str | None = None,
@@ -148,71 +235,10 @@ async def scan_directory(
     _admin: User = Depends(require_admin),
 ):
     scan_dir = directory or os.environ.get("MUSIC_SCAN_DIR", "/music")
-    if not os.path.isdir(scan_dir):
+    result = await scan_directory_internal(scan_dir, db)
+    if result.get("error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Directory not found: {scan_dir}",
+            detail=result["error"],
         )
-
-    audio_files = []
-    for root, _dirs, files in os.walk(scan_dir):
-        for f in files:
-            if Path(f).suffix.lower() in AUDIO_EXTENSIONS:
-                audio_files.append(os.path.join(root, f))
-
-    if not audio_files:
-        return {"scanned": 0, "imported": 0, "skipped": 0, "message": "No audio files found"}
-
-    imported = 0
-    skipped = 0
-
-    for file_path in audio_files:
-        filename = os.path.basename(file_path)
-
-        existing = await db.execute(
-            select(Track).where(Track.file_url == f"local:{file_path}")
-        )
-        if existing.scalar_one_or_none():
-            skipped += 1
-            continue
-
-        metadata = extract_metadata(file_path)
-        title = metadata.get("title") or Path(filename).stem
-        duration = int(metadata.get("duration", 0)) if metadata.get("duration") else 0
-
-        artist_name = metadata.get("artist")
-        if not artist_name:
-            parts = filename.rsplit(".", 1)[0]
-            if " - " in parts:
-                artist_name, title = parts.split(" - ", 1)
-
-        artist = None
-        if artist_name:
-            artist = await find_or_create_artist(db, artist_name)
-        else:
-            artist = await find_or_create_artist(db, "Unknown Artist")
-
-        track = Track(
-            id=uuid.uuid4(),
-            title=title.strip(),
-            artist_id=artist.id,
-            duration_seconds=duration,
-            file_url=f"local:{file_path}",
-            genre=metadata.get("genre"),
-            track_gain=metadata.get("replay_gain"),
-            track_peak=metadata.get("track_peak"),
-            is_explicit=False,
-        )
-        db.add(track)
-        imported += 1
-
-    await db.commit()
-
-    logger.info("music_scan_completed", scanned=len(audio_files), imported=imported, skipped=skipped)
-
-    return {
-        "scanned": len(audio_files),
-        "imported": imported,
-        "skipped": skipped,
-        "directory": scan_dir,
-    }
+    return result
