@@ -2,26 +2,17 @@ import { useEffect, useState } from 'react';
 import { useLibraryStore } from '@/stores/libraryStore';
 import PlaylistCard from '@/components/PlaylistCard';
 import ImportPlaylistModal from '@/components/ImportPlaylistModal';
+import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import { Link } from 'react-router-dom';
 import { Plus, Upload } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 
 const Library = () => {
   const { t } = useTranslation();
-  const { playlists, favorites, loadPlaylists, loadFavorites, createPlaylist, isLoading } = useLibraryStore();
+  const { playlists, favorites, loadPlaylists, loadFavorites, isLoading } = useLibraryStore();
   const [activeTab, setActiveTab] = useState<'playlists' | 'favorites'>('playlists');
   const [showImportModal, setShowImportModal] = useState(false);
-
-  const handleCreatePlaylist = async () => {
-    const name = prompt(t('library.playlist_name_placeholder') || 'Playlist name');
-    if (name && name.trim()) {
-      try {
-        await createPlaylist(name.trim());
-      } catch (err) {
-        console.error('Failed to create playlist', err);
-      }
-    }
-  };
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     loadPlaylists();
@@ -41,7 +32,7 @@ const Library = () => {
             {t('library.import_playlist')}
           </button>
           <button
-            onClick={handleCreatePlaylist}
+            onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-2 rounded-full bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           >
             <Plus size={16} />
@@ -53,6 +44,10 @@ const Library = () => {
       <ImportPlaylistModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
+      />
+      <CreatePlaylistModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
       />
 
       <div className="mb-6 flex gap-2">
@@ -89,7 +84,7 @@ const Library = () => {
               <p className="text-xl font-bold text-white">Create your first playlist</p>
               <p className="mt-2 text-gray-400">It's easy, we'll help you</p>
               <button
-                onClick={handleCreatePlaylist}
+                onClick={() => setShowCreateModal(true)}
                 className="mt-4 rounded-full bg-white px-6 py-3 font-bold text-black hover:scale-105"
               >
                 {t('library.create_button')}

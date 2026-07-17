@@ -2,13 +2,15 @@ import { NavLink } from 'react-router-dom';
 import { Home, Search, Library, Plus, Heart, Radio, BarChart3, Upload, Headphones, Activity, Sparkles, Mail, Compass, History as HistoryIcon, ListMusic } from 'lucide-react';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useAuthStore } from '@/stores/authStore';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
+import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 
 const Sidebar = () => {
   const { playlists, loadPlaylists } = useLibraryStore();
   const { user } = useAuthStore();
   const { t } = useTranslation();
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     loadPlaylists();
@@ -20,6 +22,7 @@ const Sidebar = () => {
     }`;
 
   return (
+    <>
     <aside className="hidden w-64 flex-shrink-0 flex-col bg-black p-2 md:flex lg:w-72" role="navigation" aria-label={t('nav.library')}>
       <div className="mb-2 rounded-lg bg-gray-900 p-4">
         <NavLink to="/" className="mb-4 flex items-center gap-2 text-white" aria-label="Alt Spotify Home">
@@ -94,16 +97,7 @@ const Sidebar = () => {
         <div className="mb-2 flex items-center justify-between px-2">
           <span className="text-sm font-semibold text-gray-400">{t('nav.playlists')}</span>
           <button
-            onClick={async () => {
-              const name = prompt(t('library.playlist_name_placeholder') || 'Playlist name');
-              if (name && name.trim()) {
-                try {
-                  await useLibraryStore.getState().createPlaylist(name.trim());
-                } catch (err) {
-                  console.error('Failed to create playlist', err);
-                }
-              }
-            }}
+            onClick={() => setShowCreateModal(true)}
             className="rounded-full p-1 text-gray-400 hover:text-white"
             aria-label={t('library.create_playlist')}
           >
@@ -142,6 +136,8 @@ const Sidebar = () => {
         </div>
       </div>
     </aside>
+    <CreatePlaylistModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} />
+    </>
   );
 };
 
