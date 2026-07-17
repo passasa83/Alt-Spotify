@@ -1,5 +1,6 @@
 import { usePlayerStore, type RepeatMode } from '@/stores/playerStore';
 import { getTrackStreamUrl } from '@/api/tracks';
+import { addFavorite, removeFavorite, checkFavorite } from '@/api/favorites';
 import {
   Play,
   Pause,
@@ -181,6 +182,9 @@ const Player = () => {
       if (isPlaying) {
         audioRef.current.play().catch(() => {});
       }
+      checkFavorite('track', String(currentTrack.id))
+        .then((res) => setIsLiked(res))
+        .catch(() => setIsLiked(false));
     }
     preloadNextTrack();
   }, [currentTrack]);
@@ -289,7 +293,20 @@ const Player = () => {
           </Link>
         </div>
         <button
-          onClick={() => setIsLiked(!isLiked)}
+          onClick={async () => {
+            if (!currentTrack) return;
+            try {
+              if (isLiked) {
+                await removeFavorite('track', String(currentTrack.id));
+                setIsLiked(false);
+              } else {
+                await addFavorite('track', String(currentTrack.id));
+                setIsLiked(true);
+              }
+            } catch {
+              // silently fail
+            }
+          }}
           className={`ml-2 ${isLiked ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
           aria-label={isLiked ? 'Remove from liked' : 'Add to liked'}
         >

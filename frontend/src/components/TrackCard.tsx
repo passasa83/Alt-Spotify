@@ -1,5 +1,6 @@
-import { Play } from 'lucide-react';
+import { Play, Heart } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useLibraryStore } from '@/stores/libraryStore';
 import type { Track } from '@/types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -11,7 +12,9 @@ interface TrackCardProps {
 const TrackCard = ({ track }: TrackCardProps) => {
   const { t } = useTranslation();
   const { setTrack, currentTrack, isPlaying } = usePlayerStore();
+  const { addToFavorites, removeFromFavorites, isFavorite } = useLibraryStore();
   const isCurrentTrack = currentTrack?.id === track.id;
+  const liked = isFavorite(String(track.id));
 
   return (
     <div className="group relative cursor-pointer rounded-md bg-gray-900 p-3 transition-colors hover:bg-gray-800">
@@ -30,6 +33,23 @@ const TrackCard = ({ track }: TrackCardProps) => {
           }`}
         >
           <Play size={18} fill="currentColor" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (liked) {
+              removeFromFavorites(String(track.id));
+            } else {
+              addToFavorites(track);
+            }
+          }}
+          className={`absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full transition-all ${
+            liked
+              ? 'text-green-500 opacity-100'
+              : 'text-gray-400 opacity-0 group-hover:opacity-100 hover:text-white'
+          }`}
+        >
+          <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
         </button>
       </div>
       <Link to={`/track/${track.id}`} className="block truncate text-sm font-semibold text-white hover:underline">

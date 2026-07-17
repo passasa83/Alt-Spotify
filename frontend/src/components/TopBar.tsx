@@ -16,7 +16,7 @@ const TopBar = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
   const { t, locale, setLocale } = useTranslation();
-  const isSearchPage = location.pathname === '/search';
+  const isSearchPage = location.pathname.startsWith('/search');
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

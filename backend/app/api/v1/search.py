@@ -21,6 +21,26 @@ from app.services.musicbrainz import search_recordings, search_artists
 
 router = APIRouter(prefix="/search", tags=["search"])
 
+import re
+
+
+def _normalize_title(title: str) -> str:
+    """Normalize title for dedup: strip suffixes like (Remaster), (Radio Edit), etc."""
+    t = title.lower().strip()
+    t = re.sub(r"\s*[-–]\s*(remaster(ed)?\s*\d*|radio edit|single|album version|deluxe|explicit|clean|remix|live|acoustic|version|remaster\s*\d{4})", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(.*?remaster.*?\)", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(.*?radio edit.*?\)", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(.*?explicit.*?\)", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(.*?clean.*?\)", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(.*?remix.*?\)", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(.*?live.*?\)", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(.*?acoustic.*?\)", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(.*?version.*?\)", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*feat\.?.*", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*ft\.?.*", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
 
 def _track_to_response(track: Track, artist_name: str = "") -> SearchTrackResponse:
     return SearchTrackResponse(
@@ -158,7 +178,7 @@ async def search(
                 artist_result = await db.execute(select(Artist).where(Artist.id == t.artist_id))
                 artist_obj = artist_result.scalar_one_or_none()
                 aname = artist_obj.name if artist_obj else ""
-                dedup_key = f"{t.title.lower().strip()}|{aname.lower().strip()}"
+                dedup_key = f"{_normalize_title(t.title)}|{_normalize_title(aname)}"
                 local_tracks_map[dedup_key] = (t, aname)
 
             external_results = await search_deezer(q, limit=page_size)
@@ -169,8 +189,11 @@ async def search(
 
             for ext in external_results:
                 ext_isrc = ext.get("isrc")
-                ext_dedup_key = f"{ext['title'].lower().strip()}|{ext['artist'].lower().strip()}"
+                ext_dedup_key = f"{_normalize_title(ext['title'])}|{_normalize_title(ext['artist'])}"
                 local_match = local_tracks_map.get(ext_dedup_key)
+
+                if ext_isrc and ext_isrc in seen_isrcs:
+                    continue
 
                 if local_match:
                     tracks.append(_track_to_response(local_match[0], local_match[1]))
