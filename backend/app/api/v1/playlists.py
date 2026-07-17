@@ -79,10 +79,10 @@ async def ensure_liked_songs_playlist(user_id: uuid.UUID, db: AsyncSession) -> N
     for track_id in existing_ids:
         if track_id not in set(fav_track_ids):
             await db.execute(
-                select(PlaylistTrack).where(
+                delete(PlaylistTrack).where(
                     PlaylistTrack.playlist_id == playlist.id,
                     PlaylistTrack.track_id == track_id,
-                ).delete()
+                )
             )
 
     await db.flush()
@@ -122,7 +122,7 @@ async def list_playlists(
     counts = {}
     if playlist_ids:
         count_res = await db.execute(
-            select(PlaylistTrack.playlist_id, func.count(PlaylistTrack.id))
+            select(PlaylistTrack.playlist_id, func.count(PlaylistTrack.track_id))
             .where(PlaylistTrack.playlist_id.in_(playlist_ids))
             .group_by(PlaylistTrack.playlist_id)
         )
