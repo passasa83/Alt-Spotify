@@ -29,6 +29,7 @@ import AdminDevices from '@/pages/AdminDevices';
 import Browse from '@/pages/Browse';
 import History from '@/pages/History';
 import SmartPlaylistCreate from '@/pages/SmartPlaylistCreate';
+import ToastContainer from '@/components/ToastContainer';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuthStore();
@@ -48,6 +49,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 
 const App = () => {
   return (
+    <>
     <Routes>
       <Route
         path="/login"
@@ -102,6 +104,8 @@ const App = () => {
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
+    <ToastContainer />
+    </>
   );
 };
 

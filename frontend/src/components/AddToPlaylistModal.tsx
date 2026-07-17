@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { X, Music, Plus } from 'lucide-react';
 import { useLibraryStore } from '@/stores/libraryStore';
+import { useToastStore } from '@/stores/toastStore';
 import { addTrackToPlaylist } from '@/api/playlists';
 import type { Track } from '@/types';
 
@@ -13,6 +14,7 @@ interface Props {
 
 const AddToPlaylistModal = ({ isOpen, onClose, track, onCreateNew }: Props) => {
   const { playlists, loadPlaylists } = useLibraryStore();
+  const addToast = useToastStore((s) => s.addToast);
 
   useEffect(() => {
     if (isOpen) loadPlaylists();
@@ -22,7 +24,9 @@ const AddToPlaylistModal = ({ isOpen, onClose, track, onCreateNew }: Props) => {
 
   const handleAdd = async (playlistId: string) => {
     try {
+      const playlist = playlists.find((p) => p.id === playlistId);
       await addTrackToPlaylist(playlistId, String(track.id));
+      addToast(`Added to ${playlist?.title || 'playlist'}`);
       onClose();
     } catch (err) {
       console.error('Failed to add track to playlist', err);
