@@ -27,7 +27,7 @@ const TrackCard = ({ track }: TrackCardProps) => {
       <div className="group relative cursor-pointer rounded-md bg-gray-900 p-3 transition-colors hover:bg-gray-800">
         <div className="relative mb-3">
           <img
-            src={track.cover_url || track.album?.cover_url || '/placeholder-album.png'}
+            src={track.cover_url || track.album?.cover_url || '/placeholder-album.svg'}
             alt={track.title}
             className="h-40 w-full rounded-md object-cover shadow-lg"
           />

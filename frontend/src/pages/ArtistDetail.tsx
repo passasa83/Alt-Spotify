@@ -61,7 +61,7 @@ const ArtistDetail = () => {
       <div className="relative mb-6">
         <div className="h-64 w-full overflow-hidden md:h-80">
           <img
-            src={artist.image_url || '/placeholder-artist.png'}
+            src={artist.image_url || '/placeholder-artist.svg'}
             alt={artist.name}
             className="h-full w-full object-cover"
           />

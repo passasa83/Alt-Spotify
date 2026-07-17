@@ -48,7 +48,7 @@ const PodcastDetail = () => {
 
       <div className="flex flex-col gap-6 md:flex-row">
         <img
-          src={podcast.image_url || '/placeholder-podcast.png'}
+          src={podcast.image_url || '/placeholder-podcast.svg'}
           alt={podcast.title}
           className="h-48 w-48 flex-shrink-0 rounded-lg object-cover shadow-lg md:h-64 md:w-64"
         />

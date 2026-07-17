@@ -84,7 +84,7 @@ const Stats = () => {
               <div key={track.id} className="group flex items-center gap-3">
                 <span className="w-6 text-center text-sm font-bold text-gray-500">{i + 1}</span>
                 <img
-                  src={track.cover_url || '/placeholder-album.png'}
+                  src={track.cover_url || '/placeholder-album.svg'}
                   alt={track.title}
                   className="h-10 w-10 rounded object-cover cursor-pointer"
                   onClick={() => setTrack(track as Track)}
