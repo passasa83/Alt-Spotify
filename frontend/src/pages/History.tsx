@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
 import { usePlayerStore } from '@/stores/playerStore';
 import TrackContextMenu from '@/components/TrackContextMenu';
@@ -143,7 +144,7 @@ const History = () => {
                 <div className="min-w-0 flex-1">
                   <p className={`truncate text-sm font-medium ${isCurrentTrack ? 'text-green-500' : ''}`}>{item.title}</p>
                   <p className="truncate text-xs text-gray-500">
-                    {item.artist?.name || ''}
+                    {item.artist?.name ? <Link to={`/artist/${item.artist.id}`} className="hover:underline">{item.artist.name}</Link> : ''}
                     {item.duration_listened_seconds > 0
                       ? ` • ${formatTime(item.duration_listened_seconds)} / ${formatTime(item.duration_seconds)}`
                       : ` • ${formatTime(item.duration_seconds)}`}

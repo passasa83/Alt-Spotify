@@ -40,7 +40,7 @@ export interface ActiveUsersPerDay {
 
 export interface TopContent {
   top_tracks: { title: string; artist: string; play_count: number }[];
-  top_artists: { name: string; play_count: number }[];
+  top_artists: { id: string; name: string; play_count: number }[];
   top_albums: { title: string; artist: string; play_count: number }[];
 }
 

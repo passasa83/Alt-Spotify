@@ -1,7 +1,7 @@
 import { Play } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import type { Album } from '@/types';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { getAlbumTracks } from '@/api/albums';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -12,6 +12,7 @@ interface AlbumCardProps {
 
 const AlbumCard = ({ album }: AlbumCardProps) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { setTrack, currentTrack, isPlaying } = usePlayerStore();
   const [tracks, setTracks] = useState<[]>([]);
 
@@ -50,7 +51,7 @@ const AlbumCard = ({ album }: AlbumCardProps) => {
       </div>
       <p className="block truncate text-sm font-semibold text-white">{album.title}</p>
       <p className="block truncate text-xs text-gray-400">
-        {album.release_year} • {album.artist?.name || t('player.unknown_artist')}
+        {album.release_year} • <span className="hover:underline" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (album.artist_id) navigate(`/artist/${album.artist_id}`); }}>{album.artist?.name || t('player.unknown_artist')}</span>
       </p>
     </Link>
   );

@@ -17,14 +17,24 @@ interface TrackListProps {
   showAlbum?: boolean;
   showIndex?: boolean;
   onRefresh?: () => void;
+  playlistTracks?: Track[];
 }
 
-const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: TrackListProps) => {
-  const { setTrack, currentTrack, isPlaying } = usePlayerStore();
+const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, playlistTracks }: TrackListProps) => {
+  const { setTrack, setPlaylistAsQueue, currentTrack, isPlaying } = usePlayerStore();
   const { t } = useTranslation();
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
   const { playlistModalTrack, showCreateModal, openAddToPlaylist, openCreatePlaylist, closeAddToPlaylist, closeCreatePlaylist } = usePlaylistModals();
+
+  const handlePlayTrack = (track: Track) => {
+    if (playlistTracks && playlistTracks.length > 0) {
+      const trackIndex = playlistTracks.findIndex(t => t.id === track.id);
+      setPlaylistAsQueue(playlistTracks, trackIndex >= 0 ? trackIndex : 0);
+    } else {
+      setTrack(track);
+    }
+  };
 
   const handleDelete = async (e: React.MouseEvent, trackId: string) => {
     e.stopPropagation();
@@ -41,7 +51,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
   const handleKeyDown = (e: React.KeyboardEvent, track: Track) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      setTrack(track);
+      handlePlayTrack(track);
     }
   };
 
@@ -71,7 +81,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
               className={`group grid cursor-pointer items-center gap-4 rounded-md px-4 py-2 transition-colors hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-green-500 ${
                 isCurrentTrack ? 'bg-gray-800' : ''
               } ${showIndex ? 'grid-cols-[16px_4fr_3fr_minmax(80px,1fr)_32px] md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]' : 'grid-cols-[4fr_3fr_minmax(80px,1fr)_32px] md:grid-cols-[4fr_2fr_3fr_minmax(80px,1fr)_32px]'}`}
-              onDoubleClick={() => setTrack(track)}
+              onDoubleClick={() => handlePlayTrack(track)}
             >
               {showIndex && (
                 <div className="flex items-center justify-end">
@@ -79,7 +89,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
                     {isCurrentTrack && isPlaying ? '♪' : index + 1}
                   </span>
                   <button
-                    onClick={() => setTrack(track)}
+                    onClick={() => handlePlayTrack(track)}
                     className="hidden text-white group-hover:block"
                     aria-label={`${t('player.play')} ${track.title}`}
                   >
@@ -91,7 +101,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh }: Tr
               <div className="flex items-center gap-3">
                 {!showIndex && (
                   <button
-                    onClick={() => setTrack(track)}
+                    onClick={() => handlePlayTrack(track)}
                     className="hidden text-white group-hover:block"
                     aria-label={`${t('player.play')} ${track.title}`}
                   >

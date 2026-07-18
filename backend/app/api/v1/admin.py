@@ -265,15 +265,15 @@ async def top_content(
     ]
 
     top_artists_result = await db.execute(
-        select(Artist.name, func.count(ListeningHistory.id).label("plays"))
+        select(Artist.id, Artist.name, func.count(ListeningHistory.id).label("plays"))
         .join(Track, Artist.id == Track.artist_id)
         .join(ListeningHistory, Track.id == ListeningHistory.track_id)
-        .group_by(Artist.name)
+        .group_by(Artist.id, Artist.name)
         .order_by(desc("plays"))
         .limit(10)
     )
     top_artists = [
-        {"name": row[0], "play_count": row[1]}
+        {"id": row[0], "name": row[1], "play_count": row[2]}
         for row in top_artists_result.all()
     ]
 

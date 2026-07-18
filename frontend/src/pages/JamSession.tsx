@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useJamStore } from '@/stores/jamStore';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -178,7 +178,7 @@ const JamSession = () => {
               <div>
                 <p className="font-semibold text-white">{currentTrack.title}</p>
                 <p className="text-sm text-gray-400">
-                  {currentTrack.artist?.name || t('player.unknown_artist')}
+                  <Link to={`/artist/${currentTrack.artist_id}`} className="hover:underline">{currentTrack.artist?.name || t('player.unknown_artist')}</Link>
                 </p>
               </div>
               <button
@@ -207,7 +207,7 @@ const JamSession = () => {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-white">{track.title}</p>
                   <p className="truncate text-xs text-gray-400">
-                    {track.artist?.name || t('player.unknown_artist')}
+                    <Link to={`/artist/${track.artist_id}`} className="hover:underline">{track.artist?.name || t('player.unknown_artist')}</Link>
                   </p>
                 </div>
               </div>

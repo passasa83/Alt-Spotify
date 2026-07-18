@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getPlaylist, getPlaylistTracks, removeTrackFromPlaylist, deletePlaylist, updatePlaylist } from '@/api/playlists';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
@@ -25,7 +25,7 @@ const PlaylistDetail = () => {
   const [editDescription, setEditDescription] = useState('');
   const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const { setTrack } = usePlayerStore();
+  const { setTrack, setPlaylistAsQueue } = usePlayerStore();
   const { loadPlaylists } = useLibraryStore();
   const addToast = useToastStore((s) => s.addToast);
   const { user } = useAuthStore();
@@ -52,16 +52,17 @@ const PlaylistDetail = () => {
   }, [id]);
 
   const handlePlayAll = () => {
-    if (tracks.length > 0 && tracks[0]?.track) {
-      setTrack(tracks[0].track);
+    if (tracks.length > 0) {
+      const allTracks = tracks.filter(pt => pt.track).map(pt => pt.track!);
+      setPlaylistAsQueue(allTracks, 0);
     }
   };
 
   const handleShufflePlay = () => {
     if (tracks.length > 0) {
-      const randomIndex = Math.floor(Math.random() * tracks.length);
-      const track = tracks[randomIndex]?.track;
-      if (track) setTrack(track);
+      const allTracks = tracks.filter(pt => pt.track).map(pt => pt.track!);
+      const randomIndex = Math.floor(Math.random() * allTracks.length);
+      setPlaylistAsQueue(allTracks, randomIndex);
     }
   };
 
@@ -218,12 +219,24 @@ const PlaylistDetail = () => {
             <div
               key={pt.track_id}
               className="group grid cursor-pointer items-center gap-4 rounded-md px-4 py-2 transition-colors hover:bg-gray-800 md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]"
-              onDoubleClick={() => pt.track && setTrack(pt.track)}
+              onDoubleClick={() => {
+                if (pt.track) {
+                  const allTracks = tracks.filter(p => p.track).map(p => p.track!);
+                  const trackIndex = allTracks.findIndex(t => t.id === pt.track!.id);
+                  setPlaylistAsQueue(allTracks, trackIndex >= 0 ? trackIndex : 0);
+                }
+              }}
             >
               <div className="flex items-center justify-end">
                 <span className="text-sm text-gray-400 group-hover:hidden">{index + 1}</span>
                 <button
-                  onClick={() => pt.track && setTrack(pt.track)}
+                  onClick={() => {
+                    if (pt.track) {
+                      const allTracks = tracks.filter(p => p.track).map(p => p.track!);
+                      const trackIndex = allTracks.findIndex(t => t.id === pt.track!.id);
+                      setPlaylistAsQueue(allTracks, trackIndex >= 0 ? trackIndex : 0);
+                    }
+                  }}
                   className="hidden text-white group-hover:block"
                 >
                   <Play size={14} fill="currentColor" />
@@ -237,7 +250,7 @@ const PlaylistDetail = () => {
                 />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-white">{pt.track.title}</p>
-                  <p className="truncate text-xs text-gray-400">{pt.track.artist?.name || 'Unknown Artist'}</p>
+                  <Link to={`/artist/${pt.track.artist_id}`} className="truncate text-xs text-gray-400 hover:underline">{pt.track.artist?.name || 'Unknown Artist'}</Link>
                 </div>
               </div>
               <span className="hidden truncate text-sm text-gray-400 md:block">{pt.track.album?.title || 'Unknown Album'}</span>

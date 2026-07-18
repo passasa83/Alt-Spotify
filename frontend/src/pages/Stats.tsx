@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getUserStats } from '@/api/users';
 import { useTranslation } from '@/hooks/useTranslation';
 import { usePlayerStore } from '@/stores/playerStore';
@@ -92,7 +93,7 @@ const Stats = () => {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-white cursor-pointer hover:underline" onClick={() => setTrack(track as Track)}>{track.title}</p>
                   <p className="truncate text-xs text-gray-400">
-                    {track.artist?.name || t('player.unknown_artist')}
+                    <Link to={`/artist/${(track as Track).artist_id}`} className="hover:underline">{track.artist?.name || t('player.unknown_artist')}</Link>
                   </p>
                 </div>
                 <div className="opacity-0 group-hover:opacity-100">
@@ -119,7 +120,7 @@ const Stats = () => {
                     <span className="text-sm text-white">{artist.name.charAt(0)}</span>
                   )}
                 </div>
-                <p className="text-sm font-medium text-white">{artist.name}</p>
+                <Link to={`/artist/${artist.id}`} className="text-sm font-medium text-white hover:underline">{artist.name}</Link>
               </div>
             ))}
           </div>
@@ -173,7 +174,7 @@ const Stats = () => {
         <div className="flex justify-center gap-8">
           <div>
             <p className="text-3xl font-bold text-green-400">
-              {stats.top_artists[0]?.name || 'N/A'}
+              {stats.top_artists[0] ? <Link to={`/artist/${stats.top_artists[0].id}`} className="text-3xl font-bold text-green-400 hover:underline">{stats.top_artists[0].name}</Link> : 'N/A'}
             </p>
             <p className="text-sm text-gray-400">{t('stats.top_artist')}</p>
           </div>
