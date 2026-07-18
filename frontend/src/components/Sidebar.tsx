@@ -23,7 +23,7 @@ const Sidebar = () => {
 
   return (
     <>
-    <aside className="hidden w-64 flex-shrink-0 flex-col bg-black p-2 md:flex lg:w-72" role="navigation" aria-label={t('nav.library')}>
+    <aside className="hidden w-64 flex-shrink-0 flex-col overflow-y-auto bg-black p-2 md:flex lg:w-72" role="navigation" aria-label={t('nav.library')}>
       <div className="mb-2 rounded-lg bg-gray-900 p-4">
         <NavLink to="/" className="mb-4 flex items-center gap-2 text-white" aria-label="Alt Spotify Home">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500">

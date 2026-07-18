@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getAdminDashboard, getPlaysPerDay, getActiveUsers, getTopContent } from '@/api/admin';
 import type { AdminDashboardData, PlaysPerDay, ActiveUsersPerDay, TopContent } from '@/api/admin';
 import { Activity, Users, Music, HardDrive, Radio, BarChart3, RefreshCw } from 'lucide-react';
@@ -158,7 +159,7 @@ const AdminDashboard = () => {
                 {topContent.top_artists.slice(0, 5).map((artist, i) => (
                   <div key={i} className="flex items-center gap-3 text-sm">
                     <span className="w-5 text-gray-500">{i + 1}</span>
-                    <p className="min-w-0 flex-1 truncate text-white">{artist.name}</p>
+                    <Link to={`/artist/${artist.id}`} className="min-w-0 flex-1 truncate text-white hover:underline">{artist.name}</Link>
                     <span className="text-gray-500">{artist.play_count}</span>
                   </div>
                 ))}

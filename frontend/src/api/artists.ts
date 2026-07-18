@@ -6,12 +6,12 @@ export const getArtists = async (page = 1, perPage = 20): Promise<PaginatedRespo
   return response.data;
 };
 
-export const getArtist = async (id: number): Promise<Artist> => {
+export const getArtist = async (id: string): Promise<Artist> => {
   const response = await client.get(`/artists/${id}`);
   return response.data;
 };
 
-export const getArtistAlbums = async (id: number, page = 1, perPage = 20): Promise<PaginatedResponse<Album>> => {
+export const getArtistAlbums = async (id: string, page = 1, perPage = 20): Promise<PaginatedResponse<Album>> => {
   const response = await client.get(`/artists/${id}/albums`, { params: { page, per_page: perPage } });
   return response.data;
 };

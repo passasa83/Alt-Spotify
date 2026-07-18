@@ -46,6 +46,7 @@ interface PlayerState {
   addToQueue: (track: Track) => void;
   removeFromQueue: (trackId: number) => void;
   clearQueue: () => void;
+  setPlaylistAsQueue: (tracks: Track[], startIndex?: number) => void;
   toggleShuffle: () => void;
   toggleRepeat: () => void;
   setLyrics: (lyrics: LyricsLine[]) => void;
@@ -182,6 +183,22 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   clearQueue: () => set({ queue: [] }),
+
+  setPlaylistAsQueue: (tracks, startIndex = 0) => {
+    if (tracks.length === 0) return;
+    const { currentTrack, history } = get();
+    if (currentTrack) {
+      set({ history: [currentTrack, ...history].slice(0, 50) });
+    }
+    const trackToPlay = tracks[startIndex];
+    const queueTracks = tracks.filter((_, index) => index !== startIndex);
+    set({
+      currentTrack: trackToPlay,
+      queue: queueTracks,
+      isPlaying: true,
+      progress: 0,
+    });
+  },
 
   toggleShuffle: () => {
     const { shuffle } = get();

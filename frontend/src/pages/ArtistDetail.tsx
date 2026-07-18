@@ -21,8 +21,8 @@ const ArtistDetail = () => {
       if (!id) return;
       try {
         const [artistData, albumsData] = await Promise.all([
-          getArtist(parseInt(id)),
-          getArtistAlbums(parseInt(id)),
+          getArtist(id),
+          getArtistAlbums(id),
         ]);
         setArtist(artistData);
         setAlbums(albumsData.items);
