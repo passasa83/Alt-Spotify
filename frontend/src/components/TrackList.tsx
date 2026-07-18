@@ -123,7 +123,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
                     {track.title}
                   </Link>
                   <Link
-                    to={`/artist/${track.artist_id}`}
+                    to={`/artist/${track.artist?.id || track.artist_id}`}
                     className="block truncate text-xs text-gray-400 hover:underline"
                   >
                     {track.artist?.name || t('player.unknown_artist')}

@@ -26,7 +26,7 @@ const PlaylistDetail = () => {
   const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const { setTrack, setPlaylistAsQueue } = usePlayerStore();
-  const { loadPlaylists } = useLibraryStore();
+  const { loadPlaylists, removeFromFavorites } = useLibraryStore();
   const addToast = useToastStore((s) => s.addToast);
   const { user } = useAuthStore();
   const isOwner = playlist?.owner_id === user?.id;
@@ -70,8 +70,7 @@ const PlaylistDetail = () => {
     if (!id) return;
     try {
       if (isLikedSongs) {
-        const { removeFavorite } = await import('@/api/favorites');
-        await removeFavorite('track', trackId);
+        await removeFromFavorites(trackId);
       } else {
         await removeTrackFromPlaylist(id, trackId);
       }
@@ -250,7 +249,7 @@ const PlaylistDetail = () => {
                 />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-white">{pt.track.title}</p>
-                  <Link to={`/artist/${pt.track.artist_id}`} className="truncate text-xs text-gray-400 hover:underline">{pt.track.artist?.name || 'Unknown Artist'}</Link>
+                  <Link to={`/artist/${pt.track.artist?.id || pt.track.artist_id}`} className="truncate text-xs text-gray-400 hover:underline">{pt.track.artist?.name || 'Unknown Artist'}</Link>
                 </div>
               </div>
               <span className="hidden truncate text-sm text-gray-400 md:block">{pt.track.album?.title || 'Unknown Album'}</span>

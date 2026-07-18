@@ -64,7 +64,11 @@ const Library = () => {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {playlists.map((playlist) => (
+          {[...playlists].sort((a, b) => {
+            if (a.title === 'Liked Songs') return -1;
+            if (b.title === 'Liked Songs') return 1;
+            return 0;
+          }).map((playlist) => (
             <PlaylistCard key={playlist.id} playlist={playlist} />
           ))}
         </div>

@@ -38,8 +38,12 @@ async def list_artists(
 
 
 @router.get("/{artist_id}", response_model=ArtistResponse)
-async def get_artist(artist_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Artist).where(Artist.id == artist_id))
+async def get_artist(artist_id: str, db: AsyncSession = Depends(get_db)):
+    try:
+        artist_uuid = uuid.UUID(artist_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artist not found")
+    result = await db.execute(select(Artist).where(Artist.id == artist_uuid))
     artist = result.scalar_one_or_none()
     if not artist:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artist not found")

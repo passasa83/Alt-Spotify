@@ -71,7 +71,7 @@ const AlbumDetail = () => {
           <p className="text-sm font-medium uppercase text-white">{t('album.album')}</p>
           <h1 className="mt-2 text-4xl font-bold text-white md:text-6xl">{album.title}</h1>
           <div className="mt-2 flex items-center gap-1 text-sm text-gray-400">
-            <Link to={`/artist/${album.artist_id}`} className="font-medium text-white hover:underline">
+            <Link to={`/artist/${album.artist?.id || album.artist_id}`} className="font-medium text-white hover:underline">
               {album.artist?.name || t('player.unknown_artist')}
             </Link>
             <span>•</span>

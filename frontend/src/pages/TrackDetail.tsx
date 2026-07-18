@@ -87,7 +87,7 @@ const TrackDetail = () => {
           <p className="text-sm font-medium uppercase text-white">Song</p>
           <h1 className="mt-2 text-4xl font-bold text-white md:text-6xl">{track.title}</h1>
           <div className="mt-2 flex items-center gap-1 text-sm text-gray-400">
-            <Link to={`/artist/${track.artist_id}`} className="font-medium text-white hover:underline">
+            <Link to={`/artist/${track.artist?.id || track.artist_id}`} className="font-medium text-white hover:underline">
               {track.artist?.name || t('player.unknown_artist')}
             </Link>
             {track.album_id && (
@@ -157,7 +157,7 @@ const TrackDetail = () => {
 
       <div className="mt-8 rounded-lg bg-gray-900 p-6">
         <h2 className="mb-4 text-xl font-bold text-white">About the artist</h2>
-        <Link to={`/artist/${track.artist_id}`} className="text-green-500 hover:underline">
+        <Link to={`/artist/${track.artist?.id || track.artist_id}`} className="text-green-500 hover:underline">
           {track.artist?.name || t('player.unknown_artist')}
         </Link>
       </div>

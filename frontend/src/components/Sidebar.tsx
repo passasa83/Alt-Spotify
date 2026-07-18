@@ -7,14 +7,15 @@ import { useTranslation } from '@/hooks/useTranslation';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 
 const Sidebar = () => {
-  const { playlists, loadPlaylists } = useLibraryStore();
+  const { playlists, loadPlaylists, loadFavorites } = useLibraryStore();
   const { user } = useAuthStore();
   const { t } = useTranslation();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     loadPlaylists();
-  }, [loadPlaylists]);
+    loadFavorites();
+  }, [loadPlaylists, loadFavorites]);
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-4 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
@@ -106,7 +107,11 @@ const Sidebar = () => {
         </div>
 
         <div className="space-y-1" role="list" aria-label="Your playlists">
-          {playlists.map((playlist) => (
+          {[...playlists].sort((a, b) => {
+            if (a.title === 'Liked Songs') return -1;
+            if (b.title === 'Liked Songs') return 1;
+            return 0;
+          }).map((playlist) => (
             <NavLink
               key={playlist.id}
               to={`/playlist/${playlist.id}`}

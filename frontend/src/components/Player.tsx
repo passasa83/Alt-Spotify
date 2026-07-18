@@ -281,7 +281,7 @@ const Player = () => {
             {currentTrack.title}
           </Link>
           <Link
-            to={`/artist/${currentTrack.artist_id}`}
+            to={`/artist/${currentTrack.artist?.id || currentTrack.artist_id}`}
             className="block truncate text-xs text-gray-400 hover:underline"
           >
             {currentTrack.artist?.name || t('player.unknown_artist')}

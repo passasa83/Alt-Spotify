@@ -76,7 +76,7 @@ const TrackCard = ({ track }: TrackCardProps) => {
               className="h-4 w-4 rounded-full object-cover"
             />
           )}
-          <Link to={`/artist/${track.artist_id}`} className="block truncate text-xs text-gray-400 hover:underline">
+          <Link to={`/artist/${track.artist?.id || track.artist_id}`} className="block truncate text-xs text-gray-400 hover:underline">
             {track.artist?.name || t('player.unknown_artist')}
           </Link>
         </div>

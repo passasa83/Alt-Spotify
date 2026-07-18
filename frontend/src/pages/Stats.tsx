@@ -93,7 +93,7 @@ const Stats = () => {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-white cursor-pointer hover:underline" onClick={() => setTrack(track as Track)}>{track.title}</p>
                   <p className="truncate text-xs text-gray-400">
-                    <Link to={`/artist/${(track as Track).artist_id}`} className="hover:underline">{track.artist?.name || t('player.unknown_artist')}</Link>
+                    <Link to={`/artist/${(track as Track).artist?.id || (track as Track).artist_id}`} className="hover:underline">{track.artist?.name || t('player.unknown_artist')}</Link>
                   </p>
                 </div>
                 <div className="opacity-0 group-hover:opacity-100">
