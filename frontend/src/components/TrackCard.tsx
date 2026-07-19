@@ -11,6 +11,8 @@ import type { Track } from '@/types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
 
+const downloadedTrackUrls = new Map<string, string>();
+
 interface TrackCardProps {
   track: Track;
   onDownloaded?: (trackId: string, fileUrl: string) => void;
@@ -26,9 +28,11 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
   const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [fileUrl, setFileUrl] = useState<string | null>(track.file_url || null);
 
-  const hasAudio = !!(fileUrl || track.hls_path);
+  const [, forceRender] = useState(0);
+  const hasDownloaded = downloadedTrackUrls.has(String(track.id));
+  const downloadedUrl = downloadedTrackUrls.get(String(track.id));
+  const hasAudio = !!(track.file_url || track.hls_path || hasDownloaded);
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -36,7 +40,8 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
     setDownloading(true);
     try {
       const result = await fetchFromYoutube(track.id);
-      setFileUrl(result.file_url);
+      downloadedTrackUrls.set(String(track.id), result.file_url);
+      forceRender((n) => n + 1);
       addToast(`Téléchargé: ${result.youtube_title || track.title}`);
       onDownloaded?.(track.id, result.file_url);
     } catch (err: any) {
@@ -47,7 +52,7 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
   };
 
   const handlePlay = () => {
-    setTrack({ ...track, file_url: fileUrl || track.file_url } as Track);
+    setTrack({ ...track, file_url: downloadedUrl || track.file_url } as Track);
   };
 
   return (
@@ -66,10 +71,10 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
               hasAudio
                 ? 'bg-green-500 text-black'
                 : 'bg-blue-500 text-white'
-            } ${hasAudio && isCurrentTrack && isPlaying
-              ? 'opacity-100 translate-y-0'
+            } ${hasAudio
+              ? 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
               : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
-            } ${downloading ? 'opacity-100 translate-y-0' : ''}`}
+            } ${downloading ? '!opacity-100 !translate-y-0' : ''} ${hasAudio && isCurrentTrack && isPlaying ? '!opacity-100 !translate-y-0' : ''}`}
             title={hasAudio ? 'Écouter' : 'Télécharger depuis YouTube'}
           >
             {downloading ? (
