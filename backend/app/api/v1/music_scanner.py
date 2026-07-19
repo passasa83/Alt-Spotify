@@ -281,24 +281,27 @@ async def fix_covers(
     from app.services.cover_service import fetch_cover
     from app.models.artist import Artist
 
-    result = await db.execute(select(Track))
+    result = await db.execute(select(Track).where((Track.cover_url.is_(None)) | (Track.cover_url.like("local_cover:%"))))
     tracks = list(result.scalars().all())
+
+    if not tracks:
+        return {"total": 0, "fixed": 0, "cleared": 0}
+
+    artist_ids = list({t.artist_id for t in tracks if t.artist_id})
+    artist_result = await db.execute(select(Artist).where(Artist.id.in_(artist_ids)))
+    artist_map = {str(a.id): a.name for a in artist_result.scalars().all()}
 
     fixed = 0
     cleared = 0
     for track in tracks:
-        if not track.cover_url or track.cover_url.startswith("local_cover:"):
-            artist_result = await db.execute(select(Artist).where(Artist.id == track.artist_id))
-            artist_obj = artist_result.scalar_one_or_none()
-            artist_name = artist_obj.name if artist_obj else ""
-
-            api_cover = await fetch_cover(track.title, artist_name)
-            if api_cover:
-                track.cover_url = api_cover
-                fixed += 1
-            else:
-                track.cover_url = None
-                cleared += 1
+        artist_name = artist_map.get(str(track.artist_id), "")
+        api_cover = await fetch_cover(track.title, artist_name)
+        if api_cover:
+            track.cover_url = api_cover
+            fixed += 1
+        else:
+            track.cover_url = None
+            cleared += 1
 
     await db.commit()
     return {"total": len(tracks), "fixed": fixed, "cleared": cleared}

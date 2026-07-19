@@ -64,12 +64,13 @@ async def lifespan(app: FastAPI):
             result = await db.execute(select(Track).where((Track.cover_url.is_(None)) | (Track.cover_url.like("local_cover:%"))))
             tracks = list(result.scalars().all())
             if tracks:
+                artist_ids = list({t.artist_id for t in tracks if t.artist_id})
+                artist_result = await db.execute(select(Artist).where(Artist.id.in_(artist_ids)))
+                artist_map = {str(a.id): a.name for a in artist_result.scalars().all()}
                 logger.info("auto_fix_covers_start", count=len(tracks))
                 fixed = 0
                 for track in tracks:
-                    artist_result = await db.execute(select(Artist).where(Artist.id == track.artist_id))
-                    artist_obj = artist_result.scalar_one_or_none()
-                    artist_name = artist_obj.name if artist_obj else ""
+                    artist_name = artist_map.get(str(track.artist_id), "")
                     api_cover = await fetch_cover(track.title, artist_name)
                     if api_cover:
                         track.cover_url = api_cover
