@@ -121,13 +121,6 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
         try:
             filename = os.path.basename(file_path)
 
-            existing = await db.execute(
-                select(Track).where(Track.file_url == f"local:{file_path}")
-            )
-            if existing.scalar_one_or_none():
-                skipped += 1
-                continue
-
             metadata = extract_metadata(file_path)
             duration = int(metadata.get("duration", 0)) if metadata.get("duration") else 0
 
@@ -144,6 +137,16 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
                 title = Path(filename).stem
 
             artist = await find_or_create_artist(db, (artist_name or "Unknown Artist").strip())
+
+            existing = await db.execute(
+                select(Track).where(
+                    Track.title.ilike(title.strip()),
+                    Track.artist_id == artist.id,
+                ).limit(1)
+            )
+            if existing.scalar_one_or_none():
+                skipped += 1
+                continue
 
             album = None
             if album_name:
