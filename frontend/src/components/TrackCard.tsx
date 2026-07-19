@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Play, Heart, Download, Loader2 } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
-import { fetchFromYoutube } from '@/api/tracks';
+import { fetchFromYoutube, resolveCoverUrl } from '@/api/tracks';
 import { useToastStore } from '@/stores/toastStore';
 import TrackContextMenu from '@/components/TrackContextMenu';
 import AddToPlaylistModal from '@/components/AddToPlaylistModal';
@@ -10,7 +10,6 @@ import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import type { Track } from '@/types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
-import { resolveCoverUrl } from '@/api/tracks';
 
 interface TrackCardProps {
   track: Track;
@@ -27,9 +26,9 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
   const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [localFileUrl, setLocalFileUrl] = useState(track.file_url || null);
+  const [fileUrl, setFileUrl] = useState<string | null>(track.file_url || null);
 
-  const hasAudio = !!(localFileUrl || track.hls_path);
+  const hasAudio = !!(fileUrl || track.hls_path);
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -37,15 +36,18 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
     setDownloading(true);
     try {
       const result = await fetchFromYoutube(track.id);
+      setFileUrl(result.file_url);
       addToast(`Téléchargé: ${result.youtube_title || track.title}`);
-      setLocalFileUrl(result.file_url);
       onDownloaded?.(track.id, result.file_url);
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || 'Échec du téléchargement';
-      addToast(msg);
+      addToast(err?.response?.data?.detail || 'Échec du téléchargement');
     } finally {
       setDownloading(false);
     }
+  };
+
+  const handlePlay = () => {
+    setTrack({ ...track, file_url: fileUrl || track.file_url } as Track);
   };
 
   return (
@@ -57,27 +59,27 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
             alt={track.title}
             className={`h-40 w-full rounded-md object-cover shadow-lg ${!hasAudio ? 'opacity-50' : ''}`}
           />
-          {hasAudio ? (
-            <button
-              onClick={() => setTrack({ ...track, file_url: localFileUrl || track.file_url } as Track)}
-              className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-black shadow-xl transition-all ${
-                isCurrentTrack && isPlaying
-                  ? 'opacity-100 translate-y-0'
-                  : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
-              }`}
-            >
+          <button
+            onClick={hasAudio ? handlePlay : handleDownload}
+            disabled={downloading}
+            className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full shadow-xl transition-all ${
+              hasAudio
+                ? 'bg-green-500 text-black'
+                : 'bg-blue-500 text-white'
+            } ${hasAudio && isCurrentTrack && isPlaying
+              ? 'opacity-100 translate-y-0'
+              : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
+            } ${downloading ? 'opacity-100 translate-y-0' : ''}`}
+            title={hasAudio ? 'Écouter' : 'Télécharger depuis YouTube'}
+          >
+            {downloading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : hasAudio ? (
               <Play size={18} fill="currentColor" />
-            </button>
-          ) : (
-            <button
-              onClick={handleDownload}
-              disabled={downloading}
-              className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white shadow-xl transition-all opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 disabled:opacity-50"
-              title="Télécharger depuis YouTube"
-            >
-              {downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            </button>
-          )}
+            ) : (
+              <Download size={18} />
+            )}
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
