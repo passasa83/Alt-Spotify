@@ -27,8 +27,9 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
   const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [localFileUrl, setLocalFileUrl] = useState(track.file_url || null);
 
-  const hasAudio = !!(track.file_url || track.hls_path);
+  const hasAudio = !!(localFileUrl || track.hls_path);
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -37,6 +38,7 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
     try {
       const result = await fetchFromYoutube(track.id);
       addToast(`Téléchargé: ${result.youtube_title || track.title}`);
+      setLocalFileUrl(result.file_url);
       onDownloaded?.(track.id, result.file_url);
     } catch (err: any) {
       const msg = err?.response?.data?.detail || 'Échec du téléchargement';
@@ -57,7 +59,7 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
           />
           {hasAudio ? (
             <button
-              onClick={() => setTrack(track)}
+              onClick={() => setTrack({ ...track, file_url: localFileUrl || track.file_url } as Track)}
               className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-black shadow-xl transition-all ${
                 isCurrentTrack && isPlaying
                   ? 'opacity-100 translate-y-0'

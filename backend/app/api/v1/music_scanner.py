@@ -73,7 +73,7 @@ def find_lrc_for_audio(audio_path: str) -> str | None:
 
 def find_cover_in_dir(directory: str) -> str | None:
     """Find cover image in a directory."""
-    dir_path = Path(directory)
+    dir_path = Path(directory).resolve()
     for name in COVER_NAMES:
         candidate = dir_path / name
         if candidate.is_file():
@@ -149,7 +149,7 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
             if album_name:
                 album = await find_or_create_album(db, album_name.strip(), artist.id)
 
-            track_dir = str(Path(file_path).parent)
+            track_dir = str(Path(file_path).resolve().parent)
             cover_path = find_cover_in_dir(track_dir)
 
             lrc_content = find_lrc_for_audio(file_path)
