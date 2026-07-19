@@ -90,9 +90,10 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: ${LOG_FORMAT:-json}
       MUSIC_SCAN_DIR: /music
-      MUSIC_DOWNLOAD_DIR: /music/downloads
+      MUSIC_DOWNLOAD_DIR: /app/downloads
     volumes:
-      - ${MUSIC_SCAN_DIR:-./music}:/music
+      - ${MUSIC_SCAN_DIR:-./music}:/music:ro
+      - ${MUSIC_DOWNLOAD_DIR:-./data/downloads}:/app/downloads
     depends_on:
       postgres:
         condition: service_healthy

@@ -9,7 +9,7 @@ import structlog
 
 logger = structlog.get_logger("app")
 
-DOWNLOAD_DIR = os.environ.get("MUSIC_DOWNLOAD_DIR", "/music/downloads")
+DOWNLOAD_DIR = os.environ.get("MUSIC_DOWNLOAD_DIR", "/app/downloads")
 
 _executor = ThreadPoolExecutor(max_workers=2)
 

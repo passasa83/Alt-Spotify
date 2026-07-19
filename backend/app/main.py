@@ -44,14 +44,16 @@ async def lifespan(app: FastAPI):
     import os
     from app.core.database import async_session
     music_dir = os.environ.get("MUSIC_SCAN_DIR", "")
-    if music_dir and os.path.isdir(music_dir):
+    download_dir = os.environ.get("MUSIC_DOWNLOAD_DIR", "")
+    scan_dirs = [d for d in [music_dir, download_dir] if d and os.path.isdir(d)]
+    for scan_dir in scan_dirs:
         try:
             from app.api.v1.music_scanner import scan_directory_internal
             async with async_session() as db:
-                result = await scan_directory_internal(music_dir, db)
-                logger.info("auto_scan_complete", **result)
+                result = await scan_directory_internal(scan_dir, db)
+                logger.info("auto_scan_complete", directory=scan_dir, **result)
         except Exception as e:
-            logger.warning("auto_scan_failed", error=str(e))
+            logger.warning("auto_scan_failed", directory=scan_dir, error=str(e))
 
     logger.info("application_started", project=settings.PROJECT_NAME)
     yield
