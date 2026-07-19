@@ -351,15 +351,21 @@ async def fetch_from_youtube(
     track.file_url = download_result["file_url"]
     if not track.duration_seconds and download_result.get("youtube_duration"):
         track.duration_seconds = download_result["youtube_duration"]
-    if not track.cover_url:
-        yt_cover = f"https://img.youtube.com/vi/{download_result.get('youtube_url', '').split('v=')[-1]}/hqdefault.jpg" if 'v=' in download_result.get('youtube_url', '') else None
-        if yt_cover:
-            track.cover_url = yt_cover
+
+    cover_path = download_result.get("cover_path")
+    if cover_path and os.path.isfile(cover_path):
+        track.cover_url = f"local_cover:{cover_path}"
+    elif not track.cover_url:
+        youtube_url_str = download_result.get('youtube_url', '')
+        if 'v=' in youtube_url_str:
+            track.cover_url = f"https://img.youtube.com/vi/{youtube_url_str.split('v=')[-1].split('&')[0]}/hqdefault.jpg"
+
     await db.commit()
 
     return {
         "track_id": str(track.id),
         "file_url": track.file_url,
+        "cover_url": track.cover_url,
         "youtube_url": download_result.get("youtube_url"),
         "youtube_title": download_result.get("youtube_title"),
         "message": "Downloaded and linked successfully",

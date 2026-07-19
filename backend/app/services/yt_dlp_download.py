@@ -85,6 +85,27 @@ def _download_audio(url: str, output_path: str) -> bool:
         return False
 
 
+def _download_thumbnail(url: str, output_dir: str) -> str | None:
+    """Download YouTube video thumbnail as cover.jpg next to the audio file."""
+    try:
+        import urllib.request
+        video_id = None
+        if 'v=' in url:
+            video_id = url.split('v=')[-1].split('&')[0]
+        elif 'youtu.be/' in url:
+            video_id = url.split('youtu.be/')[-1].split('?')[0]
+        if not video_id:
+            return None
+        thumb_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+        cover_path = os.path.join(output_dir, "cover.jpg")
+        urllib.request.urlretrieve(thumb_url, cover_path)
+        if os.path.isfile(cover_path) and os.path.getsize(cover_path) > 100:
+            return cover_path
+    except Exception as e:
+        logger.warning("yt_dlp_thumb_error", url=url, error=str(e))
+    return None
+
+
 def _get_track_metadata(file_path: str) -> dict:
     try:
         from mutagen import File as MutagenFile
@@ -129,11 +150,13 @@ async def search_and_download(
         return {"success": False, "error": "Download failed"}
 
     metadata = _get_track_metadata(output_path)
+    cover_path = _download_thumbnail(youtube_url, os.path.dirname(output_path))
 
     return {
         "success": True,
         "file_path": output_path,
         "file_url": f"local:{output_path}",
+        "cover_path": cover_path,
         "youtube_url": youtube_url,
         "youtube_title": search_result['title'] if search_result else title,
         "youtube_duration": search_result['duration'] if search_result else 0,
@@ -158,11 +181,13 @@ async def download_from_url(youtube_url: str) -> dict:
         return {"success": False, "error": "Download failed"}
 
     metadata = _get_track_metadata(output_path)
+    cover_path = _download_thumbnail(youtube_url, os.path.dirname(output_path))
 
     return {
         "success": True,
         "file_path": output_path,
         "file_url": f"local:{output_path}",
+        "cover_path": cover_path,
         "youtube_url": youtube_url,
         "youtube_title": title,
         "youtube_duration": info.get('duration', 0) if info else 0,

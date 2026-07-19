@@ -272,12 +272,63 @@ async def scan_directory(
     return result
 
 
+@router.post("/fix-covers")
+async def fix_covers(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Fix broken cover_url paths for all local tracks."""
+    music_scan = os.environ.get("MUSIC_SCAN_DIR", "/music")
+    music_dl = os.environ.get("MUSIC_DOWNLOAD_DIR", "/app/downloads")
+
+    result = await db.execute(select(Track).where(Track.file_url.like("local:%")))
+    tracks = list(result.scalars().all())
+
+    fixed = 0
+    cleared = 0
+    for track in tracks:
+        if not track.file_url:
+            continue
+        file_path = track.file_url[len("local:"):]
+
+        track_dir = str(Path(file_path).resolve().parent)
+        cover = find_cover_in_dir(track_dir)
+        if cover:
+            new_cover = f"local_cover:{cover}"
+            if track.cover_url != new_cover:
+                track.cover_url = new_cover
+                fixed += 1
+        elif track.cover_url and track.cover_url.startswith("local_cover:"):
+            full = os.path.normpath(f"/{track.cover_url[len('local_cover:'):]}")
+            if not os.path.isfile(full):
+                track.cover_url = None
+                cleared += 1
+
+    await db.commit()
+    return {"total": len(tracks), "fixed": fixed, "cleared": cleared}
+
+
 @router.get("/local/covers/{cover_path:path}")
 async def serve_local_cover(
     cover_path: str,
     _user: User = Depends(get_current_user_from_header_or_query),
 ):
     full_path = os.path.normpath(f"/{cover_path}")
-    if not os.path.isfile(full_path):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover not found")
-    return FileResponse(full_path, media_type="image/jpeg")
+
+    if os.path.isfile(full_path):
+        return FileResponse(full_path, media_type="image/jpeg")
+
+    music_scan = os.environ.get("MUSIC_SCAN_DIR", "/music")
+    music_dl = os.environ.get("MUSIC_DOWNLOAD_DIR", "/app/downloads")
+
+    basename = os.path.basename(full_path)
+    dirpart = os.path.dirname(full_path)
+
+    for base in [music_scan, music_dl, "/music"]:
+        for suffix in ["", "/Jellyfin/Musique"]:
+            candidate = os.path.join(base + suffix, dirpart.lstrip("/"), basename)
+            candidate = os.path.normpath(candidate)
+            if os.path.isfile(candidate):
+                return FileResponse(candidate, media_type="image/jpeg")
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover not found")
