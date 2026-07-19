@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Play, Heart } from 'lucide-react';
+import { Play, Heart, Download, Loader2 } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
+import { fetchFromYoutube } from '@/api/tracks';
+import { useToastStore } from '@/stores/toastStore';
 import TrackContextMenu from '@/components/TrackContextMenu';
 import AddToPlaylistModal from '@/components/AddToPlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
@@ -12,18 +14,37 @@ import { resolveCoverUrl } from '@/api/tracks';
 
 interface TrackCardProps {
   track: Track;
+  onDownloaded?: (trackId: string, fileUrl: string) => void;
 }
 
-const TrackCard = ({ track }: TrackCardProps) => {
+const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
   const { t } = useTranslation();
   const { setTrack, currentTrack, isPlaying } = usePlayerStore();
   const { addToFavorites, removeFromFavorites, isFavorite } = useLibraryStore();
+  const { addToast } = useToastStore();
   const isCurrentTrack = currentTrack?.id === track.id;
   const liked = isFavorite(String(track.id));
   const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const hasAudio = !!(track.file_url || track.hls_path);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setDownloading(true);
+    try {
+      const result = await fetchFromYoutube(track.id);
+      addToast(`Téléchargé: ${result.youtube_title || track.title}`);
+      onDownloaded?.(track.id, result.file_url);
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || 'Échec du téléchargement';
+      addToast(msg);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <>
@@ -46,9 +67,14 @@ const TrackCard = ({ track }: TrackCardProps) => {
               <Play size={18} fill="currentColor" />
             </button>
           ) : (
-            <div className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 text-gray-400 shadow-xl">
-              <Play size={18} />
-            </div>
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white shadow-xl transition-all opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 disabled:opacity-50"
+              title="Télécharger depuis YouTube"
+            >
+              {downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            </button>
           )}
           <button
             onClick={(e) => {

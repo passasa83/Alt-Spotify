@@ -310,3 +310,101 @@ async def download_track(
     device_id = body.get("device_id", "default")
     download_url = generate_download_url(track_id, str(current_user.id), device_id)
     return {"download_url": download_url}
+
+
+@router.post("/{track_id}/fetch-youtube")
+async def fetch_from_youtube(
+    track_id: uuid.UUID,
+    body: dict | None = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Track)
+        .options(selectinload(Track.artist))
+        .where(Track.id == track_id)
+    )
+    track = result.scalar_one_or_none()
+    if not track:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+
+    if track.file_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Track already has audio")
+
+    from app.services.yt_dlp_download import search_and_download
+    artist_name = track.artist.name if track.artist else ""
+    youtube_url = (body or {}).get("youtube_url")
+
+    download_result = await search_and_download(
+        title=track.title,
+        artist=artist_name,
+        track_id=str(track_id),
+        youtube_url=youtube_url,
+    )
+
+    if not download_result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=download_result.get("error", "Download failed"),
+        )
+
+    track.file_url = download_result["file_url"]
+    if not track.duration_seconds and download_result.get("youtube_duration"):
+        track.duration_seconds = download_result["youtube_duration"]
+    if not track.cover_url:
+        yt_cover = f"https://img.youtube.com/vi/{download_result.get('youtube_url', '').split('v=')[-1]}/hqdefault.jpg" if 'v=' in download_result.get('youtube_url', '') else None
+        if yt_cover:
+            track.cover_url = yt_cover
+    await db.commit()
+
+    return {
+        "track_id": str(track.id),
+        "file_url": track.file_url,
+        "youtube_url": download_result.get("youtube_url"),
+        "youtube_title": download_result.get("youtube_title"),
+        "message": "Downloaded and linked successfully",
+    }
+
+
+@router.post("/fetch-url")
+async def fetch_from_youtube_url(
+    youtube_url: str,
+    title: str = "",
+    artist: str = "",
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.yt_dlp_download import download_from_url
+
+    download_result = await download_from_url(youtube_url)
+
+    if not download_result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=download_result.get("error", "Download failed"),
+        )
+
+    artist_name = artist or download_result.get("metadata", {}).get("artist", "")
+    track_title = title or download_result.get("metadata", {}).get("title", "") or download_result.get("youtube_title", "Unknown")
+
+    from app.utils.artist import ensure_artist
+    artist_id = await ensure_artist(db, artist_name or "Unknown", None)
+
+    track = Track(
+        title=track_title,
+        artist_id=artist_id,
+        file_url=download_result["file_url"],
+        duration_seconds=download_result.get("youtube_duration") or download_result.get("metadata", {}).get("duration", 0),
+    )
+    db.add(track)
+    await db.flush()
+    await db.refresh(track)
+
+    return {
+        "track_id": str(track.id),
+        "title": track.title,
+        "artist": artist_name,
+        "file_url": track.file_url,
+        "youtube_url": youtube_url,
+        "message": "Downloaded and imported successfully",
+    }

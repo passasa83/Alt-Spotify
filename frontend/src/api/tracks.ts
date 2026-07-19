@@ -80,3 +80,16 @@ export const uploadLyrics = async (trackId: string, file: File): Promise<{ messa
   });
   return response.data;
 };
+
+export const fetchFromYoutube = async (trackId: string, youtubeUrl?: string): Promise<any> => {
+  const response = await client.post(`/tracks/${trackId}/fetch-youtube`, youtubeUrl ? { youtube_url: youtubeUrl } : {});
+  return response.data;
+};
+
+export const fetchFromYoutubeUrl = async (youtubeUrl: string, title?: string, artist?: string): Promise<any> => {
+  const params = new URLSearchParams({ youtube_url: youtubeUrl });
+  if (title) params.append('title', title);
+  if (artist) params.append('artist', artist);
+  const response = await client.post(`/tracks/fetch-url?${params.toString()}`);
+  return response.data;
+};
