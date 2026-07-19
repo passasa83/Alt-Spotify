@@ -149,10 +149,10 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
             if album_name:
                 album = await find_or_create_album(db, album_name.strip(), artist.id)
 
-            track_dir = str(Path(file_path).resolve().parent)
-            cover_path = find_cover_in_dir(track_dir)
-
             lrc_content = find_lrc_for_audio(file_path)
+
+            from app.services.cover_service import fetch_cover
+            api_cover = await fetch_cover(title.strip(), (artist_name or "").strip())
 
             track = Track(
                 id=uuid.uuid4(),
@@ -161,7 +161,7 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
                 album_id=album.id if album else None,
                 duration_seconds=duration,
                 file_url=f"local:{file_path}",
-                cover_url=f"local_cover:{cover_path}" if cover_path else None,
+                cover_url=api_cover,
                 genre=metadata.get("genre"),
                 track_gain=metadata.get("replay_gain"),
                 track_peak=metadata.get("track_peak"),
@@ -277,44 +277,26 @@ async def fix_covers(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    """Fix broken cover_url paths for all local tracks."""
-    result = await db.execute(select(Track).where(Track.file_url.like("local:%")))
+    """Replace all local_cover: URLs with API-fetched cover art."""
+    from app.services.cover_service import fetch_cover
+    from app.models.artist import Artist
+
+    result = await db.execute(select(Track))
     tracks = list(result.scalars().all())
 
     fixed = 0
     cleared = 0
     for track in tracks:
-        if not track.file_url:
-            continue
-        file_path = track.file_url[len("local:"):]
+        if not track.cover_url or track.cover_url.startswith("local_cover:"):
+            artist_result = await db.execute(select(Artist).where(Artist.id == track.artist_id))
+            artist_obj = artist_result.scalar_one_or_none()
+            artist_name = artist_obj.name if artist_obj else ""
 
-        track_dir = str(Path(file_path).resolve().parent)
-        cover = find_cover_in_dir(track_dir)
-
-        if not cover and file_path.startswith("/app/downloads/"):
-            alt_dir = "/music/" + file_path[len("/app/downloads/"):]
-            alt_dir = str(Path(alt_dir).resolve().parent)
-            cover = find_cover_in_dir(alt_dir)
-
-        if not cover and file_path.startswith("/music/"):
-            alt_dir = "/app/downloads/" + file_path[len("/music/"):]
-            alt_dir = str(Path(alt_dir).resolve().parent)
-            cover = find_cover_in_dir(alt_dir)
-
-        if cover:
-            new_cover = f"local_cover:{cover}"
-            if track.cover_url != new_cover:
-                track.cover_url = new_cover
+            api_cover = await fetch_cover(track.title, artist_name)
+            if api_cover:
+                track.cover_url = api_cover
                 fixed += 1
-        elif track.cover_url and track.cover_url.startswith("local_cover:"):
-            stored = track.cover_url[len("local_cover:"):]
-            found = False
-            for prefix in ["/", "/music", "/app/downloads"]:
-                test = os.path.normpath(f"{prefix}/{stored}" if not stored.startswith("/") else f"{prefix}{stored}")
-                if os.path.isfile(test):
-                    found = True
-                    break
-            if not found:
+            else:
                 track.cover_url = None
                 cleared += 1
 

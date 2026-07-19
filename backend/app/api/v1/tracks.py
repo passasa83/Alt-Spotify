@@ -352,13 +352,11 @@ async def fetch_from_youtube(
     if not track.duration_seconds and download_result.get("youtube_duration"):
         track.duration_seconds = download_result["youtube_duration"]
 
-    cover_path = download_result.get("cover_path")
-    if cover_path and os.path.isfile(cover_path):
-        track.cover_url = f"local_cover:{cover_path}"
-    elif not track.cover_url:
-        youtube_url_str = download_result.get('youtube_url', '')
-        if 'v=' in youtube_url_str:
-            track.cover_url = f"https://img.youtube.com/vi/{youtube_url_str.split('v=')[-1].split('&')[0]}/hqdefault.jpg"
+    if not track.cover_url:
+        from app.services.cover_service import fetch_cover
+        api_cover = await fetch_cover(track.title, artist_name)
+        if api_cover:
+            track.cover_url = api_cover
 
     await db.commit()
 
