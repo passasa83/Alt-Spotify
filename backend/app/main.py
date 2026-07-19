@@ -51,9 +51,9 @@ async def lifespan(app: FastAPI):
             from app.api.v1.music_scanner import scan_directory_internal
             async with async_session() as db:
                 result = await scan_directory_internal(scan_dir, db)
-                logger.info("auto_scan_complete", directory=scan_dir, **result)
+                logger.info("auto_scan_complete", scan_dir=scan_dir, **result)
         except Exception as e:
-            logger.warning("auto_scan_failed", directory=scan_dir, error=str(e))
+            logger.warning("auto_scan_failed", scan_dir=scan_dir, error=str(e))
 
     logger.info("application_started", project=settings.PROJECT_NAME)
     yield
