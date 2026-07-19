@@ -278,9 +278,6 @@ async def fix_covers(
     _admin: User = Depends(require_admin),
 ):
     """Fix broken cover_url paths for all local tracks."""
-    music_scan = os.environ.get("MUSIC_SCAN_DIR", "/music")
-    music_dl = os.environ.get("MUSIC_DOWNLOAD_DIR", "/app/downloads")
-
     result = await db.execute(select(Track).where(Track.file_url.like("local:%")))
     tracks = list(result.scalars().all())
 
@@ -293,14 +290,31 @@ async def fix_covers(
 
         track_dir = str(Path(file_path).resolve().parent)
         cover = find_cover_in_dir(track_dir)
+
+        if not cover and file_path.startswith("/app/downloads/"):
+            alt_dir = "/music/" + file_path[len("/app/downloads/"):]
+            alt_dir = str(Path(alt_dir).resolve().parent)
+            cover = find_cover_in_dir(alt_dir)
+
+        if not cover and file_path.startswith("/music/"):
+            alt_dir = "/app/downloads/" + file_path[len("/music/"):]
+            alt_dir = str(Path(alt_dir).resolve().parent)
+            cover = find_cover_in_dir(alt_dir)
+
         if cover:
             new_cover = f"local_cover:{cover}"
             if track.cover_url != new_cover:
                 track.cover_url = new_cover
                 fixed += 1
         elif track.cover_url and track.cover_url.startswith("local_cover:"):
-            full = os.path.normpath(f"/{track.cover_url[len('local_cover:'):]}")
-            if not os.path.isfile(full):
+            stored = track.cover_url[len("local_cover:"):]
+            found = False
+            for prefix in ["/", "/music", "/app/downloads"]:
+                test = os.path.normpath(f"{prefix}/{stored}" if not stored.startswith("/") else f"{prefix}{stored}")
+                if os.path.isfile(test):
+                    found = True
+                    break
+            if not found:
                 track.cover_url = None
                 cleared += 1
 
@@ -313,22 +327,24 @@ async def serve_local_cover(
     cover_path: str,
     _user: User = Depends(get_current_user_from_header_or_query),
 ):
+    candidates = []
+
     full_path = os.path.normpath(f"/{cover_path}")
+    candidates.append(full_path)
 
-    if os.path.isfile(full_path):
-        return FileResponse(full_path, media_type="image/jpeg")
+    if full_path.startswith("/app/downloads/"):
+        candidates.append("/music" + full_path[len("/app/downloads"):])
+    elif full_path.startswith("/music/"):
+        candidates.append("/app/downloads" + full_path[len("/music"):])
 
-    music_scan = os.environ.get("MUSIC_SCAN_DIR", "/music")
-    music_dl = os.environ.get("MUSIC_DOWNLOAD_DIR", "/app/downloads")
+    if cover_path.startswith("app/downloads/"):
+        candidates.append("/music/" + cover_path[len("app/downloads/"):])
+    elif not cover_path.startswith("/"):
+        candidates.append("/music/" + cover_path)
 
-    basename = os.path.basename(full_path)
-    dirpart = os.path.dirname(full_path)
-
-    for base in [music_scan, music_dl, "/music"]:
-        for suffix in ["", "/Jellyfin/Musique"]:
-            candidate = os.path.join(base + suffix, dirpart.lstrip("/"), basename)
-            candidate = os.path.normpath(candidate)
-            if os.path.isfile(candidate):
-                return FileResponse(candidate, media_type="image/jpeg")
+    for path in candidates:
+        path = os.path.normpath(path)
+        if os.path.isfile(path):
+            return FileResponse(path, media_type="image/jpeg")
 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover not found")
