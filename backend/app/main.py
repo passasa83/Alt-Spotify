@@ -55,6 +55,30 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("auto_scan_failed", scan_dir=scan_dir, error=str(e))
 
+    try:
+        from app.services.cover_service import fetch_cover
+        from app.models.track import Track
+        from app.models.artist import Artist
+        from sqlalchemy import select
+        async with async_session() as db:
+            result = await db.execute(select(Track).where((Track.cover_url.is_(None)) | (Track.cover_url.like("local_cover:%"))))
+            tracks = list(result.scalars().all())
+            if tracks:
+                logger.info("auto_fix_covers_start", count=len(tracks))
+                fixed = 0
+                for track in tracks:
+                    artist_result = await db.execute(select(Artist).where(Artist.id == track.artist_id))
+                    artist_obj = artist_result.scalar_one_or_none()
+                    artist_name = artist_obj.name if artist_obj else ""
+                    api_cover = await fetch_cover(track.title, artist_name)
+                    if api_cover:
+                        track.cover_url = api_cover
+                        fixed += 1
+                await db.commit()
+                logger.info("auto_fix_covers_complete", total=len(tracks), fixed=fixed)
+    except Exception as e:
+        logger.warning("auto_fix_covers_failed", error=str(e))
+
     logger.info("application_started", project=settings.PROJECT_NAME)
     yield
     logger.info("application_shutting_down")
