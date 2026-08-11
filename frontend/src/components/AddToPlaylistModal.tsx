@@ -32,8 +32,12 @@ const AddToPlaylistModal = ({ isOpen, onClose, track, onCreateNew }: Props) => {
       }
       addToast(`Added to ${title}`);
       onClose();
-    } catch (err) {
-      console.error('Failed to add track to playlist', err);
+    } catch (err: any) {
+      if (err?.response?.status === 409) {
+        addToast('Track already in this playlist');
+      } else {
+        addToast('Failed to add track');
+      }
     }
   };
 
