@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getPlaylist, getPlaylistTracks, removeTrackFromPlaylist, deletePlaylist, updatePlaylist } from '@/api/playlists';
+import { getPlaylist, getPlaylistTracks, removeTrackFromPlaylist, deletePlaylist, updatePlaylist, getDuplicates, removeDuplicates, type DuplicatesResult } from '@/api/playlists';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useToastStore } from '@/stores/toastStore';
@@ -25,6 +25,10 @@ const PlaylistDetail = () => {
   const [editDescription, setEditDescription] = useState('');
   const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDuplicates, setShowDuplicates] = useState(false);
+  const [duplicates, setDuplicates] = useState<DuplicatesResult | null>(null);
+  const [loadingDuplicates, setLoadingDuplicates] = useState(false);
+  const [removingDuplicates, setRemovingDuplicates] = useState(false);
   const { setTrack, setPlaylistAsQueue } = usePlayerStore();
   const { loadPlaylists, removeFromFavorites } = useLibraryStore();
   const addToast = useToastStore((s) => s.addToast);
@@ -116,6 +120,37 @@ const PlaylistDetail = () => {
     setShowEditModal(true);
   };
 
+  const handleCheckDuplicates = async () => {
+    if (!id) return;
+    setLoadingDuplicates(true);
+    try {
+      const result = await getDuplicates(id);
+      setDuplicates(result);
+      setShowDuplicates(true);
+    } catch {
+      addToast('Failed to check duplicates');
+    } finally {
+      setLoadingDuplicates(false);
+    }
+  };
+
+  const handleRemoveDuplicates = async () => {
+    if (!id) return;
+    setRemovingDuplicates(true);
+    try {
+      const result = await removeDuplicates(id, 'first');
+      addToast(`Removed ${result.removed} duplicate(s)`);
+      const tracksData = await getPlaylistTracks(id);
+      setTracks(tracksData);
+      setShowDuplicates(false);
+      setDuplicates(null);
+    } catch {
+      addToast('Failed to remove duplicates');
+    } finally {
+      setRemovingDuplicates(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -196,6 +231,18 @@ const PlaylistDetail = () => {
               title="Delete playlist"
             >
               <Trash2 size={20} />
+            </button>
+            <button
+              onClick={handleCheckDuplicates}
+              disabled={loadingDuplicates}
+              className="text-gray-400 transition-colors hover:text-white"
+              title="Check for duplicates"
+            >
+              {loadingDuplicates ? (
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+              ) : (
+                <span className="text-xs font-medium">1:1</span>
+              )}
             </button>
           </>
         )}
@@ -352,6 +399,52 @@ const PlaylistDetail = () => {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
       />
+
+      {showDuplicates && duplicates && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setShowDuplicates(false)}>
+          <div className="w-full max-w-lg rounded-lg bg-gray-900 p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-white">Duplicate Detection</h2>
+            {duplicates.total_exact === 0 && duplicates.total_fuzzy === 0 ? (
+              <p className="mt-3 text-sm text-gray-400">No duplicates found in this playlist.</p>
+            ) : (
+              <>
+                <p className="mt-2 text-sm text-gray-400">
+                  Found {duplicates.total_exact} exact duplicate(s) and {duplicates.total_fuzzy} similar track(s).
+                </p>
+                {duplicates.exact_duplicates.length > 0 && (
+                  <div className="mt-3 max-h-48 overflow-y-auto">
+                    <p className="mb-1 text-xs font-semibold text-gray-500">Exact duplicates:</p>
+                    {duplicates.exact_duplicates.map((group, i) => (
+                      <div key={i} className="mb-2 rounded bg-gray-800 p-2">
+                        {group.map((d) => (
+                          <p key={d.track_id} className="text-xs text-gray-300">
+                            {d.title} (position {d.position + 1})
+                          </p>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-4 flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowDuplicates(false)}
+                    className="rounded-md px-4 py-2 text-sm text-gray-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRemoveDuplicates}
+                    disabled={removingDuplicates}
+                    className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50"
+                  >
+                    {removingDuplicates ? 'Removing...' : `Remove ${duplicates.total_exact} duplicate(s)`}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

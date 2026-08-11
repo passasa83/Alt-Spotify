@@ -102,3 +102,39 @@ export const importPlaylistFromDeezer = async (url: string): Promise<DeezerImpor
   const response = await client.post('/playlists/import-export/deezer', { url });
   return response.data;
 };
+
+export interface DuplicateGroup {
+  track_id: string;
+  title: string;
+  artist_id: string;
+  position: number;
+  added_at?: string;
+}
+
+export interface DuplicatesResult {
+  exact_duplicates: DuplicateGroup[][];
+  fuzzy_duplicates: DuplicateGroup[][];
+  total_exact: number;
+  total_fuzzy: number;
+}
+
+export const getDuplicates = async (playlistId: string): Promise<DuplicatesResult> => {
+  const response = await client.get(`/playlists/${playlistId}/duplicates`);
+  return response.data;
+};
+
+export const removeDuplicates = async (playlistId: string, keep: 'first' | 'last' = 'first'): Promise<{ removed: number }> => {
+  const response = await client.post(`/playlists/${playlistId}/remove-duplicates`, null, { params: { keep } });
+  return response.data;
+};
+
+export interface GenerateTopResult {
+  playlist_id: string;
+  title: string;
+  track_count: number;
+}
+
+export const generateTopPlaylist = async (period: 'month' | 'year', year?: number, month?: number, limit = 50): Promise<GenerateTopResult> => {
+  const response = await client.post('/playlists/generate-top', null, { params: { period, year, month, limit } });
+  return response.data;
+};

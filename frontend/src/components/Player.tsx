@@ -119,6 +119,13 @@ const Player = () => {
     const handleEnded = () => {
       if (crossfadeDuration > 0 && nextAudioRef.current) {
         startCrossfadeTransition();
+      } else if (nextAudioRef.current && nextAudioRef.current.src) {
+        nextAudioRef.current.play().catch(() => {});
+        audioRef.current?.pause();
+        audioRef.current = nextAudioRef.current;
+        nextAudioRef.current = null;
+        next();
+        setDuration(audioRef.current?.duration || 0);
       } else {
         next();
       }

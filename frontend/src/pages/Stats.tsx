@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getUserStats } from '@/api/users';
+import { generateTopPlaylist } from '@/api/playlists';
 import { useTranslation } from '@/hooks/useTranslation';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useLibraryStore } from '@/stores/libraryStore';
+import { useToastStore } from '@/stores/toastStore';
+import { resolveCoverUrl } from '@/api/tracks';
 import TrackContextMenu from '@/components/TrackContextMenu';
 import AddToPlaylistModal from '@/components/AddToPlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import type { UserStats, Track } from '@/types';
-import { Clock, Music, Flame, BarChart3 } from 'lucide-react';
+import { Clock, Music, Flame, BarChart3, ListMusic } from 'lucide-react';
 
 const Stats = () => {
   const { t } = useTranslation();
@@ -16,7 +20,11 @@ const Stats = () => {
   const [error, setError] = useState<string | null>(null);
   const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [generatingPlaylist, setGeneratingPlaylist] = useState(false);
   const { setTrack } = usePlayerStore();
+  const { loadPlaylists } = useLibraryStore();
+  const addToast = useToastStore((s) => s.addToast);
+  const navigate = useNavigate();
 
   useEffect(() => {
     getUserStats()
@@ -46,6 +54,21 @@ const Stats = () => {
   const maxPlays = Math.max(...(stats.top_tracks.map((t) => stats.total_plays) || [1]));
   const maxGenreCount = Math.max(...stats.genre_distribution.map((g) => g.count), 1);
   const maxHourCount = Math.max(...stats.listening_by_hour, 1);
+
+  const handleGenerateTop = async (period: 'month' | 'year') => {
+    setGeneratingPlaylist(true);
+    try {
+      const now = new Date();
+      const result = await generateTopPlaylist(period, now.getFullYear(), period === 'month' ? now.getMonth() + 1 : undefined);
+      await loadPlaylists();
+      addToast(`"${result.title}" playlist created with ${result.track_count} tracks`);
+      navigate(`/playlist/${result.playlist_id}`);
+    } catch {
+      addToast('Failed to generate top playlist');
+    } finally {
+      setGeneratingPlaylist(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -184,6 +207,29 @@ const Stats = () => {
             </p>
             <p className="text-sm text-gray-400">{t('stats.top_track')}</p>
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg bg-gray-800 p-6">
+        <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
+          <ListMusic size={20} /> Generate Top Playlist
+        </h3>
+        <p className="mb-4 text-sm text-gray-400">Create an automatic playlist of your most played tracks.</p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => handleGenerateTop('month')}
+            disabled={generatingPlaylist}
+            className="rounded-full bg-green-500 px-6 py-2 text-sm font-bold text-black transition-transform hover:scale-105 disabled:opacity-50"
+          >
+            {generatingPlaylist ? 'Generating...' : 'Top Songs This Month'}
+          </button>
+          <button
+            onClick={() => handleGenerateTop('year')}
+            disabled={generatingPlaylist}
+            className="rounded-full border border-gray-400 px-6 py-2 text-sm font-bold text-white transition-colors hover:border-white disabled:opacity-50"
+          >
+            {generatingPlaylist ? 'Generating...' : 'Top Songs This Year'}
+          </button>
         </div>
       </div>
 
