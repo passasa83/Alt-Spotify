@@ -14,6 +14,9 @@ from app.models.device_session import DeviceSession
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
+import structlog
+logger = structlog.get_logger("app")
+
 
 class DeviceRegister(BaseModel):
     device_id: str
@@ -62,6 +65,7 @@ async def register_device(
     await db.flush()
     await db.refresh(device)
 
+    logger.info("device_registered", user_id=str(current_user.id), device_id=body.device_id, device_type=body.device_type)
     return DeviceResponse(
         id=str(device.id),
         device_id=device.device_id,

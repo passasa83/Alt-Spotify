@@ -10,7 +10,7 @@ from app.models.track import Track
 
 router = APIRouter(prefix="/lyrics", tags=["lyrics"])
 
-LRC_LINE_RE = re.compile(r"\[(\d{2}):(\d{2})\.(\d{2,3})\]\s*(.*)")
+LRC_LINE_RE = re.compile(r"\[(\d{2}):(\d{2})\.(\d{2,3})\][ \t]*(.*)")
 
 
 def parse_lrc(lrc_text: str) -> list[dict]:

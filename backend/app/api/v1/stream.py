@@ -96,19 +96,19 @@ async def download_track(track_id: uuid.UUID, db: AsyncSession = Depends(get_db)
     track = result.scalar_one_or_none()
     if not track:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
-    if not track.file_path:
+    if not track.file_url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track file not available")
 
     client = get_minio_client()
     try:
-        response = client.get_object(settings.MINIO_BUCKET, track.file_path)
+        response = client.get_object(settings.MINIO_BUCKET, track.file_url)
         content = response.read()
         response.close()
         response.release_conn()
     except Exception:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track file not found")
 
-    file_ext = track.file_path.rsplit(".", 1)[-1] if "." in track.file_path else "mp3"
+    file_ext = track.file_url.rsplit(".", 1)[-1] if "." in track.file_url else "mp3"
     content_type = {
         "mp3": "audio/mpeg",
         "flac": "audio/flac",

@@ -10,6 +10,7 @@ vi.mock('@/api/auth', () => ({
 import * as authApi from '@/api/auth';
 
 const mockLogin = vi.mocked(authApi.login);
+const mockRegister = vi.mocked(authApi.register);
 const mockGetMe = vi.mocked(authApi.getMe);
 
 beforeEach(() => {
@@ -78,5 +79,24 @@ describe('authStore', () => {
 
     expect(useAuthStore.getState().isLoading).toBe(false);
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it('register calls authApi.register', async () => {
+    mockRegister.mockResolvedValueOnce({} as any);
+
+    await useAuthStore.getState().register('new@test.com', 'newuser', 'password123');
+
+    expect(mockRegister).toHaveBeenCalledWith('new@test.com', 'newuser', 'password123');
+    expect(useAuthStore.getState().isLoading).toBe(false);
+  });
+
+  it('register failure sets isLoading to false and throws', async () => {
+    mockRegister.mockRejectedValueOnce(new Error('Email already registered'));
+
+    await expect(
+      useAuthStore.getState().register('dup@test.com', 'dupuser', 'password123')
+    ).rejects.toThrow('Email already registered');
+
+    expect(useAuthStore.getState().isLoading).toBe(false);
   });
 });

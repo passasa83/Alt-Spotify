@@ -69,7 +69,7 @@ services:
 
   backend:
     build:
-      context: https://github.com/passasa83/Alt-Spotify.git#Akajox:backend
+      context: ./backend
     ports:
       - "8000:8000"
     environment:
@@ -108,7 +108,7 @@ services:
 
   worker:
     build:
-      context: https://github.com/passasa83/Alt-Spotify.git#Akajox:worker
+      context: ./worker
     environment:
       REDIS_URL: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
@@ -124,53 +124,14 @@ services:
 
   frontend:
     build:
-      context: https://github.com/passasa83/Alt-Spotify.git#Akajox:frontend
+      context: ./frontend
     ports:
       - "3000:80"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
-      - "traefik.http.routers.frontend.entrypoints=web"
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
-      - "traefik.http.routers.frontend.middlewares=sec-headers,compress"
-      # Middlewares intégrés (Remplace dynamic.yml)
-      - "traefik.http.middlewares.sec-headers.headers.stsSeconds=31536000"
-      - "traefik.http.middlewares.sec-headers.headers.stsIncludeSubdomains=true"
-      - "traefik.http.middlewares.sec-headers.headers.stsPreload=true"
-      - "traefik.http.middlewares.sec-headers.headers.forceSTSHeader=true"
-      - "traefik.http.middlewares.sec-headers.headers.contentTypeNosniff=true"
-      - "traefik.http.middlewares.sec-headers.headers.browserXssFilter=true"
-      - "traefik.http.middlewares.sec-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
-      - "traefik.http.middlewares.sec-headers.headers.frameDeny=true"
-      - "traefik.http.middlewares.compress.compress=true"
     depends_on:
       - backend
     networks:
       - frontend-net
 
-  traefik:
-    image: traefik:v2.11
-    command:
-      - "--entryPoints.web.address=:80"
-      - "--entryPoints.websecure.address=:443"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedByDefault=false"
-      - "--providers.docker.network=frontend-net"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - traefik_certs:/letsencrypt
-    depends_on:
-      - backend
-      - frontend
-    networks:
-      - frontend-net
-      - backend-net
-
-volumes:
-  traefik_certs:
 
 networks:
   frontend-net:

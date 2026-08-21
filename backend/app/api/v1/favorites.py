@@ -20,6 +20,9 @@ from app.utils.track_serializer import serialize_track
 
 router = APIRouter(prefix="/favorites", tags=["favorites"])
 
+import structlog
+logger = structlog.get_logger("app")
+
 LIKED_SONGS_TITLE = "Liked Songs"
 
 
@@ -63,6 +66,7 @@ async def add_favorite(
         )
     )
     if existing.scalar_one_or_none():
+        logger.warning("favorite_already_exists", user_id=str(current_user.id), entity_type=entity_type, entity_id=str(entity_id))
         raise HTTPException(status_code=409, detail="Already favorited")
 
     fav = Favorite(
@@ -105,11 +109,11 @@ async def remove_favorite(
     db: AsyncSession = Depends(get_db),
 ):
     await db.execute(
-        select(Favorite).where(
+        delete(Favorite).where(
             Favorite.user_id == current_user.id,
             Favorite.entity_id == entity_id,
             Favorite.entity_type == entity_type,
-        ).delete()
+        )
     )
 
     if entity_type == "track":
@@ -122,10 +126,10 @@ async def remove_favorite(
         playlist = result.scalar_one_or_none()
         if playlist:
             await db.execute(
-                select(PlaylistTrack).where(
+                delete(PlaylistTrack).where(
                     PlaylistTrack.playlist_id == playlist.id,
                     PlaylistTrack.track_id == entity_id,
-                ).delete()
+                )
             )
 
     await db.flush()
