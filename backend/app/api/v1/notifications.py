@@ -1,20 +1,19 @@
-import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.user import User
-from app.schemas.notification import NotificationResponse
 from app.services.notifications import (
-    get_user_notifications,
-    get_unread_count,
-    mark_as_read,
-    mark_all_as_read,
     delete_notification,
+    get_unread_count,
+    get_user_notifications,
+    mark_all_as_read,
+    mark_as_read,
 )
 from app.utils.deps import get_current_user
+from app.utils.ws import relay_channel
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -84,22 +83,4 @@ async def notifications_websocket(websocket: WebSocket):
         await websocket.close(code=4001, reason="Invalid token")
         return
 
-    r = await get_redis()
-    pubsub = r.pubsub()
-    await pubsub.subscribe(f"notifications:{user_id}")
-
-    try:
-        while True:
-            try:
-                await websocket.receive_text()
-            except Exception:
-                pass
-
-            pub_message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=0.1)
-            if pub_message and pub_message["type"] == "message":
-                await websocket.send_text(pub_message["data"])
-    except WebSocketDisconnect:
-        pass
-    finally:
-        await pubsub.unsubscribe(f"notifications:{user_id}")
-        await r.aclose()
+    await relay_channel(websocket, f"notifications:{user_id}")

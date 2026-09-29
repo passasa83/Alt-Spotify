@@ -2,14 +2,16 @@ import uuid
 from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.models.album import Album
 from app.models.artist import Artist
-from app.schemas.artist import ArtistCreate, ArtistUpdate, ArtistResponse
+from app.schemas.album import AlbumResponse
+from app.schemas.artist import ArtistCreate, ArtistResponse, ArtistUpdate
 from app.schemas.common import PaginatedResponse
-from app.utils.deps import get_current_user, require_admin
+from app.utils.deps import require_admin
 
 router = APIRouter(prefix="/artists", tags=["artists"])
 
@@ -48,6 +50,28 @@ async def get_artist(artist_id: str, db: AsyncSession = Depends(get_db)):
     if not artist:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artist not found")
     return artist
+
+
+@router.get("/{artist_id}/albums", response_model=PaginatedResponse[AlbumResponse])
+async def list_artist_albums(
+    artist_id: uuid.UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    count_query = select(func.count(Album.id)).where(Album.artist_id == artist_id)
+    total = (await db.execute(count_query)).scalar() or 0
+    result = await db.execute(
+        select(Album)
+        .where(Album.artist_id == artist_id)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .order_by(Album.release_date.desc().nullslast(), Album.created_at.desc())
+    )
+    items = result.scalars().all()
+    return PaginatedResponse(
+        items=items, total=total, page=page, page_size=page_size, pages=ceil(total / page_size) if total else 0
+    )
 
 
 @router.post("", response_model=ArtistResponse, status_code=status.HTTP_201_CREATED)

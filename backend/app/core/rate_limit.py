@@ -1,6 +1,5 @@
 import os
 import time
-from urllib.parse import urlparse
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware

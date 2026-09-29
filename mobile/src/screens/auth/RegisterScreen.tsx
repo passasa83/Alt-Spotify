@@ -15,6 +15,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [pseudo, setPseudo] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [inviteToken, setInviteToken] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const { register, isLoading } = useAuthStore();
 
@@ -32,7 +33,7 @@ export default function RegisterScreen({ navigation }: Props) {
       return;
     }
     try {
-      await register(email.trim(), pseudo.trim(), password);
+      await register(email.trim(), pseudo.trim(), password, inviteToken.trim() || undefined);
       Alert.alert('Success', 'Account created! Please sign in.', [
         { text: 'OK', onPress: () => navigation.navigate('Login') },
       ]);
@@ -104,6 +105,19 @@ export default function RegisterScreen({ navigation }: Props) {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry={!showPassword}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Ionicons name="key-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Invitation code"
+              placeholderTextColor={colors.textMuted}
+              value={inviteToken}
+              onChangeText={setInviteToken}
+              autoCapitalize="none"
+              autoCorrect={false}
             />
           </View>
 

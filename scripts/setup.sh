@@ -14,7 +14,7 @@ if [ ! -f .env ]; then
     echo "Creating .env from .env.example..."
     cp .env.example .env
     SECRET_KEY=$(openssl rand -hex 32 2>/dev/null || python3 -c "import secrets; print(secrets.token_hex(32))")
-    sed -i "s/SECRET_KEY=.*/SECRET_KEY=$SECRET_KEY/" .env
+    sed -i "s/^SECRET_KEY=.*/SECRET_KEY=$SECRET_KEY/" .env
     echo ".env created. Please review and update passwords."
 fi
 

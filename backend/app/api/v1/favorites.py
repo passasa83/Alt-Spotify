@@ -1,26 +1,26 @@
 import uuid
 from math import ceil
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func, delete
-from sqlalchemy.orm import selectinload
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models.favorite import Favorite
-from app.models.track import Track
 from app.models.album import Album
 from app.models.artist import Artist
-from app.models.podcast import Podcast
+from app.models.favorite import Favorite
 from app.models.playlist import Playlist
 from app.models.playlist_track import PlaylistTrack
+from app.models.podcast import Podcast
+from app.models.track import Track
 from app.models.user import User
 from app.utils.deps import get_current_user
 from app.utils.track_serializer import serialize_track
 
 router = APIRouter(prefix="/favorites", tags=["favorites"])
 
-import structlog
 logger = structlog.get_logger("app")
 
 LIKED_SONGS_TITLE = "Liked Songs"

@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
 
 const Register = () => {
+  const [searchParams] = useSearchParams();
+  // Invite links from the admin page look like /register?invite=<token>.
+  const [inviteToken, setInviteToken] = useState(searchParams.get('invite') ?? '');
   const [email, setEmail] = useState('');
   const [pseudo, setPseudo] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +31,7 @@ const Register = () => {
     }
 
     try {
-      await register(email, pseudo, password);
+      await register(email, pseudo, password, inviteToken.trim() || undefined);
       navigate('/login');
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
@@ -109,6 +112,21 @@ const Register = () => {
               className="w-full rounded-md border border-gray-600 bg-gray-800 px-4 py-3 text-white placeholder-gray-400 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
               placeholder={t('auth.confirm_your_password')}
             />
+          </div>
+
+          <div>
+            <label htmlFor="reg-invite" className="mb-1 block text-sm font-medium text-gray-300">{t('auth.invite_code')}</label>
+            <input
+              id="reg-invite"
+              type="text"
+              value={inviteToken}
+              onChange={(e) => setInviteToken(e.target.value)}
+              aria-label={t('auth.invite_code')}
+              autoComplete="off"
+              className="w-full rounded-md border border-gray-600 bg-gray-800 px-4 py-3 text-white placeholder-gray-400 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              placeholder={t('auth.enter_invite_code')}
+            />
+            <p className="mt-1 text-xs text-gray-400">{t('auth.no_invite')}</p>
           </div>
 
           <button

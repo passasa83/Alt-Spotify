@@ -1,14 +1,18 @@
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from mutagen import File as MutagenFile
 import structlog
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from mutagen import File as MutagenFile
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.minio import upload_file
+from app.core.tasks import celery_client, enqueue_transcode
 from app.core.validation import ALLOWED_AUDIO_TYPES, ALLOWED_IMAGE_TYPES
+from app.models.album import Album
+from app.models.artist import Artist
 from app.models.track import Track
 from app.models.user import User
 from app.utils.deps import require_admin
@@ -25,13 +29,14 @@ MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 async def upload_audio(
     request: Request,
     file: UploadFile = File(...),
-    title: str | None = None,
-    artist: str | None = None,
-    artist_id: uuid.UUID | None = None,
-    album_id: uuid.UUID | None = None,
-    genre: str | None = None,
-    is_explicit: bool = False,
-    allowed_territories: str | None = None,
+    title: str | None = Form(default=None),
+    artist: str | None = Form(default=None),
+    artist_id: uuid.UUID | None = Form(default=None),
+    album: str | None = Form(default=None),
+    album_id: uuid.UUID | None = Form(default=None),
+    genre: str | None = Form(default=None),
+    is_explicit: bool = Form(default=False),
+    allowed_territories: str | None = Form(default=None),
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -59,7 +64,8 @@ async def upload_audio(
     replay_gain = None
     track_peak = None
     try:
-        import tempfile, os
+        import os
+        import tempfile
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
             tmp.write(file_data)
             tmp_path = tmp.name
@@ -103,10 +109,8 @@ async def upload_audio(
         territories_list = [t.strip().upper() for t in allowed_territories.split(",") if t.strip()]
         
     final_artist_name = artist or metadata.get("artist")
-    
+
     if not artist_id and final_artist_name:
-        from app.models.artist import Artist
-        from sqlalchemy import select
         result = await db.execute(select(Artist).where(Artist.name.ilike(final_artist_name)))
         found_artist = result.scalars().first()
         if not found_artist:
@@ -120,6 +124,19 @@ async def upload_audio(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Artist ID or Artist Name is required",
         )
+
+    if not album_id:
+        album_name = album or metadata.get("album")
+        if album_name:
+            result = await db.execute(
+                select(Album).where(Album.artist_id == artist_id, Album.title.ilike(album_name))
+            )
+            found_album = result.scalars().first()
+            if not found_album:
+                found_album = Album(title=album_name, artist_id=artist_id)
+                db.add(found_album)
+                await db.flush()
+            album_id = found_album.id
 
     track = Track(
         id=track_id,
@@ -146,25 +163,64 @@ async def upload_audio(
         file_type=file.content_type,
     )
 
-    # Trigger Celery transcoding task
-    try:
-        from worker.tasks import transcode_audio
-        transcode_audio.delay(object_name, f"hls/{track_id}", str(track_id))
-    except Exception as e:
-        logger.warning("celery_transcode_dispatch_failed", error=str(e))
+    # Commit before queueing so the worker always finds the track row.
+    await db.commit()
+    task_id = await enqueue_transcode(track_id, object_name)
 
     return {
         "track_id": str(track.id),
-        "status": "processing",
-        "message": "Audio uploaded, transcoding started",
+        "task_id": task_id,
+        "status": "processing" if task_id else "ready",
+        "message": "Audio uploaded, transcoding started" if task_id else "Audio uploaded",
     }
+
+
+@router.post("/transcode/{track_id}", status_code=status.HTTP_202_ACCEPTED)
+async def retranscode_track(
+    track_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """(Re)generate the HLS variants of a single track."""
+    result = await db.execute(select(Track).where(Track.id == track_id))
+    track = result.scalar_one_or_none()
+    if not track:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+    if not track.file_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Track has no source file")
+
+    task_id = await enqueue_transcode(track.id, track.file_url)
+    if not task_id:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Transcoding queue unavailable")
+    return {"track_id": str(track.id), "task_id": task_id}
+
+
+@router.post("/transcode-missing", status_code=status.HTTP_202_ACCEPTED)
+async def transcode_missing(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Queue HLS transcoding for every track that has a source file but no HLS yet."""
+    result = await db.execute(
+        select(Track.id, Track.file_url).where(Track.file_url.is_not(None), Track.hls_path.is_(None))
+    )
+    rows = result.all()
+    queued = 0
+    for track_id, file_url in rows:
+        if not await enqueue_transcode(track_id, file_url):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Transcoding queue unavailable ({queued}/{len(rows)} tracks queued)",
+            )
+        queued += 1
+    return {"queued": queued}
 
 
 @router.post("/cover", status_code=status.HTTP_201_CREATED)
 async def upload_cover(
     file: UploadFile = File(...),
-    entity_type: str = "track",
-    entity_id: uuid.UUID | None = None,
+    entity_type: str = Form(default="track"),
+    entity_id: uuid.UUID | None = Form(default=None),
     _admin: User = Depends(require_admin),
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
@@ -193,10 +249,9 @@ async def upload_cover(
 
 
 @router.get("/status/{task_id}")
-async def get_upload_status(task_id: str):
+async def get_upload_status(task_id: str, _admin: User = Depends(require_admin)):
     try:
-        from worker.celery_app import app as celery_app
-        result = celery_app.AsyncResult(task_id)
+        result = celery_client.AsyncResult(task_id)
         return {
             "task_id": task_id,
             "status": result.state,
@@ -249,5 +304,5 @@ async def upload_lyrics(
     return {
         "track_id": str(track.id),
         "message": "Lyrics uploaded successfully",
-        "lines_count": len([l for l in lrc_text.splitlines() if l.strip().startswith("[")]),
+        "lines_count": len([line for line in lrc_text.splitlines() if line.strip().startswith("[")]),
     }

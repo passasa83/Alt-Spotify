@@ -1,12 +1,11 @@
 import uuid
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func, delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
 from app.core.config import settings
+from app.core.database import get_db
 from app.models.follow import Follow, FollowType
 from app.models.listening_history import ListeningHistory
 from app.models.track import Track
@@ -259,8 +258,9 @@ async def share_qr(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        import qrcode
         import io
+
+        import qrcode
         from fastapi.responses import StreamingResponse
 
         base_url = settings.BASE_URL

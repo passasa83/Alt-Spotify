@@ -92,7 +92,29 @@ describe('Register', () => {
     await user.type(screen.getByPlaceholderText('Confirm your password'), 'password123');
     await user.click(screen.getByRole('button', { name: /sign up/i }));
 
-    expect(register).toHaveBeenCalledWith('new@test.com', 'newuser', 'password123');
+    expect(register).toHaveBeenCalledWith('new@test.com', 'newuser', 'password123', undefined);
+  });
+
+  it('prefills the invitation code from the invite link', async () => {
+    const register = vi.fn().mockResolvedValue(undefined);
+    mockUseAuthStore.mockReturnValue({ register, isLoading: false } as any);
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/register?invite=abc123']}>
+        <Register />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByPlaceholderText('Paste your invitation code')).toHaveValue('abc123');
+
+    await user.type(screen.getByPlaceholderText('Enter your email'), 'new@test.com');
+    await user.type(screen.getByPlaceholderText('Choose a display name'), 'newuser');
+    await user.type(screen.getByPlaceholderText('Create a password'), 'password123');
+    await user.type(screen.getByPlaceholderText('Confirm your password'), 'password123');
+    await user.click(screen.getByRole('button', { name: /sign up/i }));
+
+    expect(register).toHaveBeenCalledWith('new@test.com', 'newuser', 'password123', 'abc123');
   });
 
   it('shows error message on registration failure', async () => {

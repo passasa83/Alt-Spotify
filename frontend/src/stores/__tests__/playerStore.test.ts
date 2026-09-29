@@ -8,6 +8,7 @@ const createTrack = (id: string, title = 'Test Track'): Track => ({
   artist_id: 'artist-1',
   duration_seconds: 180,
   play_count: 0,
+  is_explicit: false,
   created_at: '2024-01-01',
 });
 
@@ -89,6 +90,29 @@ describe('playerStore', () => {
     expect(state.currentTrack).toEqual(track2);
     expect(state.queue).toEqual([]);
     expect(state.isPlaying).toBe(true);
+  });
+
+  it('next advances to the preferred queued track (preloaded by the crossfade)', () => {
+    const [track1, track2, track3] = [createTrack('1'), createTrack('2'), createTrack('3')];
+    usePlayerStore.getState().setTrack(track1);
+    usePlayerStore.getState().addToQueue(track2);
+    usePlayerStore.getState().addToQueue(track3);
+
+    usePlayerStore.getState().next(track3);
+
+    const state = usePlayerStore.getState();
+    expect(state.currentTrack).toEqual(track3);
+    expect(state.queue).toEqual([track2]);
+  });
+
+  it('next ignores a preferred track that is not queued', () => {
+    const [track1, track2] = [createTrack('1'), createTrack('2')];
+    usePlayerStore.getState().setTrack(track1);
+    usePlayerStore.getState().addToQueue(track2);
+
+    usePlayerStore.getState().next(createTrack('99'));
+
+    expect(usePlayerStore.getState().currentTrack).toEqual(track2);
   });
 
   it('next with empty queue stops playing', () => {

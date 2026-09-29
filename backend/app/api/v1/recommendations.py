@@ -4,10 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.user import User
 from app.services.recommendation import (
+    generate_daily_mix,
     get_personalized_recommendations,
     get_radio_tracks,
     get_similar_tracks,
-    generate_daily_mix,
 )
 from app.utils.deps import get_current_user
 

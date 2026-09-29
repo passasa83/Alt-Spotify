@@ -1,29 +1,28 @@
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
+from app.api.v1.router import api_router
+from app.core.compression import CompressionMiddleware
 from app.core.config import settings
 from app.core.database import init_db
-from app.core.redis import close_redis
-from app.services.meilisearch import ensure_indexes, reindex_all
-from app.core.metrics import MetricsMiddleware
-from app.core.logging import setup_logging
-from app.core.middleware_logging import RequestLoggingMiddleware, ErrorLoggingMiddleware
-from app.core.rate_limit import RateLimitMiddleware
-from app.core.security_enhanced import SecurityHeadersMiddleware, InputSanitizationMiddleware
-from app.core.request_id import RequestIDMiddleware
 from app.core.exceptions import (
     AppException,
     app_exception_handler,
-    not_found_handler,
     internal_error_handler,
+    not_found_handler,
 )
+from app.core.logging import setup_logging
+from app.core.metrics import MetricsMiddleware
+from app.core.middleware_logging import ErrorLoggingMiddleware, RequestLoggingMiddleware
 from app.core.openapi import custom_openapi
-from app.core.compression import CompressionMiddleware
-from app.api.v1.router import api_router
+from app.core.rate_limit import RateLimitMiddleware
+from app.core.redis import close_redis
+from app.core.request_id import RequestIDMiddleware
+from app.core.security_enhanced import SecurityHeadersMiddleware
+from app.services.meilisearch import ensure_indexes, reindex_all
 
 logger = structlog.get_logger("app")
 
@@ -64,9 +63,8 @@ app.add_middleware(ErrorLoggingMiddleware)
 # 3. Rate limiting
 app.add_middleware(RateLimitMiddleware)
 
-# 4. Security headers + input sanitization
+# 4. Security headers
 app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(InputSanitizationMiddleware)
 
 # 5. Compression
 if settings.COMPRESSION_ENABLED:

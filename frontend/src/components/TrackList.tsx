@@ -24,7 +24,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
   const { setTrack, setPlaylistAsQueue, currentTrack, isPlaying } = usePlayerStore();
   const { t } = useTranslation();
   const { user } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'ADMIN';
   const { playlistModalTrack, showCreateModal, openAddToPlaylist, openCreatePlaylist, closeAddToPlaylist, closeCreatePlaylist } = usePlaylistModals();
 
   const handlePlayTrack = (track: Track) => {

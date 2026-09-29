@@ -1,6 +1,6 @@
 import { Play } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
-import type { Album } from '@/types';
+import type { Album, Track } from '@/types';
 import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { getAlbumTracks } from '@/api/albums';
@@ -13,8 +13,8 @@ interface AlbumCardProps {
 const AlbumCard = ({ album }: AlbumCardProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { setTrack, currentTrack, isPlaying } = usePlayerStore();
-  const [tracks, setTracks] = useState<[]>([]);
+  const { setPlaylistAsQueue, currentTrack, isPlaying } = usePlayerStore();
+  const [tracks, setTracks] = useState<Track[]>([]);
 
   useEffect(() => {
     getAlbumTracks(album.id).then(setTracks).catch(() => {});
@@ -23,7 +23,7 @@ const AlbumCard = ({ album }: AlbumCardProps) => {
   const handlePlay = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (tracks.length > 0) {
-      setTrack(tracks[0]!);
+      setPlaylistAsQueue(tracks, 0);
     }
   };
 
@@ -51,7 +51,7 @@ const AlbumCard = ({ album }: AlbumCardProps) => {
       </div>
       <p className="block truncate text-sm font-semibold text-white">{album.title}</p>
       <p className="block truncate text-xs text-gray-400">
-        {album.release_year} • <span className="hover:underline" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (album.artist_id) navigate(`/artist/${album.artist_id}`); }}>{album.artist?.name || t('player.unknown_artist')}</span>
+        {album.release_date?.slice(0, 4) || album.created_at?.slice(0, 4)} • <span className="hover:underline" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (album.artist_id) navigate(`/artist/${album.artist_id}`); }}>{album.artist?.name || t('player.unknown_artist')}</span>
       </p>
     </Link>
   );

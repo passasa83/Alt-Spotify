@@ -25,7 +25,7 @@ export default function SettingsScreen({ navigation }: Props) {
     loadNotificationPreference();
   }, []);
 
-  const loadNotificationPreference = async () => => {
+  const loadNotificationPreference = async () => {
     const pref = await AsyncStorage.getItem('push_notifications_enabled');
     setNotificationsEnabled(pref !== 'false');
   };

@@ -6,7 +6,7 @@ export interface User {
   bio?: string;
   country?: string;
   is_child_account: boolean;
-  role: 'admin' | 'user';
+  role: 'ADMIN' | 'USER';
   is_active: boolean;
   created_at: string;
 }
@@ -67,6 +67,7 @@ export interface Playlist {
   created_at: string;
   updated_at: string;
   track_count?: number;
+  cover_url?: string;
 }
 
 export interface PlaylistTrack {

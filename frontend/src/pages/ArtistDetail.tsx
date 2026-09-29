@@ -3,8 +3,8 @@ import { useParams } from 'react-router-dom';
 import { getArtist, getArtistAlbums } from '@/api/artists';
 import { usePlayerStore } from '@/stores/playerStore';
 import AlbumCard from '@/components/AlbumCard';
-import { Play, Pause, Shuffle, CheckCircle } from 'lucide-react';
-import type { Artist, Album } from '@/types';
+import { Play, Shuffle, CheckCircle } from 'lucide-react';
+import type { Artist, Album, Track } from '@/types';
 import TrackList from '@/components/TrackList';
 import { getAlbumTracks } from '@/api/albums';
 
@@ -12,9 +12,9 @@ const ArtistDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [artist, setArtist] = useState<Artist | null>(null);
   const [albums, setAlbums] = useState<Album[]>([]);
-  const [topTracks, setTopTracks] = useState<[]>([]);
+  const [topTracks, setTopTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { setTrack, currentTrack, isPlaying, togglePlay } = usePlayerStore();
+  const { setPlaylistAsQueue } = usePlayerStore();
 
   useEffect(() => {
     const loadArtist = async () => {
@@ -81,7 +81,7 @@ const ArtistDetail = () => {
         <button
           onClick={() => {
             if (topTracks.length > 0) {
-              setTrack(topTracks[0]!);
+              setPlaylistAsQueue(topTracks, 0);
             }
           }}
           className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-black transition-transform hover:scale-105"

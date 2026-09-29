@@ -60,19 +60,14 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   addToFavorites: async (track) => {
     try {
       await favoritesApi.addFavorite('track', String(track.id));
-      const { favorites } = get();
-      if (!favorites.find((t) => t.id === track.id)) {
-        set({ favorites: [...favorites, track] });
-      }
     } catch {
-      // Fallback to localStorage
-      const { favorites } = get();
-      if (!favorites.find((t) => t.id === track.id)) {
-        const newFavorites = [...favorites, track];
-        localStorage.setItem('favorites', JSON.stringify(newFavorites));
-        set({ favorites: newFavorites });
-      }
+      // Offline fallback: the favorite stays local and is synced on next load.
     }
+    const { favorites } = get();
+    if (favorites.find((t) => t.id === track.id)) return;
+    const newFavorites = [...favorites, track];
+    localStorage.setItem('favorites', JSON.stringify(newFavorites));
+    set({ favorites: newFavorites });
   },
 
   removeFromFavorites: async (trackId) => {

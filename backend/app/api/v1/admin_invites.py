@@ -6,11 +6,11 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
 from app.core.config import settings
-from app.utils.deps import require_admin
-from app.models.user import User
+from app.core.database import get_db
 from app.models.admin_invite import AdminInviteToken
+from app.models.user import User
+from app.utils.deps import require_admin
 
 router = APIRouter(prefix="/admin/invites", tags=["admin-invites"])
 

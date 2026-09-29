@@ -1,5 +1,6 @@
-import re
 import io
+import re
+
 import httpx
 import structlog
 
@@ -103,8 +104,8 @@ async def download_deezer_preview(preview_url: str, object_name: str) -> str | N
             resp.raise_for_status()
             content = resp.content
 
-        from app.core.minio import get_minio_client
         from app.core.config import settings
+        from app.core.minio import get_minio_client
 
         minio_client = get_minio_client()
         minio_client.put_object(

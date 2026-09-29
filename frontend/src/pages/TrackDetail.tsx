@@ -8,11 +8,6 @@ import { Play, Pause, Heart } from 'lucide-react';
 import type { Track, LyricsLine } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
 
-interface LyricsLine {
-  time_seconds: number;
-  text: string;
-}
-
 const TrackDetail = () => {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();

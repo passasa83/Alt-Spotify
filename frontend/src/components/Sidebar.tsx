@@ -120,7 +120,6 @@ const Sidebar = () => {
                   isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white'
                 }`
               }
-              aria-current={({ isActive }: { isActive: boolean }) => isActive ? 'page' : undefined}
             >
               {playlist.title}
             </NavLink>

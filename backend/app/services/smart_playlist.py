@@ -1,14 +1,13 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.listening_history import ListeningHistory
 from app.models.playlist import Playlist
 from app.models.playlist_track import PlaylistTrack
 from app.models.track import Track
-from app.models.listening_history import ListeningHistory
-
 
 SMART_RULE_TYPES = {
     "genre": {"ops": ["equals", "not_equals", "contains"]},

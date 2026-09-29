@@ -7,14 +7,14 @@ interface JamState {
   messages: any[];
   participants: JamParticipant[];
   isConnected: boolean;
-  votes: { trackId: number; voters: number[] }[];
+  votes: { trackId: string; voters: number[] }[];
   ws: WebSocket | null;
   createSession: () => Promise<void>;
   joinSession: (code: string) => Promise<void>;
   leaveSession: () => Promise<void>;
   loadSession: (sessionId: string) => Promise<void>;
   sendTrackChange: (track: Track) => void;
-  sendVoteSkip: (trackId: number) => void;
+  sendVoteSkip: (trackId: string) => void;
   sendChat: (message: string) => void;
   connectWebSocket: (sessionId: string) => void;
   disconnectWebSocket: () => void;
@@ -59,7 +59,7 @@ export const useJamStore = create<JamState>((set, get) => ({
     }
   },
 
-  sendVoteSkip: (trackId: number) => {
+  sendVoteSkip: (trackId: string) => {
     const { ws } = get();
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'vote_skip', data: { track_id: trackId } }));

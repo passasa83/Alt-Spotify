@@ -1,5 +1,14 @@
-import os
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Values shipped in the example files: a server running with one of them
+# accepts JWTs forged by anyone who has read this repository.
+_PLACEHOLDER_SECRET_KEYS = {
+    "changeme",
+    "change-me-to-a-random-secret-key",
+    "change-me-in-production-use-openssl-rand-hex-32",
+}
+_MIN_SECRET_KEY_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -17,7 +26,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/alt_spotify"
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    SECRET_KEY: str = "CHANGE-ME-IN-PRODUCTION-USE-OPENSSL-RAND-HEX-32"
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     REFRESH_TOKEN_EXPIRE_DAYS: int = 365
@@ -37,6 +46,10 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
     ALLOWED_HOSTS: str = "*"
     BASE_URL: str = "http://localhost:3000"
+
+    # When False, only the very first account (which becomes admin) can be
+    # created without an invitation.
+    OPEN_REGISTRATION: bool = False
 
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_DEFAULT: str = "100/minute"
@@ -58,6 +71,16 @@ class Settings(BaseSettings):
     LASTFM_API_KEY: str = ""
     LASTFM_API_SECRET: str = ""
     LASTFM_CALLBACK_URL: str = "http://localhost:3000/settings"
+
+    @model_validator(mode="after")
+    def _check_secret_key(self) -> "Settings":
+        key = self.SECRET_KEY.strip()
+        if key.lower() in _PLACEHOLDER_SECRET_KEYS or len(key) < _MIN_SECRET_KEY_LENGTH:
+            raise ValueError(
+                f"SECRET_KEY must be a random value of at least {_MIN_SECRET_KEY_LENGTH} characters "
+                "(generate one with: openssl rand -hex 32)"
+            )
+        return self
 
     @property
     def cors_origins_list(self) -> list[str]:

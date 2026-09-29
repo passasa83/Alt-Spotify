@@ -47,16 +47,16 @@ async def test_update_profile_duplicate_pseudo(client: AsyncClient, auth_headers
     assert response.status_code == 409
 
 
-async def test_get_user_by_id(client: AsyncClient, test_user):
-    response = await client.get(f"/api/v1/users/{test_user.id}")
+async def test_get_user_by_id(client: AsyncClient, test_user, auth_headers):
+    response = await client.get(f"/api/v1/users/{test_user.id}", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["email"] == "test@example.com"
 
 
-async def test_get_user_not_found(client: AsyncClient):
+async def test_get_user_not_found(client: AsyncClient, auth_headers):
     fake_id = uuid.uuid4()
-    response = await client.get(f"/api/v1/users/{fake_id}")
+    response = await client.get(f"/api/v1/users/{fake_id}", headers=auth_headers)
     assert response.status_code == 404
 
 

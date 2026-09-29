@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from typing import Generic, TypeVar
 from math import ceil
+from typing import Generic, TypeVar
 
 from fastapi import Query
 from pydantic import BaseModel

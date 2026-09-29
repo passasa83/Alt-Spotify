@@ -1,9 +1,12 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Integer, ForeignKey, DateTime, Boolean
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
+
 
 class AdminInviteToken(Base):
     __tablename__ = "admin_invite_tokens"

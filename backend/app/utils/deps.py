@@ -1,8 +1,7 @@
-from collections.abc import AsyncGenerator
 from uuid import UUID
 
 import structlog
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,6 +44,50 @@ async def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
     return current_user
+
+
+def _extract_stream_token(authorization: str | None, token: str | None) -> str | None:
+    if token:
+        return token
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return None
+
+
+async def get_current_user_stream(
+    request: Request,
+    token: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Same as ``get_current_user`` but also accepts the JWT as ``?token=``.
+
+    Media elements (``<audio>``, ``<video>``, HLS.js) cannot attach an
+    ``Authorization`` header, so the frontend passes the access token in the
+    query string for those requests only.
+    """
+    bearer = _extract_stream_token(request.headers.get("Authorization"), token)
+    if not bearer:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = verify_token(bearer, token_type="access")
+    if user_id is None:
+        logger.warning("stream_token_invalid")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    result = await db.execute(select(User).where(User.id == UUID(user_id)))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+    return user
 
 
 async def require_owner(

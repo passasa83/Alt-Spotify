@@ -28,7 +28,7 @@ const EditTrack = () => {
         setArtist(track.artist?.name || '');
         setAlbum(track.album?.title || '');
         setGenre(track.genre || '');
-        setIsExplicit(track.is_explicit);
+        setIsExplicit(!!track.is_explicit);
         setAllowedTerritories(track.allowed_territories?.join(', ') || '');
       })
       .catch(() => setError('Failed to load track'))

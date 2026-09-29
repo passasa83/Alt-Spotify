@@ -13,15 +13,15 @@ const AlbumDetail = () => {
   const [album, setAlbum] = useState<Album | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { setTrack, currentTrack, isPlaying, togglePlay } = usePlayerStore();
+  const { setPlaylistAsQueue } = usePlayerStore();
 
   useEffect(() => {
     const loadAlbum = async () => {
       if (!id) return;
       try {
         const [albumData, tracksData] = await Promise.all([
-          getAlbum(parseInt(id)),
-          getAlbumTracks(parseInt(id)),
+          getAlbum(id),
+          getAlbumTracks(id),
         ]);
         setAlbum(albumData);
         setTracks(tracksData);
@@ -50,12 +50,15 @@ const AlbumDetail = () => {
     );
   }
 
-  const totalDuration = tracks.reduce((acc, track) => acc + track.duration, 0);
+  const totalDuration = tracks.reduce((acc, track) => acc + track.duration_seconds, 0);
   const minutes = Math.floor(totalDuration / 60);
+  const releaseYear = album.release_date
+    ? new Date(album.release_date).getFullYear()
+    : new Date(album.created_at).getFullYear();
 
   const handlePlayAll = () => {
     if (tracks.length > 0) {
-      setTrack(tracks[0]!);
+      setPlaylistAsQueue(tracks, 0);
     }
   };
 
@@ -75,7 +78,7 @@ const AlbumDetail = () => {
               {album.artist?.name || t('player.unknown_artist')}
             </Link>
             <span>•</span>
-            <span>{album.release_year || new Date(album.created_at).getFullYear()}</span>
+            <span>{releaseYear}</span>
             <span>•</span>
             <span>{t('album.songs_about_min', { count: tracks.length, minutes })}</span>
           </div>

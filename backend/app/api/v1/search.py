@@ -1,28 +1,29 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status
-from sqlalchemy import select, func, or_
-from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
+import re
 from datetime import datetime, timezone
+from urllib.parse import urlparse
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.models.artist import Artist
 from app.models.album import Album
-from app.models.track import Track
+from app.models.artist import Artist
 from app.models.playlist import Playlist
 from app.models.podcast import Podcast
-from app.schemas.artist import ArtistResponse
+from app.models.track import Track
+from app.models.user import User
 from app.schemas.album import AlbumResponse
-from app.schemas.track import TrackResponse, SearchTrackResponse
+from app.schemas.artist import ArtistResponse
 from app.schemas.playlist import PlaylistResponse
-from app.services.deezer import search_deezer, download_deezer_preview
-from app.services.jiosaavn import search_jiosaavn, import_from_jiosaavn
-from app.services.meilisearch import search_meili
-from app.services.musicbrainz import search_recordings, search_artists
+from app.schemas.track import SearchTrackResponse
+from app.services.deezer import download_deezer_preview, search_deezer
+from app.services.jiosaavn import import_from_jiosaavn, search_jiosaavn
+from app.services.musicbrainz import search_recordings
 from app.utils.artist import ensure_artist
+from app.utils.deps import get_current_user, require_admin
 
 router = APIRouter(prefix="/search", tags=["search"])
-
-import re
 
 
 def _normalize_title(title: str) -> str:
@@ -109,6 +110,7 @@ async def search(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
 ):
     types = [t.strip() for t in type.split(",")]
     offset = (page - 1) * page_size
@@ -294,6 +296,7 @@ async def search_jiosaavn_only(
     limit: int = Query(10, ge=1, le=50),
     auto_import: bool = Query(True),
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """Search JioSaavn directly and optionally auto-import tracks."""
     jio_results = await search_jiosaavn(q, limit=limit)
@@ -323,6 +326,7 @@ async def search_enriched(
     limit: int = Query(10, ge=1, le=50),
     auto_import: bool = Query(True),
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """
     Search MusicBrainz for rich metadata + JioSaavn for audio download.
@@ -381,8 +385,16 @@ async def download_deezer_track(
     artist_name: str,
     preview_url: str,
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """Download a Deezer preview to MinIO and create/update a local track."""
+    # The server fetches this URL itself: only allow Deezer's CDN, never
+    # arbitrary hosts (internal services, cloud metadata endpoints...).
+    parsed = urlparse(preview_url)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not (host == "dzcdn.net" or host.endswith(".dzcdn.net")):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="preview_url must be a Deezer CDN URL")
+
     object_name = f"deezer/previews/{deezer_id}.mp3"
     result = await download_deezer_preview(preview_url, object_name)
     
@@ -392,20 +404,12 @@ async def download_deezer_track(
             detail="Failed to download from Deezer"
         )
     
-    from app.core.minio import get_file_url
-    file_url = get_file_url(object_name)
-    
     artist_id = await ensure_artist(db, artist_name, None)
-    
-    existing = await db.execute(
-        select(Track).where(Track.isrc.isnot(None), Track.isrc != "").limit(1)
-    )
     
     track = Track(
         title=title,
         artist_id=artist_id,
-        file_url=file_url,
-        file_path=object_name,
+        file_url=object_name,
         duration_seconds=30,
         cover_url=None,
     )
@@ -417,6 +421,6 @@ async def download_deezer_track(
         "track_id": str(track.id),
         "title": title,
         "artist": artist_name,
-        "file_url": file_url,
+        "file_url": object_name,
         "message": "Downloaded and imported successfully"
     }

@@ -2,7 +2,7 @@ import client from './client';
 import type { Album, Track, PaginatedResponse } from '../types';
 
 export const getAlbums = async (page = 1, perPage = 20): Promise<PaginatedResponse<Album>> => {
-  const response = await client.get('/albums', { params: { page, per_page: perPage } });
+  const response = await client.get('/albums', { params: { page, page_size: perPage } });
   return response.data;
 };
 
@@ -17,6 +17,6 @@ export const getAlbumTracks = async (id: string): Promise<Track[]> => {
 };
 
 export const searchAlbums = async (query: string): Promise<Album[]> => {
-  const response = await client.get('/albums/search', { params: { q: query } });
-  return response.data;
+  const response = await client.get('/albums', { params: { q: query } });
+  return response.data.items;
 };

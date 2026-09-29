@@ -14,6 +14,7 @@ const createTrack = (id: string, title = 'Test Track'): Track => ({
   artist_id: 'artist-1',
   duration_seconds: 245,
   play_count: 0,
+  is_explicit: false,
   created_at: '2024-01-01',
   artist: { id: 'artist-1', name: 'Test Artist', created_at: '2024-01-01' },
   album: { id: 'album-1', title: 'Test Album', artist_id: 'artist-1', created_at: '2024-01-01' },

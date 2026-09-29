@@ -1,47 +1,46 @@
 import uuid
 from datetime import datetime, timezone
 from math import ceil
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select, func, update, text, cast, String, literal
-from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import String, cast, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from app.api.v1.stream import stream_object_response
 from app.core.database import get_db
-from app.core.minio import get_file_url
-from app.services.offline import generate_download_url
-from app.models.track import Track
 from app.models.listening_history import ListeningHistory
-from app.schemas.track import TrackCreate, TrackUpdate, TrackResponse
-from app.schemas.common import PaginatedResponse
-from app.utils.deps import get_current_user, require_admin
-from app.utils.track_serializer import serialize_track
+from app.models.track import Track
 from app.models.user import User
+from app.schemas.common import PaginatedResponse
+from app.schemas.track import TrackCreate, TrackResponse, TrackUpdate
+from app.services.offline import generate_download_url
+from app.utils.deps import get_current_user, get_current_user_stream, require_admin
+from app.utils.track_access import get_track_for_user
+from app.utils.track_serializer import serialize_track
 
 logger = structlog.get_logger("app")
 
 router = APIRouter(prefix="/tracks", tags=["tracks"])
 
 
-async def _get_track_for_user(track_id: uuid.UUID, current_user: User, db: AsyncSession) -> Track:
+async def _reload_track(track_id: uuid.UUID, db: AsyncSession) -> Track:
+    """Reload a track with its relations eagerly loaded.
+
+    ``TrackResponse`` embeds ``artist``/``album``, which would otherwise trigger
+    a lazy load outside of the async greenlet context.
+    """
     result = await db.execute(
         select(Track)
         .options(selectinload(Track.artist), selectinload(Track.album))
         .where(Track.id == track_id)
+        # The track is usually already in the identity map (just created or
+        # updated), in which case eager loaders are skipped without this.
+        .execution_options(populate_existing=True)
     )
-    track = result.scalar_one_or_none()
-    if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
-
-    if track.allowed_territories:
-        if not current_user.country or current_user.country not in track.allowed_territories:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Track not available in your territory")
-
-    if current_user.is_child_account and track.is_explicit:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Explicit content is restricted for child accounts")
-
-    return track
+    return result.scalar_one()
 
 
 @router.get("", response_model=PaginatedResponse[TrackResponse])
@@ -56,6 +55,8 @@ async def list_tracks(
     max_bpm: float | None = None,
     key: str | None = None,
     mood: str | None = None,
+    sort: Literal["created_at", "play_count", "title"] = "created_at",
+    order: Literal["asc", "desc"] = "desc",
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -108,9 +109,12 @@ async def list_tracks(
         count_query = count_query.where(Track.mood.ilike(f"%{mood}%"))
 
     total = (await db.execute(count_query)).scalar() or 0
+    sort_column = getattr(Track, sort)
     result = await db.execute(
         query.options(selectinload(Track.artist), selectinload(Track.album))
-        .offset((page - 1) * page_size).limit(page_size).order_by(Track.created_at.desc())
+        .offset((page - 1) * page_size).limit(page_size)
+        # Track.id as tie-breaker keeps pagination stable for equal values.
+        .order_by(sort_column.asc() if order == "asc" else sort_column.desc(), Track.id)
     )
     items = result.scalars().all()
     return PaginatedResponse(
@@ -124,7 +128,7 @@ async def get_track(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    track = await _get_track_for_user(track_id, current_user, db)
+    track = await get_track_for_user(track_id, current_user, db)
     return serialize_track(track)
 
 
@@ -137,8 +141,7 @@ async def create_track(
     track = Track(**body.model_dump())
     db.add(track)
     await db.flush()
-    await db.refresh(track)
-    return track
+    return serialize_track(await _reload_track(track.id, db))
 
 
 @router.put("/{track_id}", response_model=TrackResponse)
@@ -155,8 +158,7 @@ async def update_track(
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(track, field, value)
     await db.flush()
-    await db.refresh(track)
-    return track
+    return serialize_track(await _reload_track(track_id, db))
 
 
 @router.delete("/{track_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -178,7 +180,7 @@ async def play_track(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_track_for_user(track_id, current_user, db)
+    await get_track_for_user(track_id, current_user, db)
 
     await db.execute(update(Track).where(Track.id == track_id).values(play_count=Track.play_count + 1))
 
@@ -197,16 +199,16 @@ async def play_track(
 
 @router.get("/{track_id}/stream")
 async def stream_track(
-    track_id: uuid.UUID, 
+    track_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_stream),
 ):
-    track = await _get_track_for_user(track_id, current_user, db)
+    track = await get_track_for_user(track_id, current_user, db)
 
     if not track.file_url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No audio file available")
-    url = get_file_url(track.file_url)
-    return {"stream_url": url}
+    return stream_object_response(request, track.file_url)
 
 
 @router.post("/{track_id}/download")
@@ -216,7 +218,7 @@ async def download_track(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    track = await _get_track_for_user(track_id, current_user, db)
+    track = await get_track_for_user(track_id, current_user, db)
 
     if not track.file_url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No audio file available")

@@ -112,6 +112,8 @@ const fr = {
   'auth.invite_required': 'Une invitation est requise pour créer un compte',
   'auth.invite_valid': 'Invitation validée',
   'auth.no_invite': 'Vous n\'avez pas d\'invitation ? Contactez un administrateur.',
+  'auth.invite_code': 'Code d\'invitation',
+  'auth.enter_invite_code': 'Collez votre code d\'invitation',
 
   // Settings
   'settings.title': 'Paramètres',

@@ -32,33 +32,33 @@ async def _create_track(db_session, artist_id, lyrics_lrc=None):
 SAMPLE_LRC = "[00:01.00]Line one\n[00:04.50]Line two\n[00:10.200]Line three\n"
 
 
-async def test_get_lyrics(client: AsyncClient, db_session):
+async def test_get_lyrics(client: AsyncClient, db_session, auth_headers):
     artist = await _create_artist(db_session)
     track = await _create_track(db_session, artist.id, lyrics_lrc=SAMPLE_LRC)
-    response = await client.get(f"/api/v1/lyrics/{track.id}")
+    response = await client.get(f"/api/v1/lyrics/{track.id}", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["track_id"] == str(track.id)
     assert "lyrics_lrc" in data
 
 
-async def test_get_lyrics_no_lyrics(client: AsyncClient, db_session):
+async def test_get_lyrics_no_lyrics(client: AsyncClient, db_session, auth_headers):
     artist = await _create_artist(db_session)
     track = await _create_track(db_session, artist.id, lyrics_lrc=None)
-    response = await client.get(f"/api/v1/lyrics/{track.id}")
+    response = await client.get(f"/api/v1/lyrics/{track.id}", headers=auth_headers)
     assert response.status_code == 404
 
 
-async def test_get_lyrics_track_not_found(client: AsyncClient):
+async def test_get_lyrics_track_not_found(client: AsyncClient, auth_headers):
     fake_id = str(uuid.uuid4())
-    response = await client.get(f"/api/v1/lyrics/{fake_id}")
+    response = await client.get(f"/api/v1/lyrics/{fake_id}", headers=auth_headers)
     assert response.status_code == 404
 
 
-async def test_get_parsed_lyrics(client: AsyncClient, db_session):
+async def test_get_parsed_lyrics(client: AsyncClient, db_session, auth_headers):
     artist = await _create_artist(db_session)
     track = await _create_track(db_session, artist.id, lyrics_lrc=SAMPLE_LRC)
-    response = await client.get(f"/api/v1/lyrics/{track.id}/parsed")
+    response = await client.get(f"/api/v1/lyrics/{track.id}/parsed", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["track_id"] == str(track.id)
@@ -71,16 +71,16 @@ async def test_get_parsed_lyrics(client: AsyncClient, db_session):
     assert data["lines"][1]["time_seconds"] == 4.5
 
 
-async def test_get_parsed_lyrics_no_lyrics(client: AsyncClient, db_session):
+async def test_get_parsed_lyrics_no_lyrics(client: AsyncClient, db_session, auth_headers):
     artist = await _create_artist(db_session)
     track = await _create_track(db_session, artist.id, lyrics_lrc=None)
-    response = await client.get(f"/api/v1/lyrics/{track.id}/parsed")
+    response = await client.get(f"/api/v1/lyrics/{track.id}/parsed", headers=auth_headers)
     assert response.status_code == 404
 
 
-async def test_get_parsed_lyrics_track_not_found(client: AsyncClient):
+async def test_get_parsed_lyrics_track_not_found(client: AsyncClient, auth_headers):
     fake_id = str(uuid.uuid4())
-    response = await client.get(f"/api/v1/lyrics/{fake_id}/parsed")
+    response = await client.get(f"/api/v1/lyrics/{fake_id}/parsed", headers=auth_headers)
     assert response.status_code == 404
 
 

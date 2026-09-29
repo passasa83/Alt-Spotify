@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import MagicMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -234,9 +235,36 @@ async def test_stream_track(client: AsyncClient, admin_headers):
     )
     track_id = create_resp.json()["id"]
 
-    response = await client.get(f"/api/v1/tracks/{track_id}/stream", headers=admin_headers)
-    assert response.status_code == 200
-    assert "stream_url" in response.json()
+    with patch("app.api.v1.stream.get_minio_client") as mock_minio:
+        mock_client = MagicMock()
+        stat = MagicMock()
+        stat.size = len(b"fake-audio-content")
+        stat.content_type = "audio/mpeg"
+        mock_client.stat_object.return_value = stat
+        obj = MagicMock()
+        obj.read.return_value = b"fake-audio-content"
+        mock_client.get_object.return_value = obj
+        mock_minio.return_value = mock_client
+
+        response = await client.get(f"/api/v1/tracks/{track_id}/stream", headers=admin_headers)
+        assert response.status_code == 200
+        assert response.content == b"fake-audio-content"
+        assert response.headers["content-type"].startswith("audio/mpeg")
+        assert response.headers["accept-ranges"] == "bytes"
+
+        # The browser media element cannot send an Authorization header,
+        # so the token is also accepted as a query parameter.
+        token = admin_headers["Authorization"].split(" ", 1)[1]
+        ranged = await client.get(
+            f"/api/v1/tracks/{track_id}/stream?token={token}",
+            headers={"Range": "bytes=0-4"},
+        )
+        assert ranged.status_code == 206
+        assert ranged.content == b"fake-"
+        assert ranged.headers["content-range"] == f"bytes 0-4/{stat.size}"
+
+        unauthenticated = await client.get(f"/api/v1/tracks/{track_id}/stream")
+        assert unauthenticated.status_code == 401
 
 
 async def test_stream_track_no_file(client: AsyncClient, admin_headers):

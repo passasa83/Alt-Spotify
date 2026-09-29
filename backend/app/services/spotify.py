@@ -1,8 +1,10 @@
-import httpx
-import re
 import base64
-from app.core.config import settings
+import re
+
+import httpx
 import structlog
+
+from app.core.config import settings
 
 logger = structlog.get_logger("app")
 

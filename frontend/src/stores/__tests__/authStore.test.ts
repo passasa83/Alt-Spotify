@@ -4,14 +4,20 @@ import { useAuthStore } from '../authStore';
 vi.mock('@/api/auth', () => ({
   login: vi.fn(),
   register: vi.fn(),
+  refreshToken: vi.fn(),
+  changePassword: vi.fn(),
+}));
+
+vi.mock('@/api/users', () => ({
   getMe: vi.fn(),
 }));
 
 import * as authApi from '@/api/auth';
+import * as usersApi from '@/api/users';
 
 const mockLogin = vi.mocked(authApi.login);
 const mockRegister = vi.mocked(authApi.register);
-const mockGetMe = vi.mocked(authApi.getMe);
+const mockGetMe = vi.mocked(usersApi.getMe);
 
 beforeEach(() => {
   useAuthStore.setState({
@@ -31,7 +37,7 @@ describe('authStore', () => {
 
   it('login stores tokens and user', async () => {
     const tokens = { access_token: 'acc123', refresh_token: 'ref123', token_type: 'bearer' };
-    const user = { id: '1', email: 'test@test.com', pseudo: 'Test', role: 'user' as const, is_active: true, created_at: '2024-01-01' };
+    const user = { id: '1', email: 'test@test.com', pseudo: 'Test', role: 'USER' as const, is_active: true, created_at: '2024-01-01' };
 
     mockLogin.mockResolvedValueOnce(tokens);
     mockGetMe.mockResolvedValueOnce(user as any);
@@ -47,7 +53,7 @@ describe('authStore', () => {
 
   it('logout clears state', async () => {
     const tokens = { access_token: 'acc123', refresh_token: 'ref123', token_type: 'bearer' };
-    const user = { id: '1', email: 'test@test.com', pseudo: 'Test', role: 'user' as const, is_active: true, created_at: '2024-01-01' };
+    const user = { id: '1', email: 'test@test.com', pseudo: 'Test', role: 'USER' as const, is_active: true, created_at: '2024-01-01' };
     mockLogin.mockResolvedValueOnce(tokens);
     mockGetMe.mockResolvedValueOnce(user as any);
     await useAuthStore.getState().login('test@test.com', 'password');
@@ -61,7 +67,7 @@ describe('authStore', () => {
   });
 
   it('refreshAuth updates user', async () => {
-    const user = { id: '2', email: 'new@test.com', pseudo: 'NewUser', role: 'user' as const, is_active: true, created_at: '2024-01-01' };
+    const user = { id: '2', email: 'new@test.com', pseudo: 'NewUser', role: 'USER' as const, is_active: true, created_at: '2024-01-01' };
     mockGetMe.mockResolvedValueOnce(user as any);
 
     await useAuthStore.getState().refreshAuth();
@@ -84,9 +90,9 @@ describe('authStore', () => {
   it('register calls authApi.register', async () => {
     mockRegister.mockResolvedValueOnce({} as any);
 
-    await useAuthStore.getState().register('new@test.com', 'newuser', 'password123');
+    await useAuthStore.getState().register('new@test.com', 'newuser', 'password123', 'invite-abc');
 
-    expect(mockRegister).toHaveBeenCalledWith('new@test.com', 'newuser', 'password123');
+    expect(mockRegister).toHaveBeenCalledWith('new@test.com', 'newuser', 'password123', 'invite-abc');
     expect(useAuthStore.getState().isLoading).toBe(false);
   });
 

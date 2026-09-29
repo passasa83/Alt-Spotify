@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { updateProfile } from '@/api/users';
+import { changePassword } from '@/api/auth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getLocale, setLocale } from '@/i18n';
 
@@ -46,17 +47,22 @@ const Settings = () => {
       setError(t('auth.passwords_no_match'));
       return;
     }
+    if (!currentPassword || !newPassword) {
+      setError(t('settings.password_change_failed'));
+      return;
+    }
     setIsSaving(true);
     setError('');
     setMessage('');
     try {
-      await updateProfile({});
+      await changePassword(currentPassword, newPassword);
       setMessage(t('settings.password_changed'));
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch {
-      setError(t('settings.password_change_failed'));
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : t('settings.password_change_failed'));
     } finally {
       setIsSaving(false);
     }

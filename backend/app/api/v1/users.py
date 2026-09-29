@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,13 +8,13 @@ from app.core.database import get_db
 from app.models.user import User
 from app.schemas.user import UserResponse, UserUpdate
 from app.services.stats import (
-    get_total_listening_time,
-    get_monthly_stats,
-    get_user_top_artists,
-    get_user_top_tracks,
     get_genre_distribution,
     get_listening_by_hour,
     get_listening_streak,
+    get_monthly_stats,
+    get_total_listening_time,
+    get_user_top_artists,
+    get_user_top_tracks,
 )
 from app.utils.deps import get_current_user
 
@@ -112,7 +112,11 @@ async def get_wrapped(
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-async def get_user(user_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_user(
+    user_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:

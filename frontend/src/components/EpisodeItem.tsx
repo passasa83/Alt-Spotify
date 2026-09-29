@@ -1,8 +1,6 @@
-import { Play, Pause, Check } from 'lucide-react';
+import { Play, Check } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { Episode } from '@/types';
-import { usePlayerStore } from '@/stores/playerStore';
-import { getEpisodeStreamUrl } from '@/api/podcasts';
-import { useState } from 'react';
 import { formatDurationHms, formatDate } from '@/utils/formatTime';
 
 interface EpisodeItemProps {
@@ -10,24 +8,20 @@ interface EpisodeItemProps {
   onPlay?: (episode: Episode) => void;
 }
 
+// Playback happens on the episode page, which holds the audio player.
 const EpisodeItem = ({ episode, onPlay }: EpisodeItemProps) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  const handlePlay = () => {
-    if (onPlay) {
-      onPlay(episode);
-    }
-    setIsPlaying(!isPlaying);
-  };
-
   return (
-    <div className="flex items-center gap-4 rounded-md p-3 transition-colors hover:bg-gray-800 group">
-      <button
-        onClick={handlePlay}
+    <Link
+      to={`/podcasts/episode/${episode.id}`}
+      onClick={() => onPlay?.(episode)}
+      className="flex items-center gap-4 rounded-md p-3 transition-colors hover:bg-gray-800 group"
+    >
+      <span
+        aria-hidden="true"
         className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-green-500 text-black opacity-0 group-hover:opacity-100 transition-opacity"
       >
-        {isPlaying ? <Pause size={16} /> : <Play size={16} fill="currentColor" />}
-      </button>
+        <Play size={16} fill="currentColor" />
+      </span>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -55,7 +49,7 @@ const EpisodeItem = ({ episode, onPlay }: EpisodeItemProps) => {
           <span>{formatDate(episode.published_at)}</span>
         )}
       </div>
-    </div>
+    </Link>
   );
 };
 

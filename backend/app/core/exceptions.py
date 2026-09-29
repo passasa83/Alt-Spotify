@@ -1,6 +1,6 @@
-from fastapi import Request
-from fastapi.responses import JSONResponse
 import structlog
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse
 
 logger = structlog.get_logger("app")
 
@@ -59,9 +59,12 @@ async def app_exception_handler(request: Request, exc: AppException):
 
 async def not_found_handler(request: Request, exc):
     request_id = getattr(request.state, "request_id", "-")
+    # Registered for status 404, so it also receives every HTTPException(404)
+    # raised by the routes: keep their detail instead of masking it.
+    detail = exc.detail if isinstance(exc, HTTPException) else "Not found"
     return JSONResponse(
         status_code=404,
-        content={"detail": "Not found", "request_id": request_id},
+        content={"detail": detail, "request_id": request_id},
     )
 
 

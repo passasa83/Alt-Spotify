@@ -1,19 +1,19 @@
 import client from './client';
 import type { User, ShareLink, PaginatedResponse } from '@/types';
 
-export const followUser = async (userId: number): Promise<void> => {
-  await client.post(`/social/follow/user/${userId}`);
+export const followUser = async (userId: string): Promise<void> => {
+  await client.post(`/social/follow/${userId}`);
 };
 
-export const unfollowUser = async (userId: number): Promise<void> => {
-  await client.delete(`/social/follow/user/${userId}`);
+export const unfollowUser = async (userId: string): Promise<void> => {
+  await client.delete(`/social/follow/${userId}`);
 };
 
-export const followArtist = async (artistId: number): Promise<void> => {
+export const followArtist = async (artistId: string): Promise<void> => {
   await client.post(`/social/follow/artist/${artistId}`);
 };
 
-export const unfollowArtist = async (artistId: number): Promise<void> => {
+export const unfollowArtist = async (artistId: string): Promise<void> => {
   await client.delete(`/social/follow/artist/${artistId}`);
 };
 
