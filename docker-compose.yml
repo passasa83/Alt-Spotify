@@ -113,6 +113,9 @@ services:
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      # false (défaut) : seul le PREMIER compte est créable librement (il devient
+      # admin) ; ensuite l'inscription se ferme et il faut des invitations admin.
+      OPEN_REGISTRATION: ${OPEN_REGISTRATION:-false}
       # URL de base des liens générés (partage, invitations admin) : doit être
       # atteignable depuis le navigateur du visiteur → IP de la machine ou
       # domaine public, jamais "localhost" hors de cette machine.
