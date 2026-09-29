@@ -10,6 +10,7 @@ vi.mock('@/stores/playerStore');
 vi.mock('@/api/tracks', () => ({
   getTrackStreamUrl: (id: string) => `/api/v1/tracks/${id}/stream`,
   getHlsStreamUrl: (id: string) => `/api/v1/stream/${id}/master.m3u8`,
+  resolveCoverUrl: (url: string | null | undefined) => url || '/placeholder-album.svg',
 }));
 vi.mock('@/components/SynchronizedLyrics', () => ({
   default: () => <div data-testid="lyrics">Lyrics</div>,

@@ -1,5 +1,7 @@
+import os
 import re
 import uuid
+from collections.abc import Callable, Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response, StreamingResponse
@@ -15,6 +17,9 @@ from app.utils.track_access import get_track_for_user
 
 router = APIRouter(prefix="/stream", tags=["stream"])
 
+# Tracks from the music folders / YouTube downloads: ``local:<path on the server>``.
+LOCAL_PREFIX = "local:"
+
 _RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
 _CHUNK_SIZE = 64 * 1024
 
@@ -29,11 +34,49 @@ _AUDIO_CONTENT_TYPES = {
 }
 
 
-def _content_type_for(object_name: str, stat_content_type=None) -> str:
+def _content_type_for(name: str, stat_content_type=None) -> str:
     if isinstance(stat_content_type, str) and stat_content_type and stat_content_type != "application/octet-stream":
         return stat_content_type
-    ext = object_name.rsplit(".", 1)[-1].lower() if "." in object_name else ""
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
     return _AUDIO_CONTENT_TYPES.get(ext, "audio/mpeg")
+
+
+def _ranged_response(
+    request: Request,
+    total_size: int,
+    media_type: str,
+    read_range: Callable[[int, int], Iterator[bytes]],
+) -> Response:
+    """Serve ``total_size`` bytes, honouring an HTTP ``Range`` header.
+
+    ``read_range(start, length)`` yields the requested bytes.
+    """
+    headers = {"Accept-Ranges": "bytes"}
+    start, end = 0, max(total_size - 1, 0)
+    response_status = status.HTTP_200_OK
+
+    range_header = request.headers.get("range")
+    match = _RANGE_RE.match(range_header.strip()) if range_header else None
+    if match and (match.group(1) or match.group(2)):
+        first, last = match.group(1), match.group(2)
+        if first:
+            start = int(first)
+            end = int(last) if last else total_size - 1
+        else:
+            start = max(total_size - int(last), 0)
+            end = total_size - 1
+        if start >= total_size or start > end:
+            return Response(
+                status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+                headers={"Content-Range": f"bytes */{total_size}"},
+            )
+        end = min(end, total_size - 1)
+        response_status = status.HTTP_206_PARTIAL_CONTENT
+        headers["Content-Range"] = f"bytes {start}-{end}/{total_size}"
+
+    length = end - start + 1
+    headers["Content-Length"] = str(length)
+    return StreamingResponse(read_range(start, length), status_code=response_status, media_type=media_type, headers=headers)
 
 
 def stream_object_response(request: Request, object_name: str) -> Response:
@@ -49,35 +92,7 @@ def stream_object_response(request: Request, object_name: str) -> Response:
     except Exception:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track file not found")
 
-    total_size = int(stat.size)
-    headers = {"Accept-Ranges": "bytes"}
-    start, end = 0, max(total_size - 1, 0)
-    response_status = status.HTTP_200_OK
-
-    range_header = request.headers.get("range")
-    if range_header:
-        match = _RANGE_RE.match(range_header.strip())
-        if match:
-            first, last = match.group(1), match.group(2)
-            if first:
-                start = int(first)
-                end = int(last) if last else total_size - 1
-            elif last:
-                start = max(total_size - int(last), 0)
-                end = total_size - 1
-            if start >= total_size or start > end:
-                return Response(
-                    status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
-                    headers={"Content-Range": f"bytes */{total_size}"},
-                )
-            end = min(end, total_size - 1)
-            response_status = status.HTTP_206_PARTIAL_CONTENT
-            headers["Content-Range"] = f"bytes {start}-{end}/{total_size}"
-
-    length = end - start + 1
-    headers["Content-Length"] = str(length)
-
-    def iterator():
+    def read_range(start: int, length: int):
         obj = client.get_object(settings.MINIO_BUCKET, object_name, offset=start, length=length)
         try:
             remaining = length
@@ -85,20 +100,41 @@ def stream_object_response(request: Request, object_name: str) -> Response:
                 chunk = obj.read(min(_CHUNK_SIZE, remaining))
                 if not chunk:
                     break
-                if len(chunk) > remaining:
-                    chunk = chunk[:remaining]
+                chunk = chunk[:remaining]
                 remaining -= len(chunk)
                 yield chunk
         finally:
             obj.close()
             obj.release_conn()
 
-    return StreamingResponse(
-        iterator(),
-        status_code=response_status,
-        media_type=_content_type_for(object_name, getattr(stat, "content_type", None)),
-        headers=headers,
-    )
+    media_type = _content_type_for(object_name, getattr(stat, "content_type", None))
+    return _ranged_response(request, int(stat.size), media_type, read_range)
+
+
+def stream_local_response(request: Request, path: str) -> Response:
+    """Serve a file from the server's music folders with HTTP Range support."""
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Local file not found")
+
+    def read_range(start: int, length: int):
+        with open(path, "rb") as f:
+            f.seek(start)
+            remaining = length
+            while remaining > 0:
+                chunk = f.read(min(_CHUNK_SIZE, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+
+    return _ranged_response(request, os.path.getsize(path), _content_type_for(path), read_range)
+
+
+def stream_track_file(request: Request, file_url: str) -> Response:
+    """Stream a track's source file: a local file (``local:<path>``) or a MinIO object."""
+    if file_url.startswith(LOCAL_PREFIX):
+        return stream_local_response(request, file_url[len(LOCAL_PREFIX):])
+    return stream_object_response(request, file_url)
 
 
 _HLS_QUALITIES = frozenset({"128k", "192k", "320k"})
@@ -191,6 +227,6 @@ async def download_track(
     file_ext = track.file_url.rsplit(".", 1)[-1] if "." in track.file_url else "mp3"
     filename = f"{track.artist.name if track.artist else 'Unknown'} - {track.title}.{file_ext}"
 
-    response = stream_object_response(request, track.file_url)
+    response = stream_track_file(request, track.file_url)
     response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response

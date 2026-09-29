@@ -39,6 +39,48 @@ async def lifespan(app: FastAPI):
         logger.info("meilisearch_reindex_complete")
     except Exception as e:
         logger.warning("meilisearch_init_failed", error=str(e))
+
+    import os
+
+    from app.core.database import async_session
+    music_dir = os.environ.get("MUSIC_SCAN_DIR", "")
+    download_dir = os.environ.get("MUSIC_DOWNLOAD_DIR", "")
+    scan_dirs = [d for d in [music_dir, download_dir] if d and os.path.isdir(d)]
+    for scan_dir in scan_dirs:
+        try:
+            from app.api.v1.music_scanner import scan_directory_internal
+            async with async_session() as db:
+                result = await scan_directory_internal(scan_dir, db)
+                logger.info("auto_scan_complete", scan_dir=scan_dir, **result)
+        except Exception as e:
+            logger.warning("auto_scan_failed", scan_dir=scan_dir, error=str(e))
+
+    try:
+        from sqlalchemy import select
+
+        from app.models.artist import Artist
+        from app.models.track import Track
+        from app.services.cover_service import fetch_cover
+        async with async_session() as db:
+            result = await db.execute(select(Track).where((Track.cover_url.is_(None)) | (Track.cover_url.like("local_cover:%"))))
+            tracks = list(result.scalars().all())
+            if tracks:
+                artist_ids = list({t.artist_id for t in tracks if t.artist_id})
+                artist_result = await db.execute(select(Artist).where(Artist.id.in_(artist_ids)))
+                artist_map = {str(a.id): a.name for a in artist_result.scalars().all()}
+                logger.info("auto_fix_covers_start", count=len(tracks))
+                fixed = 0
+                for track in tracks:
+                    artist_name = artist_map.get(str(track.artist_id), "")
+                    api_cover = await fetch_cover(track.title, artist_name)
+                    if api_cover:
+                        track.cover_url = api_cover
+                        fixed += 1
+                await db.commit()
+                logger.info("auto_fix_covers_complete", total=len(tracks), fixed=fixed)
+    except Exception as e:
+        logger.warning("auto_fix_covers_failed", error=str(e))
+
     logger.info("application_started", project=settings.PROJECT_NAME)
     yield
     logger.info("application_shutting_down")

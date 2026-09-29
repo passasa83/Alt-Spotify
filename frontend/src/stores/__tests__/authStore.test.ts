@@ -12,6 +12,10 @@ vi.mock('@/api/users', () => ({
   getMe: vi.fn(),
 }));
 
+vi.mock('@/api/users', () => ({
+  getMe: vi.fn(),
+}));
+
 import * as authApi from '@/api/auth';
 import * as usersApi from '@/api/users';
 

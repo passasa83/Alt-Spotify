@@ -11,6 +11,8 @@ from mutagen import File as MutagenFile
 # the qualities accepted by the backend stream endpoints.
 HLS_VARIANTS = [("128k", 128), ("192k", 192), ("320k", 320)]
 HLS_SEGMENT_SECONDS = 6
+# Tracks from the music folders / YouTube downloads (same convention as the backend).
+LOCAL_PREFIX = "local:"
 FFMPEG_TIMEOUT = 600
 
 
@@ -85,7 +87,10 @@ def _master_playlist(variants: list[tuple[str, int]]) -> str:
 
 @app.task(bind=True, name="tasks.transcode_audio", max_retries=3)
 def transcode_audio(self, input_path: str, output_prefix: str, track_id: str):
-    """Transcode a source file stored in MinIO to multi-bitrate HLS.
+    """Transcode a track's source file to multi-bitrate HLS.
+
+    ``input_path`` is a MinIO object name, or ``local:<path>`` for files from
+    the music folders mounted read-only in this container.
 
     Segments and playlists are uploaded under ``output_prefix``, then
     ``tracks.hls_path`` is set so the players switch to HLS.
@@ -95,11 +100,17 @@ def transcode_audio(self, input_path: str, output_prefix: str, track_id: str):
     work_dir = tempfile.mkdtemp(prefix="hls-")
 
     try:
-        source = os.path.join(work_dir, "source" + Path(input_path).suffix)
-        try:
-            client.fget_object(bucket, input_path, source)
-        except Exception as e:
-            raise self.retry(exc=e, countdown=30)
+        if input_path.startswith(LOCAL_PREFIX):
+            source = input_path[len(LOCAL_PREFIX):]
+            if not os.path.isfile(source):
+                # Not retried: the folder isn't mounted here or the file is gone.
+                raise FileNotFoundError(f"Local source not found in worker: {source}")
+        else:
+            source = os.path.join(work_dir, "source" + Path(input_path).suffix)
+            try:
+                client.fget_object(bucket, input_path, source)
+            except Exception as e:
+                raise self.retry(exc=e, countdown=30)
 
         done = []
         for label, kbps in _pick_variants(_source_bitrate_kbps(source)):

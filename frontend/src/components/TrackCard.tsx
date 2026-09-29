@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Play, Heart } from 'lucide-react';
+import { Play, Heart, Download, Loader2 } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
+import { fetchFromYoutube, resolveCoverUrl } from '@/api/tracks';
+import { useToastStore } from '@/stores/toastStore';
 import TrackContextMenu from '@/components/TrackContextMenu';
 import AddToPlaylistModal from '@/components/AddToPlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
@@ -9,37 +11,79 @@ import type { Track } from '@/types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
 
+const downloadedTrackUrls = new Map<string, string>();
+
 interface TrackCardProps {
   track: Track;
+  onDownloaded?: (trackId: string, fileUrl: string) => void;
 }
 
-const TrackCard = ({ track }: TrackCardProps) => {
+const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
   const { t } = useTranslation();
   const { setTrack, currentTrack, isPlaying } = usePlayerStore();
   const { addToFavorites, removeFromFavorites, isFavorite } = useLibraryStore();
+  const { addToast } = useToastStore();
   const isCurrentTrack = currentTrack?.id === track.id;
   const liked = isFavorite(String(track.id));
   const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const [, forceRender] = useState(0);
+  const hasDownloaded = downloadedTrackUrls.has(String(track.id));
+  const downloadedUrl = downloadedTrackUrls.get(String(track.id));
+  const hasAudio = !!(track.file_url || track.hls_path || hasDownloaded);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setDownloading(true);
+    try {
+      const result = await fetchFromYoutube(track.id);
+      downloadedTrackUrls.set(String(track.id), result.file_url);
+      forceRender((n) => n + 1);
+      addToast(`Téléchargé: ${result.youtube_title || track.title}`);
+      onDownloaded?.(track.id, result.file_url);
+    } catch (err: any) {
+      addToast(err?.response?.data?.detail || 'Échec du téléchargement');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handlePlay = () => {
+    setTrack({ ...track, file_url: downloadedUrl || track.file_url } as Track);
+  };
 
   return (
     <>
       <div className="group relative cursor-pointer rounded-md bg-gray-900 p-3 transition-colors hover:bg-gray-800">
         <div className="relative mb-3">
           <img
-            src={track.cover_url || track.album?.cover_url || '/placeholder-album.svg'}
+            src={resolveCoverUrl(track.cover_url || track.album?.cover_url)}
             alt={track.title}
-            className="h-40 w-full rounded-md object-cover shadow-lg"
+            className={`h-40 w-full rounded-md object-cover shadow-lg ${!hasAudio ? 'opacity-50' : ''}`}
           />
           <button
-            onClick={() => setTrack(track)}
-            className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-black shadow-xl transition-all ${
-              isCurrentTrack && isPlaying
-                ? 'opacity-100 translate-y-0'
-                : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
-            }`}
+            onClick={hasAudio ? handlePlay : handleDownload}
+            disabled={downloading}
+            className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full shadow-xl transition-all ${
+              hasAudio
+                ? 'bg-green-500 text-black'
+                : 'bg-blue-500 text-white'
+            } ${hasAudio
+              ? 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
+              : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
+            } ${downloading ? '!opacity-100 !translate-y-0' : ''} ${hasAudio && isCurrentTrack && isPlaying ? '!opacity-100 !translate-y-0' : ''}`}
+            title={hasAudio ? 'Écouter' : 'Télécharger depuis YouTube'}
           >
-            <Play size={18} fill="currentColor" />
+            {downloading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : hasAudio ? (
+              <Play size={18} fill="currentColor" />
+            ) : (
+              <Download size={18} />
+            )}
           </button>
           <button
             onClick={(e) => {

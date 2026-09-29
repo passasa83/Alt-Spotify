@@ -1,7 +1,8 @@
-# Changements — branche `Akajox`
+# Changements — branche `Akajox`, fusionnée dans `main`
 
-Récapitulatif des corrections apportées au projet. Les consignes de déploiement
-sont en premier : à lire **avant** de mettre à jour le serveur.
+Récapitulatif des corrections apportées au projet, fusionnées avec les nouveautés de `main`
+(scanner de musique locale, Tidal, yt-dlp, pochettes). Les consignes de déploiement sont en
+premier : à lire **avant** de mettre à jour le serveur.
 
 ---
 
@@ -13,17 +14,21 @@ sont en premier : à lire **avant** de mettre à jour le serveur.
    python -c "import secrets; print(secrets.token_hex(32))"
    ```
    Changer la clé déconnecte tous les utilisateurs.
-2. **Reconstruire les images** (nouvelles dépendances : Celery côté backend, psycopg côté worker) :
+   `docker compose` refuse aussi de démarrer si elle est absente du `.env`.
+2. **Récupérer les nouvelles images** (construites par GitHub Actions au push sur `main` ;
+   nouvelles dépendances : Celery côté backend, psycopg côté worker) :
    ```bash
-   docker compose up -d --build
+   docker compose pull && docker compose up -d
    ```
-3. **Générer le HLS des morceaux existants** : la chaîne de transcodage était cassée, aucun
-   morceau n'a encore ses variantes HLS. Une fois connecté en admin :
-   `POST /api/v1/upload/transcode-missing`.
+   Le worker monte maintenant les mêmes dossiers de musique que le backend (lecture seule),
+   pour pouvoir transcoder les fichiers locaux.
+3. **Générer le HLS des morceaux existants** (fichiers locaux, téléchargements YouTube et
+   uploads) : la chaîne de transcodage était cassée, aucun morceau n'a encore ses variantes HLS.
+   Une fois connecté en admin : `POST /api/v1/upload/transcode-missing`.
 4. **Inscription sur invitation** : les comptes existants ne changent pas. Les nouveaux membres
    ont besoin d'un lien créé depuis la page admin « Invitations ».
-5. **Connexion obligatoire sur toute l'API** (catalogue, paroles, podcasts, playlists…). Un outil
-   externe qui appelait l'API sans token recevra désormais une erreur 401.
+5. **Connexion obligatoire sur toute l'API** (catalogue, paroles, podcasts, playlists, Tidal…).
+   Un outil externe qui appelait l'API sans token recevra désormais une erreur 401.
 
 ---
 
@@ -32,6 +37,10 @@ sont en premier : à lire **avant** de mettre à jour le serveur.
 La chaîne upload → transcodage → lecture HLS ne fonctionnait pas du tout. Elle est testée de bout
 en bout dans Docker (upload d'un MP3, transcodage en ~2 s, lecture des playlists et segments).
 
+- **Fichiers locaux** (`local:/music/…`, téléchargements yt-dlp) : le worker les lit directement
+  depuis les dossiers montés et les transcode comme les uploads. Le stream direct et le
+  téléchargement des fichiers locaux passent par une fonction commune qui gère correctement
+  les requêtes de plages d'octets (et renvoie 416 pour une plage invalide).
 - **Envoi des tâches au worker** : le backend importait `worker.tasks`, absent de son image Docker,
   et l'erreur était avalée. Il envoie maintenant les tâches par leur nom via Celery
   (`backend/app/core/tasks.py`), après le commit en base.
@@ -66,6 +75,8 @@ en bout dans Docker (upload d'un MP3, transcodage en ~2 s, lecture des playlists
 - **Connexion obligatoire** sur le catalogue, les paroles, les podcasts (y compris le streaming
   audio des épisodes), les recommandations, les profils utilisateurs (qui exposaient l'email)
   et le téléchargement des morceaux.
+- **Tidal** : tous les endpoints étaient publics, y compris les URL de streaming, ce qui
+  exposait l'abonnement Tidal à n'importe qui sur Internet. Ils exigent maintenant une connexion.
 - **Recherche** : `/search` exige une connexion (il crée des fiches en base).
   `/search/jiosaavn` et `/search/enriched` sont réservés aux admins.
 - **`/search/download-deezer`** : il téléchargeait n'importe quelle URL sans authentification
@@ -104,7 +115,11 @@ en bout dans Docker (upload d'un MP3, transcodage en ~2 s, lecture des playlists
   (`fakeredis`) ni d'un Postgres réel, et tournent en ~1 min 15 au lieu de ~10 min.
 - Nouveaux tests : invitations, `SECRET_KEY`, accès (playlists privées, catalogue, podcasts),
   HLS, transcodage, WebSockets Jam et notifications, push par lots, tri des morceaux.
-- CI : la `SECRET_KEY` est fournie aux jobs de tests et Docker.
+- CI : la `SECRET_KEY` est fournie aux tests ; le frontend est vérifié (typecheck, tests, build).
+- Lint : erreurs d'imports corrigées dans le code venu de `main` (Tidal, scanner, yt-dlp),
+  qui faisaient échouer `ruff check`.
+- Testé de bout en bout dans Docker après la fusion : upload et fichier local transcodés en
+  ~2 s, playlists et segments HLS servis, stream direct et téléchargement fonctionnels.
 
 ## Pas encore corrigé
 

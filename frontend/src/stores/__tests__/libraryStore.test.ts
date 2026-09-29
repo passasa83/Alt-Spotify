@@ -10,8 +10,8 @@ vi.mock('@/api/playlists', () => ({
 
 vi.mock('@/api/favorites', () => ({
   getFavorites: vi.fn(),
-  addFavorite: vi.fn(),
-  removeFavorite: vi.fn(),
+  addFavorite: vi.fn().mockResolvedValue({}),
+  removeFavorite: vi.fn().mockResolvedValue({}),
   checkFavorite: vi.fn(),
 }));
 
@@ -70,7 +70,6 @@ describe('libraryStore', () => {
     await useLibraryStore.getState().addToFavorites(track);
 
     expect(useLibraryStore.getState().favorites).toEqual([track]);
-    expect(JSON.parse(localStorage.getItem('favorites') || '[]')).toEqual([track]);
   });
 
   it('addToFavorites does not duplicate', async () => {

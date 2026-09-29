@@ -7,9 +7,23 @@ export interface UploadResult {
   status?: string;
   message?: string;
 }
+export const resolveCoverUrl = (url: string | null | undefined): string => {
+  if (!url) return '/placeholder-album.svg';
+  if (url.startsWith('local_cover:')) {
+    const token = localStorage.getItem('access_token');
+    const path = url.substring('local_cover:'.length);
+    return `/api/v1/local/covers${path.startsWith('/') ? path : `/${path}`}${token ? `?token=${token}` : ''}`;
+  }
+  return url;
+};
 
 export const getTracks = async (page = 1, pageSize = 20): Promise<PaginatedResponse<Track>> => {
   const response = await client.get('/tracks', { params: { page, page_size: pageSize } });
+  return response.data;
+};
+
+export const getLocalTracks = async (page = 1, pageSize = 50): Promise<PaginatedResponse<Track>> => {
+  const response = await client.get('/tracks', { params: { page, page_size: pageSize, local_only: true, sort: 'created_at', order: 'desc' } });
   return response.data;
 };
 
@@ -76,5 +90,18 @@ export const uploadLyrics = async (trackId: string, file: File): Promise<{ messa
   const response = await client.post(`/upload/lyrics/${trackId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+  return response.data;
+};
+
+export const fetchFromYoutube = async (trackId: string, youtubeUrl?: string): Promise<any> => {
+  const response = await client.post(`/tracks/${trackId}/fetch-youtube`, youtubeUrl ? { youtube_url: youtubeUrl } : {});
+  return response.data;
+};
+
+export const fetchFromYoutubeUrl = async (youtubeUrl: string, title?: string, artist?: string): Promise<any> => {
+  const params = new URLSearchParams({ youtube_url: youtubeUrl });
+  if (title) params.append('title', title);
+  if (artist) params.append('artist', artist);
+  const response = await client.post(`/tracks/fetch-url?${params.toString()}`);
   return response.data;
 };

@@ -126,6 +126,11 @@ class ChangePasswordBody(BaseModel):
     new_password: str
 
 
+@router.get("/me", response_model=UserResponse)
+async def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(body: RefreshBody, db: AsyncSession = Depends(get_db)):
     user_id = verify_token(body.refresh_token, token_type="refresh")

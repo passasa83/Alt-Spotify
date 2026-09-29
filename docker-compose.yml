@@ -68,8 +68,7 @@ services:
       - backend-net
 
   backend:
-    build:
-      context: ./backend
+    image: ghcr.io/passasa83/alt-spotify-backend:main
     ports:
       - "8000:8000"
     environment:
@@ -90,6 +89,11 @@ services:
       RATE_LIMIT_AUTH: ${RATE_LIMIT_AUTH:-10/minute}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: ${LOG_FORMAT:-json}
+      MUSIC_SCAN_DIR: /music
+      MUSIC_DOWNLOAD_DIR: /app/downloads
+    volumes:
+      - ${MUSIC_SCAN_DIR:-./music}:/music:ro
+      - ${MUSIC_DOWNLOAD_DIR:-./data/downloads}:/app/downloads
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,8 +111,7 @@ services:
       - frontend-net
 
   worker:
-    build:
-      context: ./worker
+    image: ghcr.io/passasa83/alt-spotify-worker:main
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-altspotify}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-altspotify}
       REDIS_URL: redis://redis:6379/0
@@ -116,6 +119,10 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-alt-spotify}
+    volumes:
+      # Same music folders as the backend, so local tracks can be transcoded.
+      - ${MUSIC_SCAN_DIR:-./music}:/music:ro
+      - ${MUSIC_DOWNLOAD_DIR:-./data/downloads}:/app/downloads:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -127,8 +134,7 @@ services:
       - backend-net
 
   frontend:
-    build:
-      context: ./frontend
+    image: ghcr.io/passasa83/alt-spotify-frontend:main
     ports:
       - "3000:80"
     depends_on:

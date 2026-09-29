@@ -35,7 +35,7 @@ describe('useSearch', () => {
       vi.advanceTimersByTime(300);
     });
 
-    expect(mockSearch).toHaveBeenCalledWith('test', {});
+    expect(mockSearch).toHaveBeenCalledWith('test', {}, 'local');
   });
 
   it('search calls API with results', async () => {

@@ -137,3 +137,33 @@ async def test_get_episode(client: AsyncClient, db_session, auth_headers):
 
     missing = await client.get(f"/api/v1/podcasts/episodes/{uuid.uuid4()}", headers=auth_headers)
     assert missing.status_code == 404
+
+
+@pytest.mark.parametrize("path", ["/api/v1/tidal/search?q=x", "/api/v1/tidal/tracks/1/stream"])
+async def test_tidal_requires_login(client: AsyncClient, path):
+    response = await client.get(path)
+    assert response.status_code == 401
+
+
+async def test_local_track_streams_with_range(client: AsyncClient, db_session, auth_headers, tmp_path):
+    audio = tmp_path / "song.mp3"
+    audio.write_bytes(bytes(range(256)) * 4)  # 1024 bytes
+    artist = Artist(id=uuid.uuid4(), name="Local")
+    db_session.add(artist)
+    await db_session.flush()
+    track = Track(title="Local song", artist_id=artist.id, duration_seconds=1, file_url=f"local:{audio}")
+    db_session.add(track)
+    await db_session.flush()
+
+    full = await client.get(f"/api/v1/tracks/{track.id}/stream", headers=auth_headers)
+    assert full.status_code == 200
+    assert full.headers["content-type"] == "audio/mpeg"
+    assert len(full.content) == 1024
+
+    part = await client.get(f"/api/v1/tracks/{track.id}/stream", headers={**auth_headers, "Range": "bytes=1000-"})
+    assert part.status_code == 206
+    assert part.headers["content-range"] == "bytes 1000-1023/1024"
+    assert part.content == audio.read_bytes()[1000:]
+
+    beyond = await client.get(f"/api/v1/tracks/{track.id}/stream", headers={**auth_headers, "Range": "bytes=5000-"})
+    assert beyond.status_code == 416
