@@ -6,7 +6,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-altspotify}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
     ports:
-      - "5432:5432"
+      # Loopback only: reachable from the host, never from the network.
+      - "127.0.0.1:5432:5432"
     volumes:
       - ${POSTGRES_DATA_DIR:-./data/postgres}:/var/lib/postgresql/data
     healthcheck:
@@ -20,7 +21,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - ${REDIS_DATA_DIR:-./data/redis}:/data
     healthcheck:
@@ -37,8 +38,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - ${MINIO_DATA_DIR:-./data/minio}:/data
     command: server /data --console-address ":9001"
@@ -56,7 +57,7 @@ services:
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-changeme}
       MEILI_ENV: development
     ports:
-      - "7700:7700"
+      - "127.0.0.1:7700:7700"
     volumes:
       - ${MEILISEARCH_DATA_DIR:-./data/meilisearch}:/meili_data
     healthcheck:
@@ -70,7 +71,23 @@ services:
   backend:
     image: ghcr.io/passasa83/alt-spotify-backend:main
     ports:
-      - "8000:8000"
+      # Loopback only. The reverse proxy reaches `backend:8000` over the
+      # `proxy` network below, this binding is just for local debugging.
+      - "127.0.0.1:8000:8000"
+    # --proxy-headers makes uvicorn trust X-Forwarded-For / X-Forwarded-Proto so
+    # that request.client.host is the real client and not the proxy's IP,
+    # which the rate limiter is keyed on. "*" is required because the proxy
+    # container has a dynamic IP on the Docker network.
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - "*"
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-altspotify}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-altspotify}
       REDIS_URL: redis://redis:6379/0
@@ -109,6 +126,7 @@ services:
     networks:
       - backend-net
       - frontend-net
+      - proxy
 
   worker:
     image: ghcr.io/passasa83/alt-spotify-worker:main
@@ -136,11 +154,13 @@ services:
   frontend:
     image: ghcr.io/passasa83/alt-spotify-frontend:main
     ports:
-      - "3000:80"
+      # Loopback only; the reverse proxy uses `frontend:80` on the proxy network.
+      - "127.0.0.1:3000:80"
     depends_on:
       - backend
     networks:
       - frontend-net
+      - proxy
 
 
 networks:
@@ -149,3 +169,9 @@ networks:
   backend-net:
     driver: bridge
     internal: true
+  # Shared with the external reverse-proxy container: it declares this network
+  # as `external: true` (name set by PROXY_NETWORK in .env) and proxies to
+  # `backend:8000` / `frontend:80` by container name.
+  proxy:
+    name: ${PROXY_NETWORK:-altspotify-proxy}
+    driver: bridge

@@ -98,7 +98,7 @@ Alt-Spotify/
 │   └── src/
 ├── worker/             # Celery workers (transcodage FFmpeg)
 ├── monitoring/         # Prometheus + Grafana
-├── traefik/            # Configuration reverse proxy
+├── nginx/             # Exemple de config reverse proxy (voir ci-dessous)
 ├── scripts/            # Scripts utilitaires (backup, setup)
 └── docker-compose.yml  # Orchestration Docker
 ```
@@ -129,12 +129,79 @@ cd backend && pytest -v
 cd frontend && npm test
 ```
 
+## Reverse proxy (nginx)
+
+Le stack ne publie aucun port sur le réseau (tout est bindé sur `127.0.0.1`) :
+`backend` et `frontend` rejoignent le réseau Docker partagé avec votre reverse
+proxy externe.
+
+**1. Rejoindre le réseau depuis le compose du reverse proxy :**
+
+```yaml
+services:
+  nginx:
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: altspotify-proxy   # valeur de PROXY_NETWORK dans le .env
+```
+
+**2. Proxy API + WebSockets (dans votre `server` block) :**
+
+```nginx
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+location /api/ {
+    proxy_pass              http://backend:8000;
+    proxy_set_header        Host              $host;
+    proxy_set_header        X-Real-IP         $remote_addr;
+    # Edge = on écrase (et on n'append pas) : uvicorn lit la PREMIÈRE entrée.
+    proxy_set_header        X-Forwarded-For   $remote_addr;
+    proxy_set_header        X-Forwarded-Proto $scheme;
+    proxy_http_version      1.1;
+    proxy_read_timeout      300s;
+    client_max_body_size    100m;   # uploads audio (100 Mo max)
+}
+
+# WebSockets : /api/v1/notifications/ws et /api/v1/jam/{id}/ws
+location ~ ^/api/v1/(notifications|jam)/.*ws$ {
+    proxy_pass              http://backend:8000;
+    proxy_http_version      1.1;
+    proxy_set_header        Upgrade             $http_upgrade;
+    proxy_set_header        Connection          $connection_upgrade;
+    proxy_set_header        Host                $host;
+    proxy_set_header        X-Forwarded-For     $remote_addr;
+    proxy_set_header        X-Forwarded-Proto   $scheme;
+    proxy_read_timeout      86400s;   # pas de heartbeat sur ces sockets
+}
+```
+
+Le frontend se sert sur `http://frontend:80`.
+
+**Pourquoi c'est important :**
+
+- uvicorn tourne avec `--proxy-headers --forwarded-allow-ips=*` : le rate
+  limiting est cléé sur `request.client.host`, donc sans ces flags **tous les
+  visiteurs partagent l'IP du proxy** (100 req/min global, 10 req/min sur
+  l'auth).
+- Comme tout le monde est "trusted", un client qui atteindrait `backend:8000`
+  directement pourrait spoof `X-Forwarded-For` : d'où le bind `127.0.0.1` et le
+  réseau `proxy` réservé au reverse proxy.
+- `nginx/nginx.conf` est un exemple de config complète (front + API) ; le vrai
+  reverse proxy vit dans son propre projet Docker.
+
 ## Déploiement NAS + VPS
 
 Pour un déploiement hybride (NAS local + VPS cloud) :
 
 1. **NAS** : Héberger MinIO, PostgreSQL, Redis, Meilisearch, Celery workers, FFmpeg
-2. **VPS** : Héberger Traefik (reverse proxy + SSL) et l'API FastAPI
+2. **VPS** : Héberger nginx (reverse proxy + SSL) et l'API FastAPI
 3. **Tunnel** : Connecter NAS ↔ VPS via Tailscale ou WireGuard
 
 ## Licence
