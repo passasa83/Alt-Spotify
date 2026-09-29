@@ -54,10 +54,13 @@ cp .env.example .env
 # 3. Lancer tous les services
 docker compose up -d
 
-# 4. Accéder à l'application
-# Frontend  → http://localhost:3000
-# API Docs  → http://localhost:8000/docs
-# MinIO     → http://localhost:9001
+# 4. Accéder à l'application (depuis cette machine ou depuis le LAN)
+# Frontend  → http://localhost:3000      ou http://<IP_MACHINE>:3000
+# API Docs  → http://localhost:8000/docs ou http://<IP_MACHINE>:8000/docs
+# MinIO     → http://localhost:9001      ou http://<IP_MACHINE>:9001
+# Les ports sont publiés sur BIND_IP (0.0.0.0 par défaut = toutes les
+# interfaces), donc joignables via l'IP de la machine, comme la plupart des
+# stacks Docker. Mettre une IP fixe dans BIND_IP pour restreindre l'accès.
 ```
 
 ## Variables d'environnement
@@ -71,6 +74,8 @@ Voir `.env.example` pour la liste complète. Variables critiques :
 | `MINIO_ACCESS_KEY` | Clé d'accès MinIO |
 | `MINIO_SECRET_KEY` | Clé secrète MinIO |
 | `MEILI_MASTER_KEY` | Clé maître Meilisearch |
+| `BIND_IP` | IP de publication des ports (défaut `0.0.0.0` → IP de la machine) |
+| `BASE_URL` | URL de base des liens générés : partage, invitations (jamais `localhost` hors de la machine) |
 
 ## Structure du projet
 
@@ -131,9 +136,15 @@ cd frontend && npm test
 
 ## Reverse proxy (nginx)
 
-Le stack ne publie aucun port sur l'extérieur (tout est bindé sur `127.0.0.1`) :
-`backend` et `frontend` rejoignent le réseau Docker partagé avec votre reverse
-proxy externe, où ils sont joignables sous `backend:8000` et `frontend:80`.
+Les ports publiés (frontend `3000`, backend `8000`, MinIO `9000`/`9001`) le sont
+sur `BIND_IP`, `0.0.0.0` par défaut : ils sont donc joignables **via l'IP de la
+machine**, comme dans la plupart des stacks Docker. PostgreSQL, Redis,
+Meilisearch et les workers, eux, ne sont raccordés qu'au réseau interne
+`backend-net` et ne publient rien.
+
+`backend` et `frontend` rejoignent en plus le réseau Docker partagé avec votre
+reverse proxy externe, où ils sont joignables sous `backend:8000` et
+`frontend:80` :
 
 **1. Partager le réseau — deux modes :**
 
@@ -278,9 +289,14 @@ proxy_set_header X-Forwarded-For $remote_addr; # uvicorn lit la 1re entrée
   `app.exemple.com/api` → `backend:8000` (saute le nginx du front). Un
   sous-domaine `api.exemple.com` → `backend:8000` impose d'ajouter l'origine du
   front dans `CORS_ORIGINS`.
-- NPM sur **une autre machine** : impossible de partager un réseau Docker —
-  publier le front et l'API sur une IP joignable (`LAN_IP:3000:80`,
-  `LAN_IP:8000:8000`) au lieu de `127.0.0.1`.
+- NPM sur **une autre machine** : impossible de partager un réseau Docker, mais
+  les ports sont publiés sur `BIND_IP` — viser `http://<IP_MACHINE>:3000` (ou
+  `:8000` pour l'API directement).
+- **Téléchargement hors-ligne du mobile** : `offline.py` génère des URLs
+  pré-signées MinIO dont l'hôte vient de `MINIO_ENDPOINT` (`minio:9000` par
+  défaut, non résolvable depuis un téléphone). Pour l'activer, poser
+  `MINIO_ENDPOINT=<IP_MACHINE>:9000` : testé joignable depuis un container
+  comme depuis le LAN, les ports `9000`/`9001` étant publiés sur `BIND_IP`.
 
 ## Déploiement NAS + VPS
 
