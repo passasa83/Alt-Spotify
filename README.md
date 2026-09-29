@@ -196,6 +196,64 @@ Le frontend se sert sur `http://frontend:80`.
 - `nginx/nginx.conf` est un exemple de config complète (front + API) ; le vrai
   reverse proxy vit dans son propre projet Docker.
 
+### Avec Nginx Proxy Manager
+
+NPM tourne dans son propre compose : c'est **lui** qui doit rejoindre le réseau
+de ce stack (`altspotify-proxy`, créé au premier `docker compose up`).
+
+```yaml
+services:
+  npm:
+    # ... inchangé ...
+    networks:
+      - npm-network
+      - altspotify-proxy          # ajouté
+
+networks:
+  npm-network:
+    external: true
+  altspotify-proxy:               # ajouté
+    external: true
+    name: altspotify-proxy
+```
+
+Puis `docker compose up -d` dans le dossier de NPM. Le réseau doit déjà exister
+(sinon : `network "altspotify-proxy" not found` → lance d'abord ce stack).
+
+Vérifié depuis un container posé sur ce réseau : `frontend` → `172.20.0.3`
+(HTTP 200), `backend` → `172.20.0.2` (`/health` → `{"status":"ok"}`).
+
+**Un seul Proxy Host suffit** — le nginx du conteneur `frontend` relaie déjà
+`/api/` vers `backend:8000` :
+
+| Champ | Valeur |
+|---|---|
+| Domain Names | `app.exemple.com` |
+| Forward Scheme / Host | `http` → `frontend:80` |
+| Websockets Support | ✓ requis (`/api/v1/notifications/ws`, `/api/v1/jam/{id}/ws`) |
+| SSL | Let's Encrypt |
+
+Onglet **Advanced** :
+
+```nginx
+client_max_body_size 100m;                     # uploads audio (100 Mo max)
+proxy_set_header X-Forwarded-For $remote_addr; # uvicorn lit la 1re entrée
+```
+
+- `client_max_body_size` se pose **sur NPM** : sinon nginx rejette les uploads
+  de plus de 1 Mo avant qu'ils n'atteignent le conteneur.
+- NPM fait un append de l'IP (`$proxy_add_x_forwarded_for`) : un client peut
+  préfaire le header et spoofer son IP pour contourner le rate limiting — d'où
+  l'écrasement par `$remote_addr`. À retirer si NPM est lui-même derrière
+  Cloudflare.
+- Alternative : `app.exemple.com` → `frontend:80` **+**
+  `app.exemple.com/api` → `backend:8000` (saute le nginx du front). Un
+  sous-domaine `api.exemple.com` → `backend:8000` impose d'ajouter l'origine du
+  front dans `CORS_ORIGINS`.
+- NPM sur **une autre machine** : impossible de partager un réseau Docker —
+  publier le front et l'API sur une IP joignable (`LAN_IP:3000:80`,
+  `LAN_IP:8000:8000`) au lieu de `127.0.0.1`.
+
 ## Déploiement NAS + VPS
 
 Pour un déploiement hybride (NAS local + VPS cloud) :
