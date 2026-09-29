@@ -131,11 +131,18 @@ cd frontend && npm test
 
 ## Reverse proxy (nginx)
 
-Le stack ne publie aucun port sur le réseau (tout est bindé sur `127.0.0.1`) :
+Le stack ne publie aucun port sur l'extérieur (tout est bindé sur `127.0.0.1`) :
 `backend` et `frontend` rejoignent le réseau Docker partagé avec votre reverse
-proxy externe.
+proxy externe, où ils sont joignables sous `backend:8000` et `frontend:80`.
 
-**1. Rejoindre le réseau depuis le compose du reverse proxy :**
+**1. Partager le réseau — deux modes :**
+
+| | `.env` de ce stack | Compose du reverse proxy | Ordre de démarrage |
+|---|---|---|---|
+| **A** — le proxy rejoint le stack (défaut) | `PROXY_NETWORK=altspotify-proxy` | ajouter le réseau en `external: true` | le stack doit avoir créé le réseau |
+| **B** — le stack rejoint le proxy | `PROXY_NETWORK=npm-network` + `PROXY_EXTERNAL=true` | aucune modification | aucun |
+
+**Mode A — rejoindre le réseau depuis le compose du reverse proxy :**
 
 ```yaml
 services:
@@ -147,6 +154,13 @@ networks:
   proxy:
     external: true
     name: altspotify-proxy   # valeur de PROXY_NETWORK dans le .env
+```
+
+**Mode B — rejoindre le réseau du reverse proxy (le sien existe déjà) :**
+
+```env
+PROXY_NETWORK=npm-network    # le réseau déclaré external: true par le proxy
+PROXY_EXTERNAL=true
 ```
 
 **2. Proxy API + WebSockets (dans votre `server` block) :**
@@ -198,8 +212,23 @@ Le frontend se sert sur `http://frontend:80`.
 
 ### Avec Nginx Proxy Manager
 
-NPM tourne dans son propre compose : c'est **lui** qui doit rejoindre le réseau
-de ce stack (`altspotify-proxy`, créé au premier `docker compose up`).
+NPM tourne dans son propre compose avec son réseau `npm-network` (déjà déclaré
+`external: true`) : le plus simple est le **mode B** — ce stack rejoint
+`npm-network`, le compose de NPM reste intact :
+
+```env
+PROXY_NETWORK=npm-network
+PROXY_EXTERNAL=true
+```
+
+Puis `docker compose up -d` ici (`docker network create npm-network` si le
+réseau n'existe pas encore). Vérifié en conditions réelles : les conteneurs
+passent sur `npm-network` et, depuis un container posé sur ce réseau, `frontend`
+répond HTTP 200 et `backend` `/health` → `{"status":"ok"}` — les noms de service
+y sont bien résolus.
+
+Alternative (**mode A**) : laisser `PROXY_NETWORK=altspotify-proxy` et ajouter
+dans le compose de NPM :
 
 ```yaml
 services:
@@ -218,10 +247,9 @@ networks:
 ```
 
 Puis `docker compose up -d` dans le dossier de NPM. Le réseau doit déjà exister
-(sinon : `network "altspotify-proxy" not found` → lance d'abord ce stack).
-
-Vérifié depuis un container posé sur ce réseau : `frontend` → `172.20.0.3`
-(HTTP 200), `backend` → `172.20.0.2` (`/health` → `{"status":"ok"}`).
+(sinon : `network "altspotify-proxy" not found` → lance d'abord ce stack), et
+surtout **ce stack doit rester démarré** : un `docker compose down` de ce côté
+supprime le réseau et NPM échouera au prochain boot.
 
 **Un seul Proxy Host suffit** — le nginx du conteneur `frontend` relaie déjà
 `/api/` vers `backend:8000` :

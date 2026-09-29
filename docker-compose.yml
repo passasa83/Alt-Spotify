@@ -173,9 +173,14 @@ networks:
   backend-net:
     driver: bridge
     internal: true
-  # Shared with the external reverse-proxy container: it declares this network
-  # as `external: true` (name set by PROXY_NETWORK in .env) and proxies to
-  # `backend:8000` / `frontend:80` by container name.
+  # Réseau partagé avec le reverse proxy (Nginx Proxy Manager, Traefik, ...).
+  # Deux modes, via PROXY_NETWORK / PROXY_EXTERNAL du .env :
+  #  - défaut : ce projet crée `altspotify-proxy`, et le proxy le rejoint en
+  #    `external: true` (voir README) ;
+  #  - PROXY_EXTERNAL=true + PROXY_NETWORK=npm-network : on rejoint le réseau
+  #    déjà créé par le proxy — son compose reste intact et aucun ordre de
+  #    démarrage n'est à respecter.
+  # Dans les deux cas, `backend` et `frontend` y sont joignables par leur nom.
   proxy:
     name: ${PROXY_NETWORK:-altspotify-proxy}
-    driver: bridge
+    external: ${PROXY_EXTERNAL:-false}
