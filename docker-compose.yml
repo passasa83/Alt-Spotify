@@ -33,10 +33,22 @@ services:
       - backend-net
 
   minio:
-    image: minio/minio:latest
+    # minio/minio a été retiré de Docker Hub et quay.io/minio/minio refuse le
+    # pull anonyme ; l'image AIStor officielle (quay.io/minio/aistor/minio)
+    # exige une licence. C'est le build archivé de Bitnami du serveur
+    # communautaire AGPL, gelé en 07/2025 (399 MB).
+    # Vérifié en local : healthcheck 200, console WebUI sur 9001, curl présent,
+    # MINIO_ROOT_USER / MINIO_ROOT_PASSWORD bien repris par MinIO.
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+    # Comme l'ancienne image minio/minio : en root, sinon le bind mount de
+    # MINIO_DATA_DIR doit appartenir à uid 1001 sur l'hôte.
+    user: "0"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    # backend-net est un réseau "internal: true" : Docker n'y publie aucun port,
+    # ces deux lignes restent donc inertes (9000/9001 ne sont joignables que
+    # depuis les autres conteneurs, ce qu'attend le backend).
     ports:
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:9001:9001"
