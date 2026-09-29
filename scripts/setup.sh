@@ -17,8 +17,15 @@ if [ ! -f .env ]; then
 fi
 
 # .env is gitignored and .env.example ships SECRET_KEY empty, so generate it
-# whenever it is missing, empty or still a placeholder (>= 32 chars required).
-if ! grep -qE '^SECRET_KEY=[^[:space:]]{32,}' .env; then
+# whenever it is missing, too short (< 32 chars) or still one of the example
+# values that backend/app/core/config.py rejects at startup.
+SECRET_CURRENT="$(grep -E '^SECRET_KEY=' .env | head -n 1 | cut -d= -f2-)"
+case "$SECRET_CURRENT" in
+    changeme|change-me-to-a-random-secret-key|change-me-in-production-use-openssl-rand-hex-32)
+        SECRET_CURRENT="" ;;
+esac
+
+if [ "${#SECRET_CURRENT}" -lt 32 ]; then
     SECRET_KEY=$(openssl rand -hex 32 2>/dev/null \
         || python3 -c "import secrets; print(secrets.token_hex(32))" 2>/dev/null \
         || true)
