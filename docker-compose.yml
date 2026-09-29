@@ -5,9 +5,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-altspotify}
       POSTGRES_USER: ${POSTGRES_USER:-altspotify}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-    ports:
-      # Loopback only: reachable from the host, never from the network.
-      - "127.0.0.1:5432:5432"
+    # Pas de ports publiés : ce service n'est raccordé qu'à backend-net
+    # ("internal: true") où Docker ne publie rien de toute façon. Et sur cette
+    # machine, PostgreSQL tourne déjà en natif sur 5432 (bind refusé sinon).
     volumes:
       - ${POSTGRES_DATA_DIR:-./data/postgres}:/var/lib/postgresql/data
     healthcheck:
@@ -20,8 +20,8 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "127.0.0.1:6379:6379"
+    # Pas de ports publiés : backend-net est un réseau "internal: true" et un
+    # redis-server natif écoute déjà sur 6379 (bind refusé sinon).
     volumes:
       - ${REDIS_DATA_DIR:-./data/redis}:/data
     healthcheck:
@@ -46,12 +46,6 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    # backend-net est un réseau "internal: true" : Docker n'y publie aucun port,
-    # ces deux lignes restent donc inertes (9000/9001 ne sont joignables que
-    # depuis les autres conteneurs, ce qu'attend le backend).
-    ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
     volumes:
       - ${MINIO_DATA_DIR:-./data/minio}:/data
     command: server /data --console-address ":9001"
@@ -68,8 +62,6 @@ services:
     environment:
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-changeme}
       MEILI_ENV: development
-    ports:
-      - "127.0.0.1:7700:7700"
     volumes:
       - ${MEILISEARCH_DATA_DIR:-./data/meilisearch}:/meili_data
     healthcheck:
