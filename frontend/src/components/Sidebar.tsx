@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Search, Library, Plus, Radio, BarChart3, Upload, Headphones, Activity, Sparkles, Mail, Compass, History as HistoryIcon, ListMusic, HardDrive, Shield, Users } from 'lucide-react';
+import { Home, Search, Library, Plus, Radio, BarChart3, Upload, Headphones, Activity, Sparkles, Mail, Compass, History as HistoryIcon, ListMusic, HardDrive, Shield } from 'lucide-react';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useEffect, useState } from 'react';
@@ -78,31 +78,10 @@ const Sidebar = () => {
             {t('smart.create_title')}
           </NavLink>
           {user?.role === 'ADMIN' && (
-            <>
-              <p className="px-3 pt-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                {t('admin.overview')}
-              </p>
-              <NavLink to="/admin" end className={navLinkClass} aria-label={t('admin.overview')}>
-                <Shield size={24} aria-hidden="true" />
-                {t('admin.overview')}
-              </NavLink>
-              <NavLink to="/admin/users" className={navLinkClass} aria-label={t('admin.users')}>
-                <Users size={24} aria-hidden="true" />
-                {t('admin.users')}
-              </NavLink>
-              <NavLink to="/admin/dashboard" className={navLinkClass} aria-label={t('admin.dashboard')}>
-                <Activity size={24} aria-hidden="true" />
-                {t('admin.dashboard')}
-              </NavLink>
-              <NavLink to="/admin/upload" className={navLinkClass} aria-label={t('nav.upload')}>
-                <Upload size={24} aria-hidden="true" />
-                {t('nav.upload')}
-              </NavLink>
-              <NavLink to="/admin/invites" className={navLinkClass} aria-label={t('admin.invites')}>
-                <Mail size={24} aria-hidden="true" />
-                {t('admin.invites')}
-              </NavLink>
-            </>
+            <NavLink to="/admin" className={navLinkClass} aria-label={t('admin.overview')}>
+              <Shield size={24} aria-hidden="true" className="text-amber-400" />
+              {t('admin.overview')}
+            </NavLink>
           )}
         </nav>
       </div>

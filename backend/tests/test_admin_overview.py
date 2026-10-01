@@ -77,3 +77,27 @@ async def test_users_list_includes_activity(client: AsyncClient, admin_headers, 
     assert user["playlist_count"] == 1
     assert user["last_played_at"] is not None
     assert user["device_count"] == 0
+
+
+async def test_overview_groups_checks_by_area(
+    client: AsyncClient, admin_headers, db_session, test_user, tmp_path, monkeypatch
+):
+    await _seed(db_session, tmp_path, test_user)
+    monkeypatch.setenv("MUSIC_SCAN_DIR", str(tmp_path))
+    monkeypatch.setenv("MUSIC_DOWNLOAD_DIR", str(tmp_path / "nowhere"))
+
+    data = (await client.get("/api/v1/admin/overview", headers=admin_headers)).json()
+
+    areas = {a["area"]: a for a in data["areas"]}
+    assert list(areas) == ["playback", "storage", "search", "database", "accounts", "security"]
+    assert areas["playback"]["status"] == "error"
+    assert areas["playback"]["problems"] == 2  # missing dir + missing file
+
+    by_code = {c["code"]: c for c in data["checks"]}
+    # Passing checks are listed too, under their own area.
+    assert by_code["music_dir_ok"]["area"] == "playback"
+    assert by_code["music_dir_ok"]["params"]["count"] == 1
+    assert by_code["database_ok"]["status"] == "ok"
+    assert by_code["database_ok"]["area"] == "database"
+    assert {c["area"] for c in data["checks"]} == set(areas)
+    assert all(w["level"] != "ok" for w in data["warnings"])

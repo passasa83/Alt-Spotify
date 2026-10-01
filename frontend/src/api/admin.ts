@@ -65,7 +65,25 @@ export interface AdminOverview {
   music_dirs: MusicDirStatus[];
   services: Record<string, { ok: boolean; detail?: string | null }>;
   config: { key: string; value: string | number | boolean }[];
+  areas: AdminArea[];
+  checks: AdminCheck[];
   warnings: OverviewWarning[];
+}
+
+export type CheckStatus = 'ok' | 'info' | 'warning' | 'error';
+export type AdminAreaName = 'playback' | 'storage' | 'search' | 'database' | 'accounts' | 'security';
+
+export interface AdminArea {
+  area: AdminAreaName;
+  status: CheckStatus;
+  problems: number;
+}
+
+export interface AdminCheck {
+  area: AdminAreaName;
+  status: CheckStatus;
+  code: string;
+  params: Record<string, string | number>;
 }
 
 export async function getAdminOverview(): Promise<AdminOverview> {

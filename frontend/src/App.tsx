@@ -27,6 +27,7 @@ import NotFound from '@/pages/NotFound';
 import AdminInvites from '@/pages/AdminInvites';
 import AdminDevices from '@/pages/AdminDevices';
 import AdminOverview from '@/pages/AdminOverview';
+import AdminLayout from '@/components/AdminLayout';
 import Browse from '@/pages/Browse';
 import History from '@/pages/History';
 import SmartPlaylistCreate from '@/pages/SmartPlaylistCreate';
@@ -93,18 +94,28 @@ const App = () => {
         <Route path="podcasts" element={<Podcasts />} />
         <Route path="podcasts/:id" element={<PodcastDetail />} />
         <Route path="podcasts/episode/:id" element={<EpisodeDetail />} />
-        <Route path="admin" element={<AdminOverview />} />
-        <Route path="admin/upload" element={<AdminUpload />} />
-        <Route path="admin/dashboard" element={<AdminDashboard />} />
-        <Route path="admin/users" element={<AdminUsers />} />
-        <Route path="admin/catalogue" element={<AdminCatalogue />} />
-        <Route path="admin/monitoring" element={<AdminMonitoring />} />
-        <Route path="admin/tracks/:id/edit" element={<EditTrack />} />
-        <Route path="admin/invites" element={<AdminInvites />} />
-        <Route path="admin/devices" element={<AdminDevices />} />
         <Route path="history" element={<History />} />
         <Route path="local" element={<LocalMusic />} />
         <Route path="smart-playlist/new" element={<SmartPlaylistCreate />} />
+      </Route>
+      {/* Admin space: its own layout, separate from the music app. */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<AdminOverview />} />
+        <Route path="upload" element={<AdminUpload />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="users" element={<AdminUsers />} />
+        <Route path="catalogue" element={<AdminCatalogue />} />
+        <Route path="monitoring" element={<AdminMonitoring />} />
+        <Route path="tracks/:id/edit" element={<EditTrack />} />
+        <Route path="invites" element={<AdminInvites />} />
+        <Route path="devices" element={<AdminDevices />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

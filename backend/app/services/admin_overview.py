@@ -171,38 +171,89 @@ def _config() -> list[dict]:
     ]
 
 
-def _warnings(catalogue: dict, dirs: list[dict], services: dict, users: dict) -> list[dict]:
-    """Codes + params: the frontend turns them into translated messages."""
-    warnings: list[dict] = []
+# Areas shown as separate panels in the admin view, in display order.
+AREAS = ("playback", "storage", "search", "database", "accounts", "security")
+_STATUS_RANK = {"ok": 0, "info": 1, "warning": 2, "error": 3}
 
-    def add(level: str, code: str, **params):
-        warnings.append({"level": level, "code": code, "params": params})
 
-    for name, status in services.items():
-        if not status["ok"]:
-            add("error", "service_down", service=name)
+def _checks(catalogue: dict, dirs: list[dict], services: dict, users: dict) -> list[dict]:
+    """Every check, passing ones included, so each area shows what works too.
+
+    ``code`` names the outcome (``minio_ok`` / ``minio_down``), the frontend
+    turns code + params into a translated sentence.
+    """
+    checks: list[dict] = []
+
+    def add(area: str, status: str, code: str, **params):
+        checks.append({"area": area, "status": status, "code": code, "params": params})
+
+    # Playback: can the backend actually read the audio files?
     for d in dirs:
+        params = {"setting": d["setting"], "path": d["path"]}
         if not d["exists"]:
-            add("error", "music_dir_missing", setting=d["setting"], path=d["path"])
+            add("playback", "error", "music_dir_missing", **params)
         elif d["audio_files"] == 0:
-            add("warning", "music_dir_empty", setting=d["setting"], path=d["path"])
+            add("playback", "warning", "music_dir_empty", **params)
+        else:
+            add("playback", "ok", "music_dir_ok", count=d["audio_files"], **params)
     if catalogue["missing_files"]:
-        add("error", "missing_files", missing=catalogue["missing_files"], total=catalogue["local_files"])
-    if catalogue["hls"] == 0 and catalogue["total"] > catalogue["no_audio"]:
-        add("info", "no_hls")
-    if settings.MINIO_ACCESS_KEY in _DEFAULT_CREDENTIALS or settings.MINIO_SECRET_KEY in _DEFAULT_CREDENTIALS:
-        add("warning", "default_minio_credentials")
-    if settings.MEILISEARCH_MASTER_KEY in _DEFAULT_CREDENTIALS:
-        add("warning", "default_meili_key")
-    if settings.DEBUG:
-        add("warning", "debug")
-    if settings.OPEN_REGISTRATION:
-        add("info", "open_registration")
-    if "*" in settings.cors_origins_list:
-        add("info", "cors_wildcard")
+        add("playback", "error", "missing_files", missing=catalogue["missing_files"], total=catalogue["local_files"])
+    elif catalogue["local_files"]:
+        add("playback", "ok", "files_ok", total=catalogue["local_files"])
+    if catalogue["hls"]:
+        add("playback", "ok", "hls_ok", count=catalogue["hls"])
+    elif catalogue["total"] > catalogue["no_audio"]:
+        add("playback", "info", "no_hls")
+
+    # Backing services.
+    service_area = {"database": "database", "redis": "database", "minio": "storage", "meilisearch": "search"}
+    for name, status in services.items():
+        area = service_area.get(name, "database")
+        if status["ok"]:
+            add(area, "ok", f"{name}_ok")
+        else:
+            add(area, "error", f"{name}_down", detail=status.get("detail") or "")
+
+    # Accounts.
     if users["admins"] <= 1:
-        add("info", "single_admin")
-    return warnings
+        add("accounts", "info", "single_admin")
+    else:
+        add("accounts", "ok", "admins_ok", count=users["admins"])
+    if settings.OPEN_REGISTRATION:
+        add("accounts", "info", "open_registration")
+    else:
+        add("accounts", "ok", "registration_invite_only")
+
+    # Security.
+    if settings.MINIO_ACCESS_KEY in _DEFAULT_CREDENTIALS or settings.MINIO_SECRET_KEY in _DEFAULT_CREDENTIALS:
+        add("security", "warning", "default_minio_credentials")
+    else:
+        add("security", "ok", "minio_credentials_ok")
+    if settings.MEILISEARCH_MASTER_KEY in _DEFAULT_CREDENTIALS:
+        add("security", "warning", "default_meili_key")
+    else:
+        add("security", "ok", "meili_key_ok")
+    if settings.DEBUG:
+        add("security", "warning", "debug")
+    else:
+        add("security", "ok", "debug_off")
+    if "*" in settings.cors_origins_list:
+        add("security", "info", "cors_wildcard")
+    else:
+        add("security", "ok", "cors_restricted", origins=settings.CORS_ORIGINS)
+
+    return checks
+
+
+def _areas(checks: list[dict]) -> list[dict]:
+    """Worst status per area, with its problem count."""
+    areas = []
+    for area in AREAS:
+        mine = [c for c in checks if c["area"] == area]
+        status = max((c["status"] for c in mine), key=_STATUS_RANK.__getitem__, default="ok")
+        problems = sum(1 for c in mine if c["status"] in ("warning", "error"))
+        areas.append({"area": area, "status": status, "problems": problems})
+    return areas
 
 
 async def get_overview(db: AsyncSession) -> dict:
@@ -213,6 +264,7 @@ async def get_overview(db: AsyncSession) -> dict:
         info = await asyncio.to_thread(_inspect_dir, path)
         dirs.append({"setting": setting, **info})
     services = await _services_status(db)
+    checks = _checks(catalogue, dirs, services, users)
     return {
         "generated_at": _utcnow().isoformat(),
         "users": users,
@@ -220,5 +272,10 @@ async def get_overview(db: AsyncSession) -> dict:
         "music_dirs": dirs,
         "services": services,
         "config": _config(),
-        "warnings": _warnings(catalogue, dirs, services, users),
+        "areas": _areas(checks),
+        "checks": checks,
+        # Kept for API clients that only want the problems.
+        "warnings": [
+            {"level": c["status"], "code": c["code"], "params": c["params"]} for c in checks if c["status"] != "ok"
+        ],
     }
