@@ -40,3 +40,6 @@ data/
 
 # Local music library mounted into Docker (MUSIC_SCAN_DIR default)
 music/
+
+# Local-only env files (e.g. frontend/.env.remote.local)
+*.local
