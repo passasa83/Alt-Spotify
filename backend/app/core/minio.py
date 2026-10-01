@@ -1,3 +1,6 @@
+import asyncio
+import time
+
 import urllib3
 from minio import Minio
 
@@ -14,6 +17,9 @@ _HTTP = urllib3.PoolManager(
     retries=urllib3.Retry(total=2, connect=1, backoff_factor=0.2, status_forcelist=(500, 502, 503, 504)),
     maxsize=10,
 )
+
+_bucket_size_cache: tuple[float, int] = (0.0, 0)
+_BUCKET_SIZE_CACHE_TTL = 300
 
 
 def get_minio_client() -> Minio:
@@ -65,3 +71,20 @@ def get_file_url(object_name: str, expires: int = 3600) -> str:
 def delete_file(object_name: str) -> None:
     client = get_minio_client()
     client.remove_object(settings.MINIO_BUCKET, object_name)
+
+
+def _list_bucket_size_bytes() -> int:
+    client = get_minio_client()
+    return sum(obj.size or 0 for obj in client.list_objects(settings.MINIO_BUCKET, recursive=True))
+
+
+async def get_bucket_size_bytes() -> int:
+    """Total bytes stored in the bucket. Listing is a bit expensive, so the
+    result is cached for a few minutes instead of redone on every scrape."""
+    global _bucket_size_cache
+    cached_at, cached_value = _bucket_size_cache
+    if time.monotonic() - cached_at < _BUCKET_SIZE_CACHE_TTL:
+        return cached_value
+    size = await asyncio.to_thread(_list_bucket_size_bytes)
+    _bucket_size_cache = (time.monotonic(), size)
+    return size

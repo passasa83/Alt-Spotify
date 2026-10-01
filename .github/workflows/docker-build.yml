@@ -1,8 +1,10 @@
 name: Build and Push Docker Images
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
     branches: [main]
+    types: [completed]
 
 env:
   REGISTRY: ghcr.io
@@ -11,6 +13,10 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # Only build/push an image for a commit whose CI run actually passed —
+    # this workflow used to trigger on every push to main regardless of
+    # whether tests failed, so a broken commit could still reach :main.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
       packages: write
@@ -18,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3

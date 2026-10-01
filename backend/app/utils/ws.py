@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 import structlog
 from fastapi import WebSocket, WebSocketDisconnect
 
+from app.core.metrics import ACTIVE_WEBSOCKET_CONNECTIONS
 from app.core.redis import get_redis
 
 logger = structlog.get_logger("app")
@@ -44,6 +45,7 @@ async def relay_channel(
     # Both loops run until one of them stops: the client disconnecting ends
     # the reader, a closed socket ends the forwarder.
     tasks = [asyncio.create_task(forward_channel()), asyncio.create_task(read_client())]
+    ACTIVE_WEBSOCKET_CONNECTIONS.inc()
     try:
         done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         for task in done:
@@ -51,6 +53,7 @@ async def relay_channel(
             if exc is not None and not isinstance(exc, WebSocketDisconnect):
                 logger.warning("websocket_relay_error", channel=channel, error=str(exc))
     finally:
+        ACTIVE_WEBSOCKET_CONNECTIONS.dec()
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)

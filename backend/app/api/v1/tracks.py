@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.v1.stream import stream_track_file
 from app.core.database import get_db
+from app.core.metrics import TRACKS_PLAYED_TOTAL
 from app.models.listening_history import ListeningHistory
 from app.models.track import Track
 from app.models.user import User
@@ -203,6 +204,7 @@ async def play_track(
     await get_track_for_user(track_id, current_user, db)
 
     await db.execute(update(Track).where(Track.id == track_id).values(play_count=Track.play_count + 1))
+    TRACKS_PLAYED_TOTAL.inc()
 
     logger.info("track_played", track_id=str(track_id), user_id=str(current_user.id))
 

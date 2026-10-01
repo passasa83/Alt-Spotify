@@ -2,6 +2,19 @@
 
 > Document généré automatiquement. Classé par priorité et catégorie.
 
+## ✅ Résolus (2026-10-01)
+
+- **S.2** — `SECRET_KEY` placeholder/trop court rejeté au démarrage (`config.py`).
+- **S.7** — `/metrics` exige un `METRICS_TOKEN` ou une session admin.
+- **C.1** — `docker-build.yml` build et push les 3 images vers GHCR.
+- **C.4** — `ci.yml` lance `npm run test:run` + `typecheck` + `build`.
+- **N.1** — `ACTIVE_WEBSOCKET_CONNECTIONS`, `TRACKS_PLAYED_TOTAL`, `STORAGE_BYTES_USED` sont maintenant mis à jour (`utils/ws.py`, `api/v1/tracks.py`, `api/v1/monitoring.py`).
+- **N.2** — `docker-build.yml` ne construit/pousse plus une image qu'après un run CI réussi sur le même commit (`workflow_run`), au lieu de pousser inconditionnellement sur chaque push.
+- **N.5** — Le cache de covers (`cover_service.py`) est maintenant adossé à Redis (TTL 30j) en plus du cache mémoire — survit aux redémarrages du backend.
+- **K.3** — Le service `worker` a un healthcheck (`celery inspect ping`) dans `docker-compose.yml`.
+
+Items restants ouverts ci-dessous, toujours d'actualité : N.3 (images taguées `:main` uniquement, pas de tag par SHA), N.4 (pas de cache de layers Docker), S.10 (CSP sans `connect-src`/`img-src`/etc.), M.3 (disque non-Unix silencieux, sans impact en prod).
+
 ---
 
 ## 🔴 Haute priorité

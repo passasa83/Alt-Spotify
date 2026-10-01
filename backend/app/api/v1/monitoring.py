@@ -104,4 +104,12 @@ async def prometheus_metrics(
         user = await _resolve_user(token, db, request)
         if user.role != UserRole.ADMIN:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
+
+    try:
+        from app.core.metrics import STORAGE_BYTES_USED
+        from app.core.minio import get_bucket_size_bytes
+        STORAGE_BYTES_USED.set(await get_bucket_size_bytes())
+    except Exception:
+        pass
+
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
