@@ -1,6 +1,6 @@
 import { usePlayerStore, type RepeatMode } from '@/stores/playerStore';
 import type { Track } from '@/types';
-import { resolveCoverUrl, getTrackStreamUrl } from '@/api/tracks';
+import { resolveCoverUrl, getTrackStreamUrl, playTrack } from '@/api/tracks';
 import { getMe } from '@/api/users';
 import { useToastStore } from '@/stores/toastStore';
 import { t as translate } from '@/i18n';
@@ -40,6 +40,8 @@ import { useMediaSession } from '@/hooks/useMediaSession';
 import QueuePanel from './QueuePanel';
 
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+// Seconds of listening before a play counts (history, stats, recommendations).
+const PLAY_RECORD_THRESHOLD = 10;
 // Unplayable tracks skipped in a row before giving up.
 const MAX_CONSECUTIVE_ERRORS = 3;
 
@@ -112,6 +114,8 @@ const Player = () => {
   const crossfadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const consecutiveErrorsRef = useRef(0);
   const authRetriedTrackIdRef = useRef<string | null>(null);
+  // Track whose current play was already sent to /tracks/{id}/play.
+  const recordedPlayRef = useRef<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
   const [isLiked, setIsLiked] = useState(false);
@@ -235,6 +239,11 @@ const Player = () => {
       if (audio.currentTime) {
         store.seek(audio.currentTime);
       }
+      const playing = store.currentTrack;
+      if (playing && audio.currentTime >= PLAY_RECORD_THRESHOLD && recordedPlayRef.current !== playing.id) {
+        recordedPlayRef.current = playing.id;
+        playTrack(playing.id).catch(() => {});
+      }
       const remaining = audio.duration - audio.currentTime;
       if (
         store.crossfadeDuration > 0 &&
@@ -327,6 +336,10 @@ const Player = () => {
       }
     }
   }, [isPlaying]);
+
+  useEffect(() => {
+    recordedPlayRef.current = null;
+  }, [currentTrack, restartTick]);
 
   useEffect(() => {
     if (restartTick === 0 || !audioRef.current) return;

@@ -59,6 +59,9 @@ const AdminMonitoring = () => {
     }
   };
 
+  // The API returns {} when the storage path can't be measured.
+  const disk = stats?.disk_usage && typeof stats.disk_usage.total_bytes === 'number' ? stats.disk_usage : null;
+
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -155,18 +158,18 @@ const AdminMonitoring = () => {
               <h3 className="text-sm font-semibold text-gray-400">{t('admin.storage_used')}</h3>
             </div>
             <p className="text-3xl font-bold text-white">
-              {stats.disk_usage ? formatBytes(stats.disk_usage.used_bytes) : 'N/A'}
+              {disk ? formatBytes(disk.used_bytes) : 'N/A'}
             </p>
-            {stats.disk_usage && (
+            {disk && (
               <div className="mt-2">
                 <div className="h-2 w-full overflow-hidden rounded-full bg-gray-700">
                   <div
                     className="h-full rounded-full bg-green-500"
-                    style={{ width: `${stats.disk_usage.usage_percent}%` }}
+                    style={{ width: `${disk.usage_percent}%` }}
                   />
                 </div>
                 <p className="mt-1 text-xs text-gray-500">
-                  {stats.disk_usage.usage_percent}% of {formatBytes(stats.disk_usage.total_bytes)}
+                  {disk.usage_percent}% of {formatBytes(disk.total_bytes)}
                 </p>
               </div>
             )}

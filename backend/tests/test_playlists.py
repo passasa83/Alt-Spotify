@@ -134,6 +134,20 @@ async def test_delete_playlist(client: AsyncClient, auth_headers):
     assert get_resp.status_code == 404
 
 
+async def test_delete_playlist_with_tracks(client: AsyncClient, auth_headers, admin_headers):
+    artist = await client.post("/api/v1/artists", headers=admin_headers, json={"name": "Del Artist"})
+    track_id = await _create_track(client, admin_headers, artist.json()["id"])
+    playlist_id = (await client.post("/api/v1/playlists", headers=auth_headers, json={"title": "Full"})).json()["id"]
+    added = await client.post(f"/api/v1/playlists/{playlist_id}/tracks", headers=auth_headers, json={"track_id": track_id})
+    assert added.status_code == 201
+
+    response = await client.delete(f"/api/v1/playlists/{playlist_id}", headers=auth_headers)
+    assert response.status_code == 204
+    assert (await client.get(f"/api/v1/playlists/{playlist_id}", headers=auth_headers)).status_code == 404
+    # The track itself is untouched.
+    assert (await client.get(f"/api/v1/tracks/{track_id}", headers=auth_headers)).status_code == 200
+
+
 async def test_add_track_to_playlist(client: AsyncClient, auth_headers, admin_headers):
     artist_resp = await client.post(
         "/api/v1/artists",

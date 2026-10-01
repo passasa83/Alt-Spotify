@@ -29,4 +29,7 @@ class Playlist(Base):
     )
 
     owner: Mapped["User"] = relationship("User", back_populates="playlists")
-    tracks: Mapped[list["PlaylistTrack"]] = relationship("PlaylistTrack", back_populates="playlist", lazy="selectin")
+    # Deleting a playlist removes its entries (their playlist_id is part of the PK).
+    tracks: Mapped[list["PlaylistTrack"]] = relationship(
+        "PlaylistTrack", back_populates="playlist", lazy="selectin", cascade="all, delete-orphan"
+    )

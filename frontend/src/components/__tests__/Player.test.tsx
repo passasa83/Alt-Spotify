@@ -8,7 +8,9 @@ import { usePlayerStore } from '@/stores/playerStore';
 import type { Track } from '@/types';
 
 vi.mock('@/stores/playerStore');
+const playTrackMock = vi.fn().mockResolvedValue(undefined);
 vi.mock('@/api/tracks', () => ({
+  playTrack: (...args: unknown[]) => playTrackMock(...args),
   getTrackStreamUrl: (id: string) => `/api/v1/tracks/${id}/stream`,
   getHlsStreamUrl: (id: string) => `/api/v1/stream/${id}/master.m3u8`,
   resolveCoverUrl: (url: string | null | undefined) => url || '/placeholder-album.svg',
@@ -163,6 +165,34 @@ describe('Player', () => {
       'Audio file not found: Broken Song',
     );
 
+    vi.unstubAllGlobals();
+  });
+
+  it('records a play once the track has played for 10 seconds', async () => {
+    playTrackMock.mockClear();
+    const state = { ...defaultPlayerState, currentTrack: createTrack('42', 'Counted'), isPlaying: true, useHls: false };
+    vi.mocked(usePlayerStore).mockReturnValue(state as any);
+    (usePlayerStore as any).getState = () => state;
+    const created: HTMLAudioElement[] = [];
+    const RealAudio = window.Audio;
+    vi.stubGlobal('Audio', class extends RealAudio { constructor() { super(); created.push(this); } });
+
+    render(
+      <MemoryRouter>
+        <Player />
+      </MemoryRouter>
+    );
+    const audio = created[0]!;
+    const tick = (t: number) => {
+      Object.defineProperty(audio, 'currentTime', { configurable: true, get: () => t, set: () => {} });
+      audio.dispatchEvent(new Event('timeupdate'));
+    };
+    tick(5);
+    expect(playTrackMock).not.toHaveBeenCalled();
+    tick(10.5);
+    tick(15);
+    expect(playTrackMock).toHaveBeenCalledTimes(1);
+    expect(playTrackMock).toHaveBeenCalledWith('42');
     vi.unstubAllGlobals();
   });
 });

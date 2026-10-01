@@ -45,6 +45,11 @@ def _normalize_title(title: str) -> str:
     return t
 
 
+def _is_playable(item) -> bool:
+    get = item.get if isinstance(item, dict) else lambda k: getattr(item, k, None)
+    return bool(get("file_url") or get("hls_path"))
+
+
 def _track_to_response(track: Track, artist_name: str = "", artist_image_url: str | None = None) -> SearchTrackResponse:
     artist_data = None
     if artist_name:
@@ -388,6 +393,9 @@ async def search(
                             seen_isrcs.add(tt_isrc)
 
                 await db.commit()
+                # Playable tracks first (stable sort keeps Deezer's relevance
+                # order within each group): local files used to come last.
+                tracks.sort(key=lambda t: not _is_playable(t))
                 results["tracks"] = tracks
 
     if "playlists" in types:

@@ -47,12 +47,17 @@ async def health_check(
         health["status"] = "degraded"
 
     try:
+        import asyncio
+
         from app.core.minio import get_minio_client
-        client = get_minio_client()
-        bucket_exists = client.bucket_exists("alt-spotify")
+        # Blocking client that retries for ~30 s when MinIO is down: off the
+        # event loop and bounded, like the admin overview.
+        bucket_exists = await asyncio.wait_for(
+            asyncio.to_thread(lambda: get_minio_client().bucket_exists(settings.MINIO_BUCKET)), timeout=3
+        )
         health["services"]["minio"] = {"status": "healthy" if bucket_exists else "degraded"}
     except Exception as e:
-        health["services"]["minio"] = {"status": "unhealthy", "error": str(e)}
+        health["services"]["minio"] = {"status": "unhealthy", "error": str(e) or type(e).__name__}
         health["status"] = "degraded"
 
     return health

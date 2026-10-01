@@ -10,8 +10,9 @@ DEEZER_API_BASE = "https://api.deezer.com"
 DEEZER_SEARCH_URL = f"{DEEZER_API_BASE}/search"
 
 DEEZER_URL_PATTERNS = [
+    # Links copied from the website carry a language segment: deezer.com/fr/playlist/123
+    r"deezer\.com/(?:[a-z]{2}(?:-[a-z]{2})?/)?playlist/(\d+)",
     r"deezer\.com/(\w+)/(\d+)",
-    r"deezer\.com/playlist/(\d+)",
 ]
 
 

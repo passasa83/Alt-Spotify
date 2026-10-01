@@ -113,3 +113,25 @@ async def test_download_deezer_only_fetches_deezer_cdn(client: AsyncClient, admi
         params={"deezer_id": 1, "title": "T", "artist_name": "A", "preview_url": preview_url},
     )
     assert response.status_code == 400
+
+
+async def test_playable_local_tracks_rank_before_external_results(client: AsyncClient, auth_headers, db_session, monkeypatch):
+    from app.api.v1 import search as search_module
+    from app.models.artist import Artist
+    from app.models.track import Track
+
+    artist = Artist(name="Local Band")
+    db_session.add(artist)
+    await db_session.flush()
+    db_session.add(Track(title="Rankme Local", artist_id=artist.id, duration_seconds=60, file_url="local:/music/r.flac"))
+    await db_session.flush()
+
+    async def fake_deezer(q, limit=20):
+        return [{"title": f"Rankme External {i}", "artist": "Someone", "deezer_id": i, "duration": 100} for i in range(3)]
+
+    monkeypatch.setattr(search_module, "search_deezer", fake_deezer)
+    response = await client.get("/api/v1/search?q=Rankme&type=tracks", headers=auth_headers)
+    assert response.status_code == 200
+    titles = [t["title"] for t in response.json()["tracks"]]
+    assert titles[0] == "Rankme Local"
+    assert set(titles[1:]) == {"Rankme External 0", "Rankme External 1", "Rankme External 2"}
