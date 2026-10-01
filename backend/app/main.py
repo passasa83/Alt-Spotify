@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 import structlog
@@ -27,11 +28,10 @@ from app.services.meilisearch import ensure_indexes, reindex_all
 logger = structlog.get_logger("app")
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    setup_logging()
-    logger.info("application_starting", project=settings.PROJECT_NAME)
-    await init_db()
+async def _run_background_startup_tasks() -> None:
+    """Music scan, cover backfill and search reindex: slow, non-critical for
+    the app to start serving requests, so they run after the app is already
+    marked ready instead of blocking the lifespan/health check."""
     try:
         await ensure_indexes()
         logger.info("meilisearch_indexes_ready")
@@ -81,6 +81,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("auto_fix_covers_failed", error=str(e))
 
+    logger.info("background_startup_tasks_complete")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    setup_logging()
+    logger.info("application_starting", project=settings.PROJECT_NAME)
+    await init_db()
+    # Kept on app.state so the task isn't garbage-collected mid-run.
+    app.state.startup_task = asyncio.create_task(_run_background_startup_tasks())
     logger.info("application_started", project=settings.PROJECT_NAME)
     yield
     logger.info("application_shutting_down")
