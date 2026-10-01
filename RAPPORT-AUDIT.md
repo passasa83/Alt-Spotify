@@ -53,10 +53,10 @@
 | Fonctionnalité | État | Constat | Amélioration |
 |---|:-:|---|---|
 | Recherche (local + Deezer) | 🔧 | Les pistes locales jouables passaient **après** tous les résultats Deezer (19ᵉ à 21ᵉ sur 24). Elles sont maintenant en tête. | Afficher clairement « non disponible » sur les résultats sans audio. |
-| **Pollution du catalogue** | ❌ | **Chaque recherche crée une piste vide en base** pour chaque résultat Deezer. En local, 2 recherches ont fait passer le catalogue de 4 à 55 pistes, dont 3 jouables. C'est l'origine des **805 pistes sans audio** du serveur et de l'accueil rempli de titres injouables. | Ne créer la piste qu'au moment d'une action (téléchargement, ajout à une playlist). Nettoyer les pistes existantes. |
+| **Pollution du catalogue** | 🔧 | **Chaque recherche crée une piste vide en base** pour chaque résultat Deezer. En local, 2 recherches ont fait passer le catalogue de 4 à 55 pistes, dont 3 jouables. C'est l'origine des **805 pistes sans audio** du serveur et de l'accueil rempli de titres injouables. | **Corrigé :** la recherche réutilise les pistes déjà créées, l'accueil, Parcourir et les playlists intelligentes n'affichent que des titres jouables, et un bouton admin purge les pistes vides inutilisées. |
 | Recherche Tidal | ✅ | Réponse en 3 s. | — |
 | Artistes / albums (admin) | ✅ | Création, modification et pages publiques fonctionnent. | Textes « Discography » et « About the artist » en anglais. |
-| Upload audio / pochette | ⚪ | Sans MinIO : erreur 500 générique **après 30 s**. | Échouer en moins de 3 s avec un message explicite (« stockage indisponible »). |
+| Upload audio / pochette | 🔧 | Sans MinIO : erreur 500 générique **après 30 s**, avec toute l'API figée pendant ce temps. | **Corrigé :** erreur 503 « stockage indisponible » en 4 s, sans figer l'API. |
 | Téléchargement YouTube | ⚪ | Échec en local faute de `ffmpeg` (inclus dans l'image Docker ; 1 844 pistes téléchargées en prod). | Afficher la raison de l'échec à l'utilisateur. |
 | Scan du dossier musique | ✅ | Les fichiers déjà importés sont ignorés. | — |
 
@@ -70,7 +70,7 @@
 | Réordonner | ❌ | Le front envoie un objet alors que l'API attend une liste (422), et aucune interface ne propose de réordonner. | Glisser-déposer et aligner le format. |
 | Playlists privées | ✅ | Invisibles pour les autres (404). | — |
 | Titres favoris (Liked Songs) | ✅ | Synchronisés avec les favoris. | — |
-| Playlist intelligente | 🟡 | La création et le rafraîchissement fonctionnent, mais une règle **vide** est acceptée, et la playlist a pris **47 titres sans audio sur 50**. | Ignorer les pistes sans audio et valider les règles. |
+| Playlist intelligente | 🔧 | La création et le rafraîchissement fonctionnent, mais une règle **vide** est acceptée, et la playlist a pris **47 titres sans audio sur 50**. | **Corrigé :** uniquement des titres jouables, et au moins une règle complète est obligatoire. |
 | Top du mois / de l'année | ✅ | Généré depuis Stats. | — |
 | Import Spotify | ⚪ | Clés API non configurées : erreur 501 avec un message clair. | — |
 | Import Deezer | 🔧 | Les liens copiés depuis le site (`deezer.com/fr/playlist/…`) étaient refusés. | — |
@@ -83,8 +83,8 @@
 | **Découvertes / Daily Mix** | 🔧 | **Aucun titre ne se lançait** : l'API renvoyait des pistes incomplètes (sans `id` ni fichier). Elles sont maintenant complètes et jouables, ce qui est vérifié dans le navigateur. | — |
 | Radio / titres similaires | 🟡 | L'API est corrigée, mais il n'y a **pas de bouton « Radio »** dans l'interface. | Ajouter « Lancer la radio » dans le menu d'une piste. |
 | Historique d'écoute | ✅ | Fonctionne depuis la correction de l'enregistrement des écoutes. | — |
-| Statistiques | 🟡 | Le top des titres et des artistes fonctionne. Mais le **temps d'écoute reste à 0h 0m** (la durée envoyée est toujours 0), et la **série d'écoute reste à 0 jour** malgré des écoutes du jour. | Envoyer la durée réellement écoutée, et corriger le calcul de la série. |
-| Wrapped annuel | 🟡 | Il est calculé, mais les heures sont à 0, pour la même raison. | Prévoir une page dédiée. |
+| Statistiques | 🔧 | Le top des titres et des artistes fonctionne. Mais le **temps d'écoute reste à 0h 0m** (la durée envoyée est toujours 0), et la **série d'écoute reste à 0 jour** malgré des écoutes du jour. | **Corrigé :** la durée réellement écoutée est envoyée, la série est calculée correctement, et les jours actifs du Wrapped aussi. |
+| Wrapped annuel | 🔧 | Il est calculé. Les heures étaient à 0 et les « jours actifs » comptaient en réalité les écoutes : corrigé. | Prévoir une page dédiée. |
 
 ### Social, partage, notifications
 
@@ -160,6 +160,9 @@
 | `/monitoring/health` gelait l'API 30 s | API figée si MinIO tombe | `99b6d8c` |
 | Monitoring : « NaN undefined % » | Affichage cassé | `99b6d8c` |
 | Découvertes / Daily Mix : aucun titre jouable | Pages de recommandations inutilisables | `f7b38c6` |
+| Catalogue pollué par les recherches | Accueil et playlists remplis de titres injouables | `ea05f36` |
+| Upload bloqué 30 s puis erreur 500 si MinIO est absent | API figée, message incompréhensible | `5206083` |
+| Temps d'écoute toujours à 0, série à 0, jours actifs faux | Statistiques fausses | `1f63834` |
 
 Tous ces correctifs sont couverts par des tests de non-régression.
 
@@ -170,10 +173,10 @@ Tous ces correctifs sont couverts par des tests de non-régression.
 ### Nécessaires (par priorité)
 
 1. **Remettre la lecture en service sur le serveur.** Corriger `MUSIC_SCAN_DIR` et `MUSIC_DOWNLOAD_DIR` (voir `DIAGNOSTIC-LECTURE.md` et `scripts/update-server.sh`). Tant que ce n'est pas fait, aucune piste ne se lit.
-2. **Arrêter de polluer le catalogue.** Ne plus créer de piste à chaque résultat de recherche, et nettoyer les pistes vides existantes (805 en prod). Ne proposer que des titres jouables dans l'accueil, les playlists intelligentes et les recommandations.
+2. ~~**Arrêter de polluer le catalogue.**~~ Fait (`ea05f36`). Sur le serveur, après mise à jour : **Administration › Catalogue › « Nettoyer N pistes vides »** pour retirer les ~805 pistes vides existantes.
 3. **Faire fonctionner le transcodage HLS.** Aujourd'hui, 0 piste est transcodée en prod. Vérifier le worker et les volumes, et lancer `transcode-missing`.
-4. **Upload robuste.** Échouer vite, avec un message clair, quand le stockage est indisponible (aujourd'hui : 30 s puis une erreur 500).
-5. **Statistiques justes.** Envoyer la durée réellement écoutée, et corriger la série d'écoute.
+4. ~~**Upload robuste.**~~ Fait (`5206083`).
+5. ~~**Statistiques justes.**~~ Fait (`1f63834`). Les écoutes passées restent à 0 s : seules les nouvelles ont leur durée.
 6. **Traduction complète** de l'interface.
 7. **Brancher dans l'interface ce que l'API sait déjà faire :**
    - réordonner une playlist par glisser-déposer ;
