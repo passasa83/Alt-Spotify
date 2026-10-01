@@ -36,6 +36,14 @@ const en = {
   'player.equalizer': 'Equalizer',
   'player.jam_session': 'Jam Session',
   'player.now_playing': 'Now Playing',
+  'player.up_next': 'Next up',
+  'player.queue_empty': 'Nothing queued yet: similar tracks will follow.',
+  'player.clear_queue': 'Clear',
+  'player.remove_from_queue': 'Remove from queue',
+  'player.error_not_found': 'Audio file not found: {title}',
+  'player.error_playback': 'Cannot play {title}',
+  'player.error_stopped': 'Playback stopped: several tracks in a row could not be played.',
+  'player.shortcuts': 'Space: play/pause · ←/→: seek 10 s · Shift+←/→: previous/next · M: mute',
 
   // History
   'history.title': 'Listening History',

@@ -1,6 +1,9 @@
 import { usePlayerStore, type RepeatMode } from '@/stores/playerStore';
 import type { Track } from '@/types';
-import { resolveCoverUrl } from '@/api/tracks';
+import { resolveCoverUrl, getTrackStreamUrl } from '@/api/tracks';
+import { getMe } from '@/api/users';
+import { useToastStore } from '@/stores/toastStore';
+import { t as translate } from '@/i18n';
 import { addFavorite, removeFavorite, checkFavorite } from '@/api/favorites';
 import {
   Play,
@@ -19,6 +22,7 @@ import {
   Sliders,
   Settings2,
   Gauge,
+  ListMusic,
 } from 'lucide-react';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -28,8 +32,38 @@ import Equalizer from './Equalizer';
 import { useTranslation } from '@/hooks/useTranslation';
 import { formatTime } from '@/utils/formatTime';
 import { attachSource, detachSource } from '@/utils/audioSource';
+import { useMediaSession } from '@/hooks/useMediaSession';
+import QueuePanel from './QueuePanel';
 
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+// Unplayable tracks skipped in a row before giving up.
+const MAX_CONSECUTIVE_ERRORS = 3;
+
+// A play() blocked by the browser's autoplay policy must not leave the UI on
+// "playing"; an AbortError (source changed mid-load) is expected and harmless.
+const safePlay = (audio: HTMLAudioElement) => {
+  audio.play().catch((err: unknown) => {
+    if ((err as DOMException)?.name === 'NotAllowedError') {
+      usePlayerStore.getState().pause();
+    }
+  });
+};
+
+// <audio> doesn't expose the HTTP status: ask the stream endpoint directly.
+const probeStreamStatus = async (trackId: string): Promise<number> => {
+  const controller = new AbortController();
+  try {
+    const response = await fetch(getTrackStreamUrl(trackId), {
+      headers: { Range: 'bytes=0-0' },
+      signal: controller.signal,
+    });
+    return response.status;
+  } catch {
+    return 0;
+  } finally {
+    controller.abort();
+  }
+};
 
 const Player = () => {
   const navigate = useNavigate();
@@ -72,6 +106,9 @@ const Player = () => {
   const handedOverTrackIdRef = useRef<string | null>(null);
   const crossfadingRef = useRef(false);
   const crossfadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const consecutiveErrorsRef = useRef(0);
+  const authRetriedTrackIdRef = useRef<string | null>(null);
+  const [showQueue, setShowQueue] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
   const [isLiked, setIsLiked] = useState(false);
@@ -94,7 +131,7 @@ const Player = () => {
     const store = usePlayerStore.getState();
     newAudio.volume = 0;
     newAudio.playbackRate = store.playbackRate;
-    newAudio.play().catch(() => {});
+    safePlay(newAudio);
 
     // Hand over right away: the incoming track drives the UI and the events,
     // the outgoing one only fades out.
@@ -127,10 +164,60 @@ const Player = () => {
     }, (fadeSeconds * 1000) / fadeSteps);
   }, []);
 
+  // Tell the user, then move on: a 401 gets one retry after a token refresh,
+  // anything else skips to the next track (up to MAX_CONSECUTIVE_ERRORS).
+  const handlePlaybackError = useCallback(async (audio: HTMLAudioElement) => {
+    const track = usePlayerStore.getState().currentTrack;
+    if (!track) return;
+    const status = await probeStreamStatus(track.id);
+    const store = usePlayerStore.getState();
+    if (audio !== audioRef.current || store.currentTrack?.id !== track.id) return;
+
+    if (status === 401 && authRetriedTrackIdRef.current !== track.id) {
+      authRetriedTrackIdRef.current = track.id;
+      try {
+        await getMe(); // the API client refreshes the access token on 401
+      } catch {
+        return; // refresh failed: the client redirects to /login
+      }
+      attachSource(audio, track, store.useHls);
+      if (store.isPlaying) safePlay(audio);
+      return;
+    }
+
+    const { addToast } = useToastStore.getState();
+    addToast(translate(status === 404 ? 'player.error_not_found' : 'player.error_playback', { title: track.title }));
+    consecutiveErrorsRef.current += 1;
+    if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
+      consecutiveErrorsRef.current = 0;
+      store.pause();
+      addToast(translate('player.error_stopped'));
+      return;
+    }
+    if (store.queue.length > 0 || store.repeat === 'off') {
+      store.next();
+    } else {
+      store.pause();
+    }
+  }, []);
+
   // Listeners are attached once per element and ignore every element but the
   // current one: the Player swaps elements on each crossfade.
   const createAudio = useCallback(() => {
     const audio = new Audio();
+
+    audio.addEventListener('error', () => {
+      if (audio !== audioRef.current) return;
+      // Clearing the source (src = '') and aborted loads are not failures.
+      if (!audio.error || audio.error.code === 1 /* MEDIA_ERR_ABORTED */) return;
+      if (!audio.getAttribute('src')) return;
+      void handlePlaybackError(audio);
+    });
+
+    audio.addEventListener('playing', () => {
+      if (audio !== audioRef.current) return;
+      consecutiveErrorsRef.current = 0;
+    });
 
     audio.addEventListener('timeupdate', () => {
       if (audio !== audioRef.current) return;
@@ -163,11 +250,16 @@ const Player = () => {
         store.restartCurrent();
         return;
       }
+      // Gapless: the next track is already buffered in its own element.
+      if (nextAudioRef.current && nextTrackRef.current) {
+        startCrossfadeTransition(0.05);
+        return;
+      }
       store.next();
     });
 
     return audio;
-  }, [startCrossfadeTransition]);
+  }, [startCrossfadeTransition, handlePlaybackError]);
 
   const preloadNextTrack = useCallback(() => {
     const nextTrack = getNextTrack();
@@ -206,7 +298,7 @@ const Player = () => {
       } else {
         attachSource(audio, currentTrack, useHls);
         if (isPlaying) {
-          audio.play().catch(() => {});
+          safePlay(audio);
         }
       }
       checkFavorite('track', String(currentTrack.id))
@@ -219,7 +311,7 @@ const Player = () => {
   useEffect(() => {
     if (audioRef.current) {
       if (isPlaying) {
-        audioRef.current.play().catch(() => {});
+        safePlay(audioRef.current);
       } else {
         audioRef.current.pause();
       }
@@ -231,7 +323,7 @@ const Player = () => {
     const audio = audioRef.current;
     audio.currentTime = 0;
     if (usePlayerStore.getState().isPlaying) {
-      audio.play().catch(() => {});
+      safePlay(audio);
     }
   }, [restartTick]);
 
@@ -286,11 +378,14 @@ const Player = () => {
     }
   };
 
+  useMediaSession(audioRef);
+
   const RepeatIcon = repeat === 'one' ? Repeat1 : Repeat;
+  const progressPercent = duration > 0 ? Math.min(100, (progress / duration) * 100) : 0;
 
   if (!currentTrack) {
     return (
-      <div className="flex h-20 flex-shrink-0 items-center justify-center bg-gray-900 border-t border-gray-800">
+      <div className="hidden h-20 flex-shrink-0 items-center justify-center bg-gray-900 border-t border-gray-800 md:flex">
         <p className="text-sm text-gray-500">{t('player.select_track')}</p>
       </div>
     );
@@ -303,13 +398,15 @@ const Player = () => {
           <SynchronizedLyrics lyrics={lyrics} currentTime={progress} onSeek={seek} />
         </div>
       )}
-      <div className="flex h-20 items-center justify-between bg-gray-900 px-4 border-t border-gray-800">
-      <div className="flex w-1/4 items-center gap-3">
+      <div className="relative flex h-16 items-center justify-between gap-2 bg-gray-900 px-3 border-t border-gray-800 md:h-20 md:px-4">
+      {/* Mobile: thin progress line instead of the seek bar */}
+      <div className="absolute left-0 top-0 h-0.5 bg-green-500 md:hidden" style={{ width: `${progressPercent}%` }} />
+      <div className="flex min-w-0 flex-1 items-center gap-3 md:w-1/4 md:flex-none">
         <Link to={`/track/${currentTrack.id}`}>
           <img
-            src={resolveCoverUrl(currentTrack.cover_url)}
+            src={resolveCoverUrl(currentTrack.cover_url || currentTrack.album?.cover_url)}
             alt={currentTrack.title}
-            className="h-14 w-14 rounded object-cover"
+            className="h-11 w-11 rounded object-cover md:h-14 md:w-14"
           />
         </Link>
         <div className="min-w-0">
@@ -348,11 +445,11 @@ const Player = () => {
         </button>
       </div>
 
-      <div className="flex w-2/4 flex-col items-center gap-1">
+      <div className="flex flex-shrink-0 flex-col items-center gap-1 md:w-2/4">
         <div className="flex items-center gap-4">
           <button
             onClick={toggleShuffle}
-            className={`p-1 ${shuffle ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
+            className={`hidden p-1 md:block ${shuffle ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
             aria-label={t('player.shuffle')}
             aria-pressed={shuffle}
           >
@@ -373,15 +470,23 @@ const Player = () => {
           </button>
           <button
             onClick={toggleRepeat}
-            className={`p-1 ${repeat !== 'off' ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
+            className={`hidden p-1 md:block ${repeat !== 'off' ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
             aria-label={repeat === 'one' ? t('player.repeat_one') : t('player.repeat')}
             aria-pressed={repeat !== 'off'}
           >
             <RepeatIcon size={16} />
           </button>
+          <button
+            onClick={() => setShowQueue(!showQueue)}
+            className={`p-1 md:hidden ${showQueue ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
+            aria-label={t('player.queue')}
+            aria-expanded={showQueue}
+          >
+            <ListMusic size={20} />
+          </button>
         </div>
 
-        <div className="flex w-full items-center gap-2">
+        <div className="hidden w-full items-center gap-2 md:flex">
           <span className="w-10 text-right text-xs text-gray-400">{formatTime(progress)}</span>
           <input
             type="range"
@@ -400,12 +505,21 @@ const Player = () => {
         </div>
       </div>
 
-      <div className="flex w-1/4 items-center justify-end gap-2">
+      <div className="hidden w-1/4 items-center justify-end gap-2 md:flex">
         {playbackRate !== 1 && (
           <span className="rounded bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-green-400">
             {playbackRate}x
           </span>
         )}
+        <button
+          onClick={() => setShowQueue(!showQueue)}
+          className={`p-1 ${showQueue ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
+          aria-label={t('player.queue')}
+          title={t('player.queue')}
+          aria-expanded={showQueue}
+        >
+          <ListMusic size={20} />
+        </button>
         <button
           onClick={toggleLyrics}
           className={`p-1 ${showLyrics ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
@@ -457,6 +571,8 @@ const Player = () => {
       </div>
       </div>
 
+      {showQueue && <QueuePanel onClose={() => setShowQueue(false)} />}
+
       {showSettings && (
         <div className="absolute bottom-full right-4 mb-2 w-80 rounded-lg bg-gray-800 p-4 shadow-xl" role="dialog" aria-label={t('player.audio_settings')}>
           <h3 className="mb-3 text-sm font-medium text-white">{t('player.audio_settings')}</h3>
@@ -504,6 +620,8 @@ const Player = () => {
               ))}
             </div>
           </div>
+
+          <p className="mb-3 text-[11px] leading-snug text-gray-500">{t('player.shortcuts')}</p>
 
           <div className="flex items-center justify-between">
             <label className="text-xs text-gray-400">{t('player.replay_gain')}</label>

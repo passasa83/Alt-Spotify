@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { useToastStore } from '@/stores/toastStore';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Player from '../Player';
@@ -118,5 +119,49 @@ describe('Player', () => {
     await user.click(playPauseButton!);
 
     expect(togglePlay).toHaveBeenCalled();
+  });
+
+  it('reports a missing audio file and skips to the next track', async () => {
+    const next = vi.fn();
+    const state = {
+      ...defaultPlayerState,
+      currentTrack: createTrack('1', 'Broken Song'),
+      isPlaying: true,
+      useHls: false,
+      next,
+      pause: vi.fn(),
+    };
+    vi.mocked(usePlayerStore).mockReturnValue(state as any);
+    (usePlayerStore as any).getState = () => state;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 404 }));
+    const created: HTMLAudioElement[] = [];
+    const RealAudio = window.Audio;
+    vi.stubGlobal(
+      'Audio',
+      class extends RealAudio {
+        constructor() {
+          super();
+          created.push(this);
+        }
+      },
+    );
+
+    render(
+      <MemoryRouter>
+        <Player />
+      </MemoryRouter>
+    );
+
+    const audio = created[0]!;
+    audio.setAttribute('src', '/api/v1/tracks/1/stream');
+    Object.defineProperty(audio, 'error', { value: { code: 4 } });
+    audio.dispatchEvent(new Event('error'));
+
+    await waitFor(() => expect(next).toHaveBeenCalled());
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(
+      'Audio file not found: Broken Song',
+    );
+
+    vi.unstubAllGlobals();
   });
 });

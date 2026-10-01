@@ -36,6 +36,14 @@ const fr = {
   'player.equalizer': 'Égaliseur',
   'player.jam_session': 'Session Jam',
   'player.now_playing': 'En cours de lecture',
+  'player.up_next': 'À suivre',
+  'player.queue_empty': 'File vide : des titres similaires suivront.',
+  'player.clear_queue': 'Vider',
+  'player.remove_from_queue': 'Retirer de la file',
+  'player.error_not_found': 'Fichier audio introuvable : {title}',
+  'player.error_playback': 'Impossible de lire {title}',
+  'player.error_stopped': 'Lecture arrêtée : plusieurs titres d\'affilée sont illisibles.',
+  'player.shortcuts': 'Espace : lecture/pause · ←/→ : avancer/reculer de 10 s · Maj+←/→ : précédent/suivant · M : muet',
 
   // History
   'history.title': 'Historique d\'écoute',
