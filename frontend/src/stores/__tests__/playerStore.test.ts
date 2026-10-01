@@ -1,6 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { usePlayerStore } from '../playerStore';
+import { getAutoplayTracks } from '@/api/recommendations';
 import type { Track } from '@/types';
+
+vi.mock('@/api/recommendations', () => ({
+  getAutoplayTracks: vi.fn(),
+}));
+
+const mockAutoplay = vi.mocked(getAutoplayTracks);
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const createTrack = (id: string, title = 'Test Track'): Track => ({
   id,
@@ -14,9 +22,12 @@ const createTrack = (id: string, title = 'Test Track'): Track => ({
 });
 
 beforeEach(() => {
+  mockAutoplay.mockReset();
+  mockAutoplay.mockResolvedValue([]);
   usePlayerStore.setState({
     currentTrack: null,
     queue: [],
+    context: null,
     history: [],
     isPlaying: false,
     volume: 0.7,
@@ -116,10 +127,12 @@ describe('playerStore', () => {
     expect(usePlayerStore.getState().currentTrack).toEqual(track2);
   });
 
-  it('next with empty queue stops playing', () => {
+  it('next with empty queue and no similar tracks stops playing', async () => {
     usePlayerStore.getState().setTrack(createTrack('1'));
+    await flush();
 
     usePlayerStore.getState().next();
+    await flush();
 
     expect(usePlayerStore.getState().isPlaying).toBe(false);
   });
@@ -210,5 +223,86 @@ describe('playerStore', () => {
 
     expect(usePlayerStore.getState().currentTrack).toEqual(track);
     expect(usePlayerStore.getState().isPlaying).toBe(true);
+  });
+
+  it('setPlaylistAsQueue queues the tracks after the clicked one', () => {
+    const tracks = ['1', '2', '3', '4'].map((id) => createTrack(id));
+
+    usePlayerStore.getState().setPlaylistAsQueue(tracks, 2);
+
+    const state = usePlayerStore.getState();
+    expect(state.currentTrack?.id).toBe('3');
+    expect(state.queue.map((t) => t.id)).toEqual(['4']);
+  });
+
+  it('setPlaylistAsQueue skips tracks without audio', () => {
+    const silent = { ...createTrack('2'), file_url: undefined };
+    const tracks = [createTrack('1'), silent, createTrack('3')];
+
+    usePlayerStore.getState().setPlaylistAsQueue(tracks, 1);
+
+    const state = usePlayerStore.getState();
+    expect(state.currentTrack?.id).toBe('3');
+    expect(state.queue.map((t) => t.id)).toEqual(['1']);
+  });
+
+  it('refills the queue from the playlist once it runs out', () => {
+    const tracks = ['1', '2', '3'].map((id) => createTrack(id));
+    usePlayerStore.getState().setPlaylistAsQueue(tracks, 1);
+
+    usePlayerStore.getState().next(); // -> 3, end of the playlist
+
+    const state = usePlayerStore.getState();
+    expect(state.currentTrack?.id).toBe('3');
+    expect(state.queue.map((t) => t.id)).toEqual(['1', '2']);
+    expect(mockAutoplay).not.toHaveBeenCalled();
+  });
+
+  it('queues similar tracks after a track played outside a playlist', async () => {
+    const similar = [createTrack('s1'), createTrack('s2')];
+    mockAutoplay.mockResolvedValue(similar);
+
+    usePlayerStore.getState().setTrack(createTrack('1'));
+    await flush();
+
+    expect(mockAutoplay).toHaveBeenCalledWith('1', ['1']);
+    expect(usePlayerStore.getState().queue).toEqual(similar);
+
+    usePlayerStore.getState().next();
+    expect(usePlayerStore.getState().currentTrack?.id).toBe('s1');
+  });
+
+  it('next waits for similar tracks when the queue is empty', async () => {
+    usePlayerStore.getState().setTrack(createTrack('1'));
+    await flush();
+    mockAutoplay.mockResolvedValue([createTrack('s1')]);
+
+    usePlayerStore.getState().next();
+    await flush();
+
+    const state = usePlayerStore.getState();
+    expect(state.currentTrack?.id).toBe('s1');
+    expect(state.isPlaying).toBe(true);
+  });
+
+  it('user-queued tracks play before the rest of the playlist', () => {
+    const tracks = ['1', '2', '3'].map((id) => createTrack(id));
+    usePlayerStore.getState().setPlaylistAsQueue(tracks, 0);
+
+    usePlayerStore.getState().addToQueue(createTrack('mine'));
+
+    expect(usePlayerStore.getState().queue.map((t) => t.id)).toEqual(['mine', '2', '3']);
+  });
+
+  it('playing a single track drops the previous playlist but keeps user picks', () => {
+    const tracks = ['1', '2', '3'].map((id) => createTrack(id));
+    usePlayerStore.getState().setPlaylistAsQueue(tracks, 0);
+    usePlayerStore.getState().addToQueue(createTrack('mine'));
+
+    usePlayerStore.getState().setTrack(createTrack('solo'));
+
+    const state = usePlayerStore.getState();
+    expect(state.context).toBeNull();
+    expect(state.queue.map((t) => t.id)).toEqual(['mine']);
   });
 });

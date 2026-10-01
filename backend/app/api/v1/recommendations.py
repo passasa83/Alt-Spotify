@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -5,11 +7,13 @@ from app.core.database import get_db
 from app.models.user import User
 from app.services.recommendation import (
     generate_daily_mix,
+    get_autoplay_tracks,
     get_personalized_recommendations,
     get_radio_tracks,
     get_similar_tracks,
 )
 from app.utils.deps import get_current_user
+from app.utils.track_serializer import serialize_track
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
@@ -91,3 +95,22 @@ async def similar_tracks(
             for t in tracks
         ],
     }
+
+
+@router.get("/autoplay/{track_id}")
+async def autoplay(
+    track_id: uuid.UUID,
+    limit: int = Query(10, ge=1, le=30),
+    exclude: str | None = Query(None, description="Comma-separated track ids to skip (recently played)"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Full, playable tracks queued by the player once the queue runs out."""
+    excluded: set[uuid.UUID] = set()
+    for raw in (exclude or "").split(","):
+        try:
+            excluded.add(uuid.UUID(raw.strip()))
+        except ValueError:
+            continue
+    tracks = await get_autoplay_tracks(track_id, current_user, db, exclude=excluded, limit=limit)
+    return {"tracks": [serialize_track(t) for t in tracks]}

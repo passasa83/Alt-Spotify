@@ -35,3 +35,11 @@ export const getSimilarTracks = async (trackId: string, limit = 10): Promise<{ t
   const response = await client.get(`/recommendations/similar/${trackId}`, { params: { limit } });
   return response.data;
 };
+
+// Playable tracks to keep the music going once the queue runs out.
+export const getAutoplayTracks = async (trackId: string, exclude: string[] = [], limit = 10): Promise<Track[]> => {
+  const response = await client.get(`/recommendations/autoplay/${trackId}`, {
+    params: { limit, exclude: exclude.join(',') || undefined },
+  });
+  return response.data.tracks;
+};

@@ -1,11 +1,13 @@
 import random
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.listening_history import ListeningHistory
 from app.models.track import Track
+from app.models.user import User
 
 
 async def get_similar_tracks(track_id: uuid.UUID, db: AsyncSession, limit: int = 10) -> list[Track]:
@@ -162,3 +164,54 @@ async def generate_daily_mix(user_id: uuid.UUID, db: AsyncSession, mix_count: in
         })
 
     return mixes
+
+
+async def get_autoplay_tracks(
+    track_id: uuid.UUID,
+    user: User,
+    db: AsyncSession,
+    exclude: set[uuid.UUID] | None = None,
+    limit: int = 10,
+) -> list[Track]:
+    """Playable tracks to continue listening after ``track_id``.
+
+    Same artist or genre first, topped up with popular tracks so the player
+    never runs dry. Only tracks with audio the user is allowed to hear.
+    """
+    result = await db.execute(select(Track).where(Track.id == track_id))
+    seed = result.scalar_one_or_none()
+    if not seed:
+        return []
+
+    excluded = set(exclude or ()) | {track_id}
+
+    def playable_query():
+        query = (
+            select(Track)
+            .options(selectinload(Track.artist), selectinload(Track.album))
+            .where(or_(Track.file_url.isnot(None), Track.hls_path.isnot(None)))
+            .where(Track.id.notin_(excluded))
+        )
+        if user.is_child_account:
+            query = query.where(Track.is_explicit.is_(False))
+        return query
+
+    def allowed(track: Track) -> bool:
+        return not track.allowed_territories or (
+            bool(user.country) and user.country in track.allowed_territories
+        )
+
+    related = Track.artist_id == seed.artist_id
+    if seed.genre:
+        related = or_(related, Track.genre == seed.genre)
+    similar = await db.execute(playable_query().where(related).order_by(func.random()).limit(limit * 2))
+    picked = [t for t in similar.scalars().all() if allowed(t)][:limit]
+
+    if len(picked) < limit:
+        excluded |= {t.id for t in picked}
+        popular = await db.execute(
+            playable_query().order_by(Track.play_count.desc()).limit((limit - len(picked)) * 2)
+        )
+        picked += [t for t in popular.scalars().all() if allowed(t)][: limit - len(picked)]
+
+    return picked

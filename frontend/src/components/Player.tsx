@@ -159,7 +159,7 @@ const Player = () => {
     audio.addEventListener('ended', () => {
       if (audio !== audioRef.current) return;
       const store = usePlayerStore.getState();
-      if (store.repeat === 'one' || (store.repeat === 'all' && store.queue.length === 0)) {
+      if (store.repeat === 'one') {
         store.restartCurrent();
         return;
       }

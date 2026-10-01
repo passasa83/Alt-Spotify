@@ -104,7 +104,7 @@ const AlbumDetail = () => {
         </button>
       </div>
 
-      <TrackList tracks={tracks} showAlbum={false} />
+      <TrackList tracks={tracks} showAlbum={false} playlistTracks={tracks} />
     </div>
   );
 };
