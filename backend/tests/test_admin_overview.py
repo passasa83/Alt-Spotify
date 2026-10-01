@@ -91,7 +91,7 @@ async def test_overview_groups_checks_by_area(
     areas = {a["area"]: a for a in data["areas"]}
     assert list(areas) == ["playback", "storage", "search", "database", "accounts", "security"]
     assert areas["playback"]["status"] == "error"
-    assert areas["playback"]["problems"] == 2  # missing dir + missing file
+    assert areas["playback"]["problems"] == 3  # missing dir + missing file + unused empty track
 
     by_code = {c["code"]: c for c in data["checks"]}
     # Passing checks are listed too, under their own area.
