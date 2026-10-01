@@ -1,15 +1,17 @@
+import hmac
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.redis import get_redis
 from app.models.podcast import Episode, Podcast
 from app.models.track import Track
-from app.models.user import User
-from app.utils.deps import require_admin
+from app.models.user import User, UserRole
+from app.utils.deps import _resolve_user, require_admin
 from app.utils.storage import get_disk_usage
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
@@ -77,7 +79,24 @@ async def system_stats(
 
 
 @router.get("/metrics")
-async def prometheus_metrics(db: AsyncSession = Depends(get_db)):
+async def prometheus_metrics(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Prometheus metrics: per-route traffic, versions... not public.
+
+    A scraper sends ``Authorization: Bearer <METRICS_TOKEN>``; otherwise an
+    admin session is required.
+    """
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
     from starlette.responses import Response
+
+    auth = request.headers.get("authorization", "")
+    token = auth[7:] if auth.lower().startswith("bearer ") else ""
+    if not (settings.METRICS_TOKEN and token and hmac.compare_digest(token, settings.METRICS_TOKEN)):
+        if not token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        user = await _resolve_user(token, db, request)
+        if user.role != UserRole.ADMIN:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)

@@ -31,7 +31,16 @@ const AdminLayout = () => {
     }
   }, [user, refreshAuth, navigate]);
 
-  if (user && user.role !== 'ADMIN') {
+  // A token in localStorage is not proof of anything: show nothing until the
+  // API has confirmed who this is, and only admins get past.
+  if (!user) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-950" role="status" aria-label="Loading">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-green-500 border-t-transparent" />
+      </div>
+    );
+  }
+  if (user.role !== 'ADMIN') {
     return <Navigate to="/" replace />;
   }
 

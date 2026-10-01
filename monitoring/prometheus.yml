@@ -8,6 +8,10 @@ scrape_configs:
       - targets: ['backend:8000']
     metrics_path: '/api/v1/monitoring/metrics'
     scrape_interval: 15s
+    # The endpoint is not public: use the backend's METRICS_TOKEN (.env).
+    authorization:
+      type: Bearer
+      credentials: 'replace-with-METRICS_TOKEN'
 
   - job_name: 'prometheus'
     static_configs:

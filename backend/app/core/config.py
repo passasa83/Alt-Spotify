@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "json"
     LOG_DIR: str = "logs"
     HSTS_ENABLED: bool = True
+    # Bearer token for Prometheus to scrape /monitoring/metrics (admins can
+    # always read it). Empty: admins only.
+    METRICS_TOKEN: str = ""
 
     CACHE_TTL: int = 300
     CACHE_ENABLED: bool = True
