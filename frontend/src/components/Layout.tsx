@@ -6,6 +6,7 @@ import Player from './Player';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useAuthStore } from '@/stores/authStore';
 import SkipToContent from './SkipToContent';
+import MobileNav from './MobileNav';
 
 const Layout = () => {
   const { initDevice } = usePlayerStore();
@@ -31,12 +32,13 @@ const Layout = () => {
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto bg-gray-900" role="main">
           <TopBar />
-          <div className="p-6" aria-live="polite">
+          <div className="p-4 md:p-6" aria-live="polite">
             <Outlet />
           </div>
         </main>
       </div>
       <Player />
+      <MobileNav />
     </div>
   );
 };

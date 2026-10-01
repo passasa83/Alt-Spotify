@@ -150,7 +150,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
               <div className="flex items-center justify-end gap-2">
                 <span className="text-sm text-gray-400">{formatTime(track.duration_seconds)}</span>
                 {isAdmin && (
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100">
+                  <div className="flex gap-2 opacity-0 [@media(hover:none)]:opacity-100 group-hover:opacity-100">
                     <Link 
                       to={`/admin/tracks/${track.id}/edit`}
                       onClick={(e) => e.stopPropagation()}
@@ -166,7 +166,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
                     </button>
                   </div>
                 )}
-                <div className="opacity-0 group-hover:opacity-100">
+                <div className="opacity-0 [@media(hover:none)]:opacity-100 group-hover:opacity-100">
                   <TrackContextMenu
                     track={track}
                     onAddToPlaylist={(t) => openAddToPlaylist(t)}

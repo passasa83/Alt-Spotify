@@ -72,8 +72,8 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
                 ? 'bg-green-500 text-black'
                 : 'bg-blue-500 text-white'
             } ${hasAudio
-              ? 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
-              : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
+              ? 'opacity-0 [@media(hover:none)]:opacity-100 translate-y-2 [@media(hover:none)]:translate-y-0 group-hover:opacity-100 group-hover:translate-y-0'
+              : 'opacity-0 [@media(hover:none)]:opacity-100 translate-y-2 [@media(hover:none)]:translate-y-0 group-hover:opacity-100 group-hover:translate-y-0'
             } ${downloading ? '!opacity-100 !translate-y-0' : ''} ${hasAudio && isCurrentTrack && isPlaying ? '!opacity-100 !translate-y-0' : ''}`}
             title={hasAudio ? 'Écouter' : 'Télécharger depuis YouTube'}
           >
@@ -97,12 +97,12 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
             className={`absolute top-2 right-10 flex h-8 w-8 items-center justify-center rounded-full transition-all ${
               liked
                 ? 'text-green-500 opacity-100'
-                : 'text-gray-400 opacity-0 group-hover:opacity-100 hover:text-white'
+                : 'text-gray-400 opacity-0 [@media(hover:none)]:opacity-100 group-hover:opacity-100 hover:text-white'
             }`}
           >
             <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
           </button>
-          <div className="absolute top-2 right-2 z-10 opacity-0 transition-all group-hover:opacity-100">
+          <div className="absolute top-2 right-2 z-10 opacity-0 [@media(hover:none)]:opacity-100 transition-all group-hover:opacity-100">
             <TrackContextMenu
               track={track}
               onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
