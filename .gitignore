@@ -43,3 +43,6 @@ music/
 
 # Local-only env files (e.g. frontend/.env.remote.local)
 *.local
+
+# Local dev backend data (backend/scripts/dev_server.py)
+.local-dev/

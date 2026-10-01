@@ -20,6 +20,7 @@ LOCAL_PREFIX = "local:"
 _FILE_COUNT_CAP = 100_000
 _AUDIO_EXTENSIONS = (".mp3", ".flac", ".ogg", ".wav", ".m4a", ".aac", ".opus")
 _DEFAULT_CREDENTIALS = {"minioadmin", "changeme"}
+_SERVICE_TIMEOUT = 3  # seconds per backing-service check
 
 
 def _utcnow() -> datetime:
@@ -119,30 +120,35 @@ async def _services_status(db: AsyncSession) -> dict:
         await db.execute(text("SELECT 1"))
         services["database"] = {"ok": True}
     except Exception as e:  # noqa: BLE001 - reported to the admin as is
-        services["database"] = {"ok": False, "detail": str(e)[:200]}
+        services["database"] = {"ok": False, "detail": (str(e) or type(e).__name__)[:200]}
 
     try:
         from app.core.redis import get_redis
 
-        await asyncio.wait_for((await get_redis()).ping(), timeout=2)
+        await asyncio.wait_for((await get_redis()).ping(), timeout=_SERVICE_TIMEOUT)
         services["redis"] = {"ok": True}
     except Exception as e:  # noqa: BLE001
-        services["redis"] = {"ok": False, "detail": str(e)[:200]}
+        services["redis"] = {"ok": False, "detail": (str(e) or type(e).__name__)[:200]}
 
     try:
         from app.core.minio import get_minio_client
 
-        exists = await asyncio.to_thread(get_minio_client().bucket_exists, settings.MINIO_BUCKET)
+        # Blocking calls (creating the client already hits the server) that
+        # retry for a long time when MinIO is down: off the event loop, bounded.
+        exists = await asyncio.wait_for(
+            asyncio.to_thread(lambda: get_minio_client().bucket_exists(settings.MINIO_BUCKET)),
+            timeout=_SERVICE_TIMEOUT,
+        )
         services["minio"] = {"ok": bool(exists), "detail": None if exists else f"bucket {settings.MINIO_BUCKET} missing"}
     except Exception as e:  # noqa: BLE001
-        services["minio"] = {"ok": False, "detail": str(e)[:200]}
+        services["minio"] = {"ok": False, "detail": (str(e) or type(e).__name__)[:200]}
 
     try:
-        async with httpx.AsyncClient(timeout=2) as client:
+        async with httpx.AsyncClient(timeout=_SERVICE_TIMEOUT) as client:
             response = await client.get(f"{settings.MEILISEARCH_URL}/health")
         services["meilisearch"] = {"ok": response.status_code == 200}
     except Exception as e:  # noqa: BLE001
-        services["meilisearch"] = {"ok": False, "detail": str(e)[:200]}
+        services["meilisearch"] = {"ok": False, "detail": (str(e) or type(e).__name__)[:200]}
 
     return services
 
