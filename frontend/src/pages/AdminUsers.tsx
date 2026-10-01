@@ -3,9 +3,10 @@ import { getAdminUsers, updateUserRole, toggleUserActive, deleteUser } from '@/a
 import type { AdminUser } from '@/api/admin';
 import { Users, Search, Trash2, Shield, UserCheck, UserX } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
+import { formatRelative } from '@/utils/formatTime';
 
 const AdminUsers = () => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -114,6 +115,7 @@ const AdminUsers = () => {
                 <th className="px-4 py-3">{t('auth.email')}</th>
                 <th className="px-4 py-3">{t('admin.role')}</th>
                 <th className="px-4 py-3">{t('admin.status')}</th>
+                <th className="px-4 py-3">{t('admin.activity')}</th>
                 <th className="px-4 py-3">{t('admin.joined')}</th>
                 <th className="px-4 py-3 text-right">{t('admin.actions')}</th>
               </tr>
@@ -155,6 +157,22 @@ const AdminUsers = () => {
                     >
                       {user.is_active ? t('admin.active') : t('admin.inactive')}
                     </span>
+                    {user.is_child_account && (
+                      <span className="ml-1 inline-flex rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-300">
+                        {t('admin.child_account')}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-400">
+                    <p className="text-gray-300">
+                      {user.last_played_at
+                        ? t('admin.last_listen', { when: formatRelative(user.last_played_at, locale) })
+                        : t('admin.never_listened')}
+                    </p>
+                    <p>
+                      {t('admin.plays', { count: user.play_count ?? 0 })} · {t('admin.playlists_count', { count: user.playlist_count ?? 0 })} ·{' '}
+                      {t('admin.devices_count', { count: user.device_count ?? 0 })}
+                    </p>
                   </td>
                   <td className="px-4 py-3 text-gray-400">
                     {new Date(user.created_at).toLocaleDateString()}

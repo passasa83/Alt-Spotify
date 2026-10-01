@@ -7,11 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.album import Album
 from app.models.artist import Artist
+from app.models.device_session import DeviceSession
 from app.models.jam import JamSession
 from app.models.listening_history import ListeningHistory
+from app.models.playlist import Playlist
 from app.models.track import Track
 from app.models.user import User, UserRole
 from app.schemas.user import UserResponse
+from app.services.admin_overview import get_overview
 from app.utils.deps import require_admin
 from app.utils.storage import get_storage_used
 
@@ -77,15 +80,66 @@ async def list_users(
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar() or 0
 
-    query = query.offset((page - 1) * page_size).limit(page_size)
+    query = query.order_by(User.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
     users = result.scalars().all()
+    activity = await _users_activity(db, [u.id for u in users])
 
     return {
-        "items": [UserResponse.model_validate(u) for u in users],
+        "items": [
+            {**UserResponse.model_validate(u).model_dump(mode="json"), **activity.get(u.id, _NO_ACTIVITY)}
+            for u in users
+        ],
         "total": total,
         "pages": (total + page_size - 1) // page_size,
     }
+
+
+_NO_ACTIVITY = {"play_count": 0, "last_played_at": None, "last_seen_at": None, "playlist_count": 0, "device_count": 0}
+
+
+async def _users_activity(db: AsyncSession, user_ids: list) -> dict:
+    """Plays, last listen, last device heartbeat, playlists and devices per user."""
+    if not user_ids:
+        return {}
+    activity = {uid: dict(_NO_ACTIVITY) for uid in user_ids}
+
+    plays = await db.execute(
+        select(ListeningHistory.user_id, func.count(ListeningHistory.id), func.max(ListeningHistory.played_at))
+        .where(ListeningHistory.user_id.in_(user_ids))
+        .group_by(ListeningHistory.user_id)
+    )
+    for uid, count, last in plays.all():
+        activity[uid]["play_count"] = count
+        activity[uid]["last_played_at"] = last.isoformat() if last else None
+
+    devices = await db.execute(
+        select(DeviceSession.user_id, func.count(DeviceSession.id), func.max(DeviceSession.last_active_at))
+        .where(DeviceSession.user_id.in_(user_ids))
+        .group_by(DeviceSession.user_id)
+    )
+    for uid, count, last in devices.all():
+        activity[uid]["device_count"] = count
+        activity[uid]["last_seen_at"] = last.isoformat() if last else None
+
+    playlists = await db.execute(
+        select(Playlist.owner_id, func.count(Playlist.id))
+        .where(Playlist.owner_id.in_(user_ids))
+        .group_by(Playlist.owner_id)
+    )
+    for uid, count in playlists.all():
+        activity[uid]["playlist_count"] = count
+
+    return activity
+
+
+@router.get("/overview")
+async def overview(
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Users, catalogue availability, music folders, services, config and warnings."""
+    return await get_overview(db)
 
 
 @router.put("/users/{user_id}/role")

@@ -26,6 +26,7 @@ import Recommendations from '@/pages/Recommendations';
 import NotFound from '@/pages/NotFound';
 import AdminInvites from '@/pages/AdminInvites';
 import AdminDevices from '@/pages/AdminDevices';
+import AdminOverview from '@/pages/AdminOverview';
 import Browse from '@/pages/Browse';
 import History from '@/pages/History';
 import SmartPlaylistCreate from '@/pages/SmartPlaylistCreate';
@@ -92,6 +93,7 @@ const App = () => {
         <Route path="podcasts" element={<Podcasts />} />
         <Route path="podcasts/:id" element={<PodcastDetail />} />
         <Route path="podcasts/episode/:id" element={<EpisodeDetail />} />
+        <Route path="admin" element={<AdminOverview />} />
         <Route path="admin/upload" element={<AdminUpload />} />
         <Route path="admin/dashboard" element={<AdminDashboard />} />
         <Route path="admin/users" element={<AdminUsers />} />

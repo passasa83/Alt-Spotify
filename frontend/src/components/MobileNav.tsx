@@ -1,16 +1,20 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Search, Library, Compass, HardDrive } from 'lucide-react';
+import { Home, Search, Library, Compass, HardDrive, Shield } from 'lucide-react';
+import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
 
 // The sidebar is hidden below md: this bar replaces it on phones.
 const MobileNav = () => {
   const { t } = useTranslation();
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
   const items = [
     { to: '/', label: t('nav.home'), icon: Home, end: true },
     { to: '/browse', label: t('browse.title'), icon: Compass },
     { to: '/search', label: t('nav.search'), icon: Search },
     { to: '/library', label: t('nav.playlists'), icon: Library },
-    { to: '/local', label: t('local.title'), icon: HardDrive },
+    isAdmin
+      ? { to: '/admin', label: t('admin.overview'), icon: Shield }
+      : { to: '/local', label: t('local.title'), icon: HardDrive },
   ];
 
   return (

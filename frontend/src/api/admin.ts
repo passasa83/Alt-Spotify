@@ -16,6 +16,61 @@ export interface AdminUser {
   role: string;
   is_active: boolean;
   created_at: string;
+  country?: string | null;
+  is_child_account?: boolean;
+  play_count?: number;
+  last_played_at?: string | null;
+  last_seen_at?: string | null;
+  playlist_count?: number;
+  device_count?: number;
+}
+
+export type OverviewWarningLevel = 'error' | 'warning' | 'info';
+
+export interface OverviewWarning {
+  level: OverviewWarningLevel;
+  code: string;
+  params: Record<string, string | number>;
+}
+
+export interface MusicDirStatus {
+  setting: string;
+  path: string;
+  exists: boolean;
+  writable: boolean;
+  audio_files: number;
+  capped: boolean;
+}
+
+export interface AdminOverview {
+  generated_at: string;
+  users: {
+    total: number;
+    active: number;
+    admins: number;
+    new_7d: number;
+    listeners_7d: number;
+    pending_invites: number;
+  };
+  catalogue: {
+    total: number;
+    playable: number;
+    no_audio: number;
+    local_files: number;
+    object_storage: number;
+    hls: number;
+    missing_files: number;
+    missing_examples: string[];
+  };
+  music_dirs: MusicDirStatus[];
+  services: Record<string, { ok: boolean; detail?: string | null }>;
+  config: { key: string; value: string | number | boolean }[];
+  warnings: OverviewWarning[];
+}
+
+export async function getAdminOverview(): Promise<AdminOverview> {
+  const response = await client.get('/admin/overview');
+  return response.data;
 }
 
 export interface CatalogueStats {
