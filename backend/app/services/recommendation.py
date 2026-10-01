@@ -208,7 +208,8 @@ async def get_autoplay_tracks(
     picked = [t for t in similar.scalars().all() if allowed(t)][:limit]
 
     if len(picked) < limit:
-        excluded |= {t.id for t in picked}
+        # Same type as the rest of the set (ids may load as str on some drivers).
+        excluded |= {uuid.UUID(str(t.id)) for t in picked}
         popular = await db.execute(
             playable_query().order_by(Track.play_count.desc()).limit((limit - len(picked)) * 2)
         )
