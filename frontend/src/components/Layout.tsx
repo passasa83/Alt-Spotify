@@ -8,10 +8,9 @@ import { useAuthStore } from '@/stores/authStore';
 import SkipToContent from './SkipToContent';
 
 const Layout = () => {
-  const { showLyrics, lyrics, initDevice } = usePlayerStore();
+  const { initDevice } = usePlayerStore();
   const { user, refreshAuth } = useAuthStore();
   const navigate = useNavigate();
-  const lyricsHeight = showLyrics && lyrics.length > 0 ? 256 : 0;
 
   useEffect(() => {
     if (!user) {
@@ -28,7 +27,7 @@ const Layout = () => {
   return (
     <div className="flex h-screen flex-col bg-black">
       <SkipToContent />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto bg-gray-900" role="main">
           <TopBar />
@@ -37,7 +36,6 @@ const Layout = () => {
           </div>
         </main>
       </div>
-      <div style={{ marginBottom: `${lyricsHeight}px` }} />
       <Player />
     </div>
   );

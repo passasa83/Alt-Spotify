@@ -98,7 +98,7 @@ const Sidebar = () => {
         </nav>
       </div>
 
-      <div className="flex-1 overflow-y-auto rounded-lg bg-gray-900 p-2">
+      <div className="flex-1 rounded-lg bg-gray-900 p-2">
         <div className="mb-2 flex items-center justify-between px-2">
           <span className="text-sm font-semibold text-gray-400">{t('nav.playlists')}</span>
           <button

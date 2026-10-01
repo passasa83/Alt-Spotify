@@ -290,14 +290,14 @@ const Player = () => {
 
   if (!currentTrack) {
     return (
-      <div className="flex h-20 items-center justify-center bg-gray-900 border-t border-gray-800">
+      <div className="flex h-20 flex-shrink-0 items-center justify-center bg-gray-900 border-t border-gray-800">
         <p className="text-sm text-gray-500">{t('player.select_track')}</p>
       </div>
     );
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50">
+    <div className="relative z-50 flex-shrink-0">
       {showLyrics && lyrics.length > 0 && (
         <div className="h-64 border-t border-gray-800 bg-gray-900">
           <SynchronizedLyrics lyrics={lyrics} currentTime={progress} onSeek={seek} />
