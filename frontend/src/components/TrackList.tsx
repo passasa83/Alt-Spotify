@@ -127,8 +127,8 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
                 <div className="min-w-0">
                   <Link
                     to={`/track/${track.id}`}
-                    className={`block truncate text-sm font-medium hover:underline ${
-                      isCurrentTrack ? 'text-green-500' : 'text-white'
+                    className={`block truncate text-sm hover:underline ${
+                      isCurrentTrack ? 'font-bold text-green-500' : 'font-medium text-white'
                     }`}
                   >
                     {track.title}

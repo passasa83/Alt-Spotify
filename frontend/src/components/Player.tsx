@@ -470,7 +470,7 @@ const Player = () => {
         <div className="min-w-0">
           <Link
             to={`/track/${currentTrack.id}`}
-            className="block truncate text-sm font-medium text-white hover:underline"
+            className="block truncate text-sm font-bold text-white hover:underline"
           >
             {currentTrack.title}
           </Link>

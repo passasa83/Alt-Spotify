@@ -150,7 +150,7 @@ const History = () => {
                   </button>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className={`truncate text-sm font-medium ${isCurrentTrack ? 'text-green-500' : ''}`}>{item.title}</p>
+                  <p className={`truncate text-sm ${isCurrentTrack ? 'font-bold text-green-500' : 'font-medium'}`}>{item.title}</p>
                   <p className="truncate text-xs text-gray-500">
                     {item.artist?.name ? <Link to={`/artist/${item.artist.id}`} className="hover:underline">{item.artist.name}</Link> : ''}
                     {item.duration_listened_seconds > 0

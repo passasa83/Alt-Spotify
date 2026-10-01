@@ -115,7 +115,10 @@ const Browse = () => {
                 {isPlayingTrack(track.id) ? <Pause size={14} fill="black" /> : <Play size={14} fill="black" />}
               </button>
               <div className="flex-1 min-w-0">
-                <Link to={`/track/${track.id}`} className="truncate text-white hover:underline">
+                <Link
+                  to={`/track/${track.id}`}
+                  className={`truncate hover:underline ${isCurrent(track.id) ? 'font-bold text-green-500' : 'text-white'}`}
+                >
                   {track.title}
                 </Link>
                 <p className="truncate text-sm text-gray-400">

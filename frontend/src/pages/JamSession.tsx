@@ -205,7 +205,7 @@ const JamSession = () => {
                   className="h-10 w-10 rounded object-cover"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-white">{track.title}</p>
+                  <p className={`truncate text-sm ${currentTrack?.id === track.id ? 'font-bold text-green-400' : 'text-white'}`}>{track.title}</p>
                   <p className="truncate text-xs text-gray-400">
                     <Link to={`/artist/${track.artist?.id || track.artist_id}`} className="hover:underline">{track.artist?.name || t('player.unknown_artist')}</Link>
                   </p>

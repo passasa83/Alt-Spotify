@@ -4,6 +4,7 @@ import { getUserStats } from '@/api/users';
 import { generateTopPlaylist } from '@/api/playlists';
 import { useTranslation } from '@/hooks/useTranslation';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useTrackPlayback } from '@/hooks/useTrackPlayback';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useToastStore } from '@/stores/toastStore';
 import { resolveCoverUrl } from '@/api/tracks';
@@ -22,6 +23,7 @@ const Stats = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [generatingPlaylist, setGeneratingPlaylist] = useState(false);
   const { setTrack } = usePlayerStore();
+  const { isCurrent } = useTrackPlayback();
   const { loadPlaylists } = useLibraryStore();
   const addToast = useToastStore((s) => s.addToast);
   const navigate = useNavigate();
@@ -114,7 +116,12 @@ const Stats = () => {
                   onClick={() => setTrack(track as Track)}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-white cursor-pointer hover:underline" onClick={() => setTrack(track as Track)}>{track.title}</p>
+                  <p
+                    className={`truncate text-sm cursor-pointer hover:underline ${isCurrent(String(track.id)) ? 'font-bold text-green-500' : 'font-medium text-white'}`}
+                    onClick={() => setTrack(track as Track)}
+                  >
+                    {track.title}
+                  </p>
                   <p className="truncate text-xs text-gray-400">
                     <Link to={`/artist/${(track as Track).artist?.id || (track as Track).artist_id}`} className="hover:underline">{track.artist?.name || t('player.unknown_artist')}</Link>
                   </p>

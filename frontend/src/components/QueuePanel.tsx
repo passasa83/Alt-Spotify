@@ -29,7 +29,7 @@ const QueueRow = ({ track, active, onPlay, onRemove }: {
           className="h-10 w-10 flex-shrink-0 rounded object-cover"
         />
         <span className="min-w-0">
-          <span className={`block truncate text-sm ${active ? 'text-green-400' : 'text-white'}`}>{track.title}</span>
+          <span className={`block truncate text-sm ${active ? 'font-bold text-green-400' : 'text-white'}`}>{track.title}</span>
           <span className="block truncate text-xs text-gray-400">
             {track.artist?.name || t('player.unknown_artist')}
           </span>

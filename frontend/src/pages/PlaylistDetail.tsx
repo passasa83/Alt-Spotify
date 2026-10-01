@@ -256,7 +256,7 @@ const PlaylistDetail = () => {
                   className="h-10 w-10 rounded object-cover"
                 />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-white">{pt.track.title}</p>
+                  <p className={`truncate text-sm ${isCurrent(pt.track.id) ? 'font-bold text-green-500' : 'font-medium text-white'}`}>{pt.track.title}</p>
                   <Link to={`/artist/${pt.track.artist?.id || pt.track.artist_id}`} className="truncate text-xs text-gray-400 hover:underline">{pt.track.artist?.name || 'Unknown Artist'}</Link>
                 </div>
               </div>

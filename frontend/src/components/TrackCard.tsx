@@ -114,7 +114,10 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
             />
           </div>
         </div>
-        <Link to={`/track/${track.id}`} className="block truncate text-sm font-semibold text-white hover:underline">
+        <Link
+          to={`/track/${track.id}`}
+          className={`block truncate text-sm hover:underline ${isCurrentTrack ? 'font-extrabold text-green-500' : 'font-semibold text-white'}`}
+        >
           {track.title}
         </Link>
         <div className="flex items-center gap-1.5">
