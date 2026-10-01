@@ -23,11 +23,15 @@ import {
   Settings2,
   Gauge,
   ListMusic,
+  Check,
 } from 'lucide-react';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import SynchronizedLyrics from './SynchronizedLyrics';
-import DownloadButton from './DownloadButton';
+import { useTrackDownload } from './DownloadButton';
+import OverflowToolbar, { type ToolbarItem } from './OverflowToolbar';
+import { usePopover } from '@/hooks/usePopover';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import Equalizer from './Equalizer';
 import { useTranslation } from '@/hooks/useTranslation';
 import { formatTime } from '@/utils/formatTime';
@@ -108,12 +112,18 @@ const Player = () => {
   const crossfadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const consecutiveErrorsRef = useRef(0);
   const authRetriedTrackIdRef = useRef<string | null>(null);
-  const [showQueue, setShowQueue] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
   const [isLiked, setIsLiked] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showEqualizer, setShowEqualizer] = useState(false);
+  // Panels share the global "one open at a time" store: they never overlap
+  // each other, nor the top bar menus.
+  const queuePanelRef = useRef<HTMLDivElement>(null);
+  const settingsPanelRef = useRef<HTMLDivElement>(null);
+  const queuePanel = usePopover('player-queue', [queuePanelRef]);
+  const settingsPanel = usePopover('player-settings', [settingsPanelRef]);
+  const equalizerPanel = usePopover('player-equalizer');
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const download = useTrackDownload(currentTrack?.id ?? '');
 
   const getNextTrack = useCallback(() => {
     const { queue, shuffle: sh } = usePlayerStore.getState();
@@ -383,6 +393,45 @@ const Player = () => {
   const RepeatIcon = repeat === 'one' ? Repeat1 : Repeat;
   const progressPercent = duration > 0 ? Math.min(100, (progress / duration) * 100) : 0;
 
+  const muted = isMuted || volume === 0;
+  const toolbarItems: ToolbarItem[] = [
+    { key: 'queue', label: t('player.queue'), icon: ListMusic, onClick: queuePanel.toggle, active: queuePanel.isOpen, popover: 'player-queue' },
+    { key: 'lyrics', label: t('player.lyrics'), icon: Mic2, onClick: toggleLyrics, active: showLyrics },
+    {
+      key: 'download',
+      label: download.downloaded ? t('player.remove_download') : t('player.download'),
+      icon: download.downloaded ? Check : Download,
+      onClick: download.toggle,
+      active: download.downloaded,
+      disabled: download.isDownloading,
+    },
+    { key: 'equalizer', label: t('player.equalizer'), icon: Sliders, onClick: equalizerPanel.open },
+    {
+      key: 'settings',
+      label: t('player.audio_settings'),
+      icon: Settings2,
+      onClick: settingsPanel.toggle,
+      active: settingsPanel.isOpen,
+      hint: playbackRate !== 1 ? `${playbackRate}x` : undefined,
+      popover: 'player-settings',
+    },
+    { key: 'jam', label: t('player.jam_session'), icon: Radio, onClick: () => navigate('/jam') },
+    // Shown inline in the centre / next to the slider on wider screens.
+    ...(isDesktop
+      ? []
+      : [
+          { key: 'shuffle', label: t('player.shuffle'), icon: Shuffle, onClick: toggleShuffle, active: shuffle },
+          {
+            key: 'repeat',
+            label: repeat === 'one' ? t('player.repeat_one') : t('player.repeat'),
+            icon: RepeatIcon,
+            onClick: toggleRepeat,
+            active: repeat !== 'off',
+          },
+          { key: 'mute', label: muted ? t('player.unmute') : t('player.mute'), icon: muted ? VolumeX : Volume2, onClick: handleVolumeToggle, active: muted },
+        ]),
+  ];
+
   if (!currentTrack) {
     return (
       <div className="hidden h-20 flex-shrink-0 items-center justify-center bg-gray-900 border-t border-gray-800 md:flex">
@@ -399,9 +448,18 @@ const Player = () => {
         </div>
       )}
       <div className="relative flex h-16 items-center justify-between gap-2 bg-gray-900 px-3 border-t border-gray-800 md:h-20 md:px-4">
-      {/* Mobile: thin progress line instead of the seek bar */}
-      <div className="absolute left-0 top-0 h-0.5 bg-green-500 md:hidden" style={{ width: `${progressPercent}%` }} />
-      <div className="flex min-w-0 flex-1 items-center gap-3 md:w-1/4 md:flex-none">
+      {/* Mobile: thin seek bar along the top edge */}
+      <input
+        type="range"
+        min={0}
+        max={duration || 0}
+        value={progress}
+        onChange={handleSeek}
+        aria-label={t('player.now_playing')}
+        className="absolute inset-x-0 -top-1 h-2 w-full cursor-pointer appearance-none bg-transparent accent-green-500 md:hidden"
+        style={{ background: `linear-gradient(to right, rgb(34 197 94) ${progressPercent}%, rgb(55 65 81) ${progressPercent}%) center / 100% 2px no-repeat` }}
+      />
+      <div className="flex min-w-0 flex-1 items-center gap-3 md:w-1/4 md:flex-none lg:w-1/4">
         <Link to={`/track/${currentTrack.id}`}>
           <img
             src={resolveCoverUrl(currentTrack.cover_url || currentTrack.album?.cover_url)}
@@ -445,7 +503,7 @@ const Player = () => {
         </button>
       </div>
 
-      <div className="flex flex-shrink-0 flex-col items-center gap-1 md:w-2/4">
+      <div className="flex flex-shrink-0 flex-col items-center gap-1 md:w-2/5 lg:w-2/4">
         <div className="flex items-center gap-4">
           <button
             onClick={toggleShuffle}
@@ -476,14 +534,6 @@ const Player = () => {
           >
             <RepeatIcon size={16} />
           </button>
-          <button
-            onClick={() => setShowQueue(!showQueue)}
-            className={`p-1 md:hidden ${showQueue ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
-            aria-label={t('player.queue')}
-            aria-expanded={showQueue}
-          >
-            <ListMusic size={20} />
-          </button>
         </div>
 
         <div className="hidden w-full items-center gap-2 md:flex">
@@ -505,76 +555,45 @@ const Player = () => {
         </div>
       </div>
 
-      <div className="hidden w-1/4 items-center justify-end gap-2 md:flex">
-        {playbackRate !== 1 && (
-          <span className="rounded bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-green-400">
-            {playbackRate}x
-          </span>
-        )}
-        <button
-          onClick={() => setShowQueue(!showQueue)}
-          className={`p-1 ${showQueue ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
-          aria-label={t('player.queue')}
-          title={t('player.queue')}
-          aria-expanded={showQueue}
-        >
-          <ListMusic size={20} />
-        </button>
-        <button
-          onClick={toggleLyrics}
-          className={`p-1 ${showLyrics ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
-          aria-label={t('player.lyrics')}
-          aria-pressed={showLyrics}
-        >
-          <Mic2 size={20} />
-        </button>
-        <DownloadButton trackId={currentTrack.id} />
-        <button
-          onClick={() => setShowEqualizer(true)}
-          className="p-1 text-gray-400 hover:text-white"
-          aria-label={t('player.equalizer')}
-        >
-          <Sliders size={20} />
-        </button>
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className={`p-1 ${showSettings ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
-          aria-label={t('player.audio_settings')}
-          aria-expanded={showSettings}
-        >
-          <Settings2 size={20} />
-        </button>
-        <button
-          onClick={() => navigate('/jam')}
-          className="p-1 text-gray-400 hover:text-white"
-          aria-label={t('player.jam_session')}
-        >
-          <Radio size={20} />
-        </button>
-        <button onClick={handleVolumeToggle} className="p-1 text-gray-400 hover:text-white" aria-label={isMuted || volume === 0 ? t('player.unmute') : t('player.mute')}>
-          {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={volume}
-          onChange={(e) => setVolume(parseFloat(e.target.value))}
-          role="slider"
-          aria-label={t('player.volume')}
-          aria-valuemin={0}
-          aria-valuemax={1}
-          aria-valuenow={volume}
-          className="h-1 w-24 cursor-pointer appearance-none rounded-full bg-gray-600 accent-green-500 focus-visible:outline-2 focus-visible:outline-green-500"
-        />
-      </div>
+      <OverflowToolbar
+        items={toolbarItems}
+        moreLabel={t('player.more')}
+        placement="top"
+        className="min-w-[2.5rem] flex-1 md:w-1/3 md:flex-none lg:w-1/4"
+        trailing={
+          isDesktop ? (
+            <>
+              <button
+                onClick={handleVolumeToggle}
+                className="p-1 text-gray-400 hover:text-white"
+                aria-label={muted ? t('player.unmute') : t('player.mute')}
+              >
+                {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={volume}
+                onChange={(e) => setVolume(parseFloat(e.target.value))}
+                aria-label={t('player.volume')}
+                className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-gray-600 accent-green-500 focus-visible:outline-2 focus-visible:outline-green-500 xl:w-24"
+              />
+            </>
+          ) : undefined
+        }
+      />
       </div>
 
-      {showQueue && <QueuePanel onClose={() => setShowQueue(false)} />}
+      {queuePanel.isOpen && (
+        <div ref={queuePanelRef}>
+          <QueuePanel onClose={queuePanel.close} />
+        </div>
+      )}
 
-      {showSettings && (
-        <div className="absolute bottom-full right-4 mb-2 w-80 rounded-lg bg-gray-800 p-4 shadow-xl" role="dialog" aria-label={t('player.audio_settings')}>
+      {settingsPanel.isOpen && (
+        <div ref={settingsPanelRef} className="absolute bottom-full right-0 mb-2 max-h-[70vh] w-full overflow-y-auto rounded-lg bg-gray-800 p-4 shadow-xl sm:right-4 sm:w-80" role="dialog" aria-label={t('player.audio_settings')}>
           <h3 className="mb-3 text-sm font-medium text-white">{t('player.audio_settings')}</h3>
 
           <div className="mb-3">
@@ -638,7 +657,7 @@ const Player = () => {
         </div>
       )}
 
-      <Equalizer isOpen={showEqualizer} onClose={() => setShowEqualizer(false)} audioRef={audioRef} />
+      <Equalizer isOpen={equalizerPanel.isOpen} onClose={equalizerPanel.close} audioRef={audioRef} />
     </div>
   );
 };

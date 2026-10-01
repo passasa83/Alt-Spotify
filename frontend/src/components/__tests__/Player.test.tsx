@@ -18,6 +18,7 @@ vi.mock('@/components/SynchronizedLyrics', () => ({
 }));
 vi.mock('@/components/DownloadButton', () => ({
   default: () => <div data-testid="download-btn">Download</div>,
+  useTrackDownload: () => ({ downloaded: false, isDownloading: false, toggle: vi.fn() }),
 }));
 vi.mock('@/components/Equalizer', () => ({
   default: () => <div data-testid="equalizer">Equalizer</div>,

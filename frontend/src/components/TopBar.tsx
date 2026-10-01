@@ -1,15 +1,14 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, Bell, ChevronDown, Settings, LogOut, Globe } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import NotificationBell from './NotificationBell';
 import { useTranslation } from '@/hooks/useTranslation';
 import type { Locale } from '@/i18n';
+import { usePopover } from '@/hooks/usePopover';
 
 const TopBar = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isLangOpen, setIsLangOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
@@ -17,19 +16,11 @@ const TopBar = () => {
   const langRef = useRef<HTMLDivElement>(null);
   const { t, locale, setLocale } = useTranslation();
   const isSearchPage = location.pathname.startsWith('/search');
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-      if (langRef.current && !langRef.current.contains(event.target as Node)) {
-        setIsLangOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  // Shared store: opening one menu closes the others (and the player panels).
+  const userMenu = usePopover('topbar-user', [dropdownRef]);
+  const langMenu = usePopover('topbar-lang', [langRef]);
+  const isDropdownOpen = userMenu.isOpen;
+  const isLangOpen = langMenu.isOpen;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,9 +30,9 @@ const TopBar = () => {
   };
 
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between bg-gray-900/80 px-6 py-3 backdrop-blur-md">
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-3 bg-gray-900/80 px-4 py-3 backdrop-blur-md md:px-6">
       {!isSearchPage && (
-        <form onSubmit={handleSearch} className="relative">
+        <form onSubmit={handleSearch} className="relative min-w-0 flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} aria-hidden="true" />
           <input
             type="text"
@@ -49,16 +40,16 @@ const TopBar = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             aria-label={t('nav.search')}
-            className="w-64 rounded-full bg-gray-800 py-2 pl-10 pr-4 text-sm text-white placeholder-gray-400 outline-none focus:outline-2 focus:outline-green-500 lg:w-96"
+            className="w-full max-w-96 rounded-full bg-gray-800 py-2 pl-10 pr-4 text-sm text-white placeholder-gray-400 outline-none focus:outline-2 focus:outline-green-500"
           />
         </form>
       )}
-      {isSearchPage && <div />}
+      {isSearchPage && <div className="flex-1" />}
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-shrink-0 items-center gap-1 sm:gap-3">
         <div className="relative" ref={langRef}>
           <button
-            onClick={() => setIsLangOpen(!isLangOpen)}
+            onClick={langMenu.toggle}
             aria-label={t('settings.language')}
             aria-expanded={isLangOpen}
             className="flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-gray-400 hover:text-white"
@@ -73,7 +64,7 @@ const TopBar = () => {
                   key={lang}
                   onClick={() => {
                     setLocale(lang);
-                    setIsLangOpen(false);
+                    langMenu.close();
                   }}
                   className={`flex w-full items-center px-4 py-2 text-sm ${
                     locale === lang ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'
@@ -90,7 +81,9 @@ const TopBar = () => {
 
         <div className="relative" ref={dropdownRef}>
           <button
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            onClick={userMenu.toggle}
+            aria-expanded={isDropdownOpen}
+            aria-label={user?.pseudo || 'User'}
             className="flex items-center gap-2 rounded-full bg-gray-800 py-1 pl-1 pr-3 hover:bg-gray-700"
           >
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-600">
@@ -107,11 +100,11 @@ const TopBar = () => {
           </button>
 
           {isDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-48 rounded-md bg-gray-800 py-1 shadow-xl">
+            <div className="absolute right-0 top-full z-50 mt-2 w-48 rounded-md bg-gray-800 py-1 shadow-xl">
               <button
                 onClick={() => {
                   navigate('/settings');
-                  setIsDropdownOpen(false);
+                  userMenu.close();
                 }}
                 className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
               >
@@ -120,6 +113,7 @@ const TopBar = () => {
               </button>
               <button
                 onClick={() => {
+                  userMenu.close();
                   logout();
                   navigate('/login');
                 }}

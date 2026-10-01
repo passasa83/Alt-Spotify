@@ -94,15 +94,16 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
                 addToFavorites(track);
               }
             }}
-            className={`absolute top-2 right-10 flex h-8 w-8 items-center justify-center rounded-full transition-all ${
+            className={`absolute top-2 right-11 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 transition-all ${
               liked
                 ? 'text-green-500 opacity-100'
                 : 'text-gray-400 opacity-0 [@media(hover:none)]:opacity-100 group-hover:opacity-100 hover:text-white'
             }`}
+            aria-label={liked ? 'Remove from liked' : 'Add to liked'}
           >
             <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
           </button>
-          <div className="absolute top-2 right-2 z-10 opacity-0 [@media(hover:none)]:opacity-100 transition-all group-hover:opacity-100">
+          <div className="absolute top-2 right-2 z-10 rounded-full bg-black/60 opacity-0 [@media(hover:none)]:opacity-100 transition-all focus-within:opacity-100 group-hover:opacity-100">
             <TrackContextMenu
               track={track}
               onAddToPlaylist={(t) => setPlaylistModalTrack(t)}

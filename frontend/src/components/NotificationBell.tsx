@@ -3,24 +3,24 @@ import { Bell } from 'lucide-react';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import NotificationItem from './NotificationItem';
+import { usePopover } from '@/hooks/usePopover';
 
 const NotificationBell = () => {
   const { t } = useTranslation();
   const {
     notifications,
     unreadCount,
-    isOpen,
     isLoading,
     loadNotifications,
     markAsRead,
     markAllAsRead,
     deleteNotification,
-    togglePanel,
     connectWebSocket,
     disconnectWebSocket,
   } = useNotificationStore();
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const { isOpen, toggle: togglePanel } = usePopover('notifications', [panelRef, buttonRef]);
 
   useEffect(() => {
     loadNotifications();
@@ -28,27 +28,14 @@ const NotificationBell = () => {
     return () => disconnectWebSocket();
   }, []);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(event.target as Node) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(event.target as Node)
-      ) {
-        if (isOpen) togglePanel();
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
-
   return (
     <div className="relative">
       <button
         ref={buttonRef}
         onClick={togglePanel}
         className="relative rounded-full p-2 text-gray-400 hover:text-white transition-colors"
+        aria-label={t('notifications.title')}
+        aria-expanded={isOpen}
       >
         <Bell size={20} />
         {unreadCount > 0 && (
@@ -61,7 +48,7 @@ const NotificationBell = () => {
       {isOpen && (
         <div
           ref={panelRef}
-          className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-hidden rounded-lg bg-gray-800 shadow-xl border border-gray-700"
+          className="fixed inset-x-4 top-16 z-50 max-h-[70vh] overflow-hidden rounded-lg border border-gray-700 bg-gray-800 shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 sm:max-h-96"
         >
           <div className="flex items-center justify-between border-b border-gray-700 px-4 py-3">
             <h3 className="text-sm font-semibold text-white">{t('notifications.title')}</h3>

@@ -1,24 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Download, Check } from 'lucide-react';
 import client from '@/api/client';
 import { usePlayerStore } from '@/stores/playerStore';
 
-interface Props {
-  trackId: string;
-  className?: string;
-}
-
-const DownloadButton = ({ trackId, className = '' }: Props) => {
+/** Offline download state and toggle for a track (also used by the player's toolbar). */
+export function useTrackDownload(trackId: string) {
   const [isDownloading, setIsDownloading] = useState(false);
   const { isDownloaded, downloadTrack, removeDownload } = usePlayerStore();
   const downloaded = isDownloaded(trackId);
 
-  const handleDownload = async () => {
+  const toggle = async () => {
     if (downloaded) {
       removeDownload(trackId);
       return;
     }
-
     setIsDownloading(true);
     try {
       const response = await client.get(`/stream/${trackId}/download`, {
@@ -32,9 +27,20 @@ const DownloadButton = ({ trackId, className = '' }: Props) => {
     }
   };
 
+  return { downloaded, isDownloading, toggle };
+}
+
+interface Props {
+  trackId: string;
+  className?: string;
+}
+
+const DownloadButton = ({ trackId, className = '' }: Props) => {
+  const { downloaded, isDownloading, toggle } = useTrackDownload(trackId);
+
   return (
     <button
-      onClick={handleDownload}
+      onClick={toggle}
       disabled={isDownloading}
       className={`p-1 transition-colors ${
         downloaded

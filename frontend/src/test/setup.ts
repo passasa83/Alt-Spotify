@@ -24,6 +24,16 @@ const fetchMock = vi.fn().mockResolvedValue({
 });
 Object.defineProperty(globalThis, 'fetch', { value: fetchMock });
 
+// jsdom has no layout engine: components that observe their size still mount.
+if (!('ResizeObserver' in globalThis)) {
+  class ResizeObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  Object.defineProperty(globalThis, 'ResizeObserver', { value: ResizeObserverStub });
+}
+
 afterEach(() => {
   localStorageMock.clear();
   fetchMock.mockClear();
