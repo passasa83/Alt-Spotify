@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Play } from 'lucide-react';
+import { Play, Pause } from 'lucide-react';
+import { useTrackPlayback } from '@/hooks/useTrackPlayback';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useAuthStore } from '@/stores/authStore';
 import TrackContextMenu from '@/components/TrackContextMenu';
@@ -27,6 +28,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
   const isAdmin = user?.role === 'ADMIN';
   const { playlistModalTrack, showCreateModal, openAddToPlaylist, openCreatePlaylist, closeAddToPlaylist, closeCreatePlaylist } = usePlaylistModals();
 
+  const { isPlayingTrack, playOrToggle } = useTrackPlayback();
   const handlePlayTrack = (track: Track) => {
     if (playlistTracks && playlistTracks.length > 0) {
       const trackIndex = playlistTracks.findIndex(t => t.id === track.id);
@@ -91,11 +93,11 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
                   </span>
                   {(track.file_url || track.hls_path) ? (
                     <button
-                      onClick={() => handlePlayTrack(track)}
+                      onClick={() => playOrToggle(track.id, () => handlePlayTrack(track))}
                       className="hidden text-white group-hover:block [@media(hover:none)]:block"
-                      aria-label={`${t('player.play')} ${track.title}`}
+                      aria-label={`${isPlayingTrack(track.id) ? t('player.pause') : t('player.play')} ${track.title}`}
                     >
-                      <Play size={14} fill="currentColor" />
+                      {isPlayingTrack(track.id) ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                     </button>
                   ) : (
                     <span className="hidden text-gray-600 group-hover:block [@media(hover:none)]:block">—</span>
@@ -107,11 +109,11 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
                 {!showIndex && (
                   (track.file_url || track.hls_path) ? (
                     <button
-                      onClick={() => handlePlayTrack(track)}
+                      onClick={() => playOrToggle(track.id, () => handlePlayTrack(track))}
                       className="hidden flex-shrink-0 text-white group-hover:block [@media(hover:none)]:block"
-                      aria-label={`${t('player.play')} ${track.title}`}
+                      aria-label={`${isPlayingTrack(track.id) ? t('player.pause') : t('player.play')} ${track.title}`}
                     >
-                      <Play size={14} fill="currentColor" />
+                      {isPlayingTrack(track.id) ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                     </button>
                   ) : (
                     <span className="hidden text-gray-600 group-hover:block [@media(hover:none)]:block">—</span>

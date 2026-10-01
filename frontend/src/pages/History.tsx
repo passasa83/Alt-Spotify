@@ -7,7 +7,8 @@ import AddToPlaylistModal from '@/components/AddToPlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import type { Track } from '@/types';
 import { formatTime, formatDate } from '@/utils/formatTime';
-import { Clock, Filter, Calendar, Play } from 'lucide-react';
+import { Clock, Filter, Calendar, Play, Pause } from 'lucide-react';
+import { useTrackPlayback } from '@/hooks/useTrackPlayback';
 import client from '@/api/client';
 import { resolveCoverUrl } from '@/api/tracks';
 import { usePlaylistModals } from '@/hooks/usePlaylistModals';
@@ -27,6 +28,7 @@ interface HistoryItem {
 const History = () => {
   const { t } = useTranslation();
   const { setTrack, currentTrack, isPlaying } = usePlayerStore();
+  const { playOrToggle } = useTrackPlayback();
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -134,12 +136,17 @@ const History = () => {
                     className="h-10 w-10 rounded object-cover"
                   />
                   <button
-                    onClick={() => setTrack(itemToTrack(item))}
+                    onClick={() => playOrToggle(item.track_id, () => setTrack(itemToTrack(item)))}
+                    aria-label={`${isCurrentTrack && isPlaying ? t('player.pause') : t('player.play')} ${item.title}`}
                     className={`absolute inset-0 flex items-center justify-center rounded bg-black/50 transition-opacity ${
                       isCurrentTrack && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                     }`}
                   >
-                    <Play size={16} fill="white" className="text-white" />
+                    {isCurrentTrack && isPlaying ? (
+                      <Pause size={16} fill="white" className="text-white" />
+                    ) : (
+                      <Play size={16} fill="white" className="text-white" />
+                    )}
                   </button>
                 </div>
                 <div className="min-w-0 flex-1">

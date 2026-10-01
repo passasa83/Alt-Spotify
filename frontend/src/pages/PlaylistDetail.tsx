@@ -8,7 +8,8 @@ import { useAuthStore } from '@/stores/authStore';
 import TrackContextMenu from '@/components/TrackContextMenu';
 import AddToPlaylistModal from '@/components/AddToPlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
-import { Play, Shuffle, Clock, Trash2, Pencil, Heart } from 'lucide-react';
+import { Play, Pause, Shuffle, Clock, Trash2, Pencil, Heart } from 'lucide-react';
+import { useTrackPlayback } from '@/hooks/useTrackPlayback';
 import type { Playlist, PlaylistTrack, Track } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
 import { resolveCoverUrl } from '@/api/tracks';
@@ -27,6 +28,7 @@ const PlaylistDetail = () => {
   const [playlistModalTrack, setPlaylistModalTrack] = useState<Track | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const { setTrack, setPlaylistAsQueue } = usePlayerStore();
+  const { isCurrent, isPlayingTrack, playOrToggle } = useTrackPlayback();
   const { loadPlaylists, removeFromFavorites } = useLibraryStore();
   const addToast = useToastStore((s) => s.addToast);
   const { user } = useAuthStore();
@@ -228,18 +230,23 @@ const PlaylistDetail = () => {
               }}
             >
               <div className="flex items-center justify-end">
-                <span className="text-sm text-gray-400 group-hover:hidden">{index + 1}</span>
+                <span className={`text-sm group-hover:hidden [@media(hover:none)]:hidden ${isCurrent(pt.track.id) ? 'text-green-500' : 'text-gray-400'}`}>
+                  {isPlayingTrack(pt.track.id) ? '♪' : index + 1}
+                </span>
                 <button
                   onClick={() => {
                     if (pt.track) {
-                      const allTracks = tracks.filter(p => p.track).map(p => p.track!);
-                      const trackIndex = allTracks.findIndex(t => t.id === pt.track!.id);
-                      setPlaylistAsQueue(allTracks, trackIndex >= 0 ? trackIndex : 0);
+                      playOrToggle(pt.track.id, () => {
+                        const allTracks = tracks.filter(p => p.track).map(p => p.track!);
+                        const trackIndex = allTracks.findIndex(t => t.id === pt.track!.id);
+                        setPlaylistAsQueue(allTracks, trackIndex >= 0 ? trackIndex : 0);
+                      });
                     }
                   }}
-                  className="hidden text-white group-hover:block"
+                  className="hidden text-white group-hover:block [@media(hover:none)]:block"
+                  aria-label={`${isPlayingTrack(pt.track.id) ? 'Pause' : 'Play'} ${pt.track.title}`}
                 >
-                  <Play size={14} fill="currentColor" />
+                  {isPlayingTrack(pt.track.id) ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                 </button>
               </div>
               <div className="flex items-center gap-3">

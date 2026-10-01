@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Play, Heart, Download, Loader2 } from 'lucide-react';
+import { Play, Pause, Heart, Download, Loader2 } from 'lucide-react';
+import { useTrackPlayback } from '@/hooks/useTrackPlayback';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { fetchFromYoutube, resolveCoverUrl } from '@/api/tracks';
@@ -51,8 +52,10 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
     }
   };
 
+  const { isPlayingTrack, playOrToggle } = useTrackPlayback();
+  const playingThis = isPlayingTrack(track.id);
   const handlePlay = () => {
-    setTrack({ ...track, file_url: downloadedUrl || track.file_url } as Track);
+    playOrToggle(track.id, () => setTrack({ ...track, file_url: downloadedUrl || track.file_url } as Track));
   };
 
   return (
@@ -75,12 +78,13 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
               ? 'opacity-0 [@media(hover:none)]:opacity-100 translate-y-2 [@media(hover:none)]:translate-y-0 group-hover:opacity-100 group-hover:translate-y-0'
               : 'opacity-0 [@media(hover:none)]:opacity-100 translate-y-2 [@media(hover:none)]:translate-y-0 group-hover:opacity-100 group-hover:translate-y-0'
             } ${downloading ? '!opacity-100 !translate-y-0' : ''} ${hasAudio && isCurrentTrack && isPlaying ? '!opacity-100 !translate-y-0' : ''}`}
-            title={hasAudio ? 'Écouter' : 'Télécharger depuis YouTube'}
+            title={hasAudio ? (playingThis ? t('player.pause') : t('player.play')) : 'Télécharger depuis YouTube'}
+            aria-label={hasAudio ? `${playingThis ? t('player.pause') : t('player.play')} ${track.title}` : 'Télécharger depuis YouTube'}
           >
             {downloading ? (
               <Loader2 size={18} className="animate-spin" />
             ) : hasAudio ? (
-              <Play size={18} fill="currentColor" />
+              playingThis ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />
             ) : (
               <Download size={18} />
             )}

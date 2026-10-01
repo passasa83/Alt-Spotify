@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '@/api/client';
 import { useTranslation } from '@/hooks/useTranslation';
-import { Clock, TrendingUp, Music, Play } from 'lucide-react';
+import { Clock, TrendingUp, Music, Play, Pause } from 'lucide-react';
+import { useTrackPlayback } from '@/hooks/useTrackPlayback';
 import { usePlayerStore } from '@/stores/playerStore';
 import TrackContextMenu from '@/components/TrackContextMenu';
 import AddToPlaylistModal from '@/components/AddToPlaylistModal';
@@ -20,6 +21,7 @@ const Browse = () => {
   const [loading, setLoading] = useState(true);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const { setTrack } = usePlayerStore();
+  const { isCurrent, isPlayingTrack, playOrToggle } = useTrackPlayback();
   const { playlistModalTrack, showCreateModal, openAddToPlaylist, openCreatePlaylist, closeAddToPlaylist, closeCreatePlaylist } = usePlaylistModals();
 
   useEffect(() => {
@@ -102,13 +104,15 @@ const Browse = () => {
               key={track.id}
               className="group flex items-center gap-4 rounded-md px-4 py-2 hover:bg-gray-800"
             >
-              <span className="w-8 text-right text-sm text-gray-500 group-hover:hidden">{i + 1}</span>
+              <span className={`w-8 text-right text-sm group-hover:hidden [@media(hover:none)]:hidden ${isCurrent(track.id) ? 'text-green-500' : 'text-gray-500'}`}>
+                {isPlayingTrack(track.id) ? '♪' : i + 1}
+              </span>
               <button
-                onClick={() => setTrack(track)}
-                className="hidden h-8 w-8 items-center justify-center rounded-full bg-green-500 text-black group-hover:flex"
-                aria-label={t('player.play')}
+                onClick={() => playOrToggle(track.id, () => setTrack(track))}
+                className="hidden h-8 w-8 items-center justify-center rounded-full bg-green-500 text-black group-hover:flex [@media(hover:none)]:flex"
+                aria-label={isPlayingTrack(track.id) ? t('player.pause') : t('player.play')}
               >
-                <Play size={14} fill="black" />
+                {isPlayingTrack(track.id) ? <Pause size={14} fill="black" /> : <Play size={14} fill="black" />}
               </button>
               <div className="flex-1 min-w-0">
                 <Link to={`/track/${track.id}`} className="truncate text-white hover:underline">
