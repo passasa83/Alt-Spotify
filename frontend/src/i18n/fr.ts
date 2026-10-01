@@ -287,6 +287,7 @@ const fr = {
   'admin.purge_error': 'Le nettoyage a échoué',
   'admin.check.catalogue_clutter': '{count} pistes sans audio, utilisées nulle part, encombrent le catalogue (restes de recherches)',
   'admin.check.catalogue_clean': 'Aucune piste vide inutilisée dans le catalogue',
+  'admin.upload_failed': 'Échec de l\'envoi. Réessayez.',
   'admin.load_error': 'Impossible de charger la vue d\'ensemble.',
   'admin.overview_subtitle': 'Utilisateurs, disponibilité et configuration de l\'instance',
   'admin.updated_at': 'Mis à jour {time}',

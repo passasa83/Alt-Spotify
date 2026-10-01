@@ -24,6 +24,16 @@ celery_client.conf.update(
 )
 
 
+def _broker_reachable() -> bool:
+    """Quick Redis ping: kombu retries a dead broker for about a minute."""
+    import redis
+
+    try:
+        return bool(redis.Redis.from_url(settings.REDIS_URL, socket_connect_timeout=2, socket_timeout=2).ping())
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def hls_prefix(track_id: uuid.UUID | str) -> str:
     return f"hls/{track_id}"
 
@@ -34,6 +44,9 @@ async def enqueue_transcode(track_id: uuid.UUID | str, source_object: str) -> st
     Returns ``None`` if the broker is unreachable: the track stays playable
     through the direct stream, it just won't get HLS variants.
     """
+    if not await run_in_threadpool(_broker_reachable):
+        logger.warning("celery_transcode_dispatch_failed", track_id=str(track_id), error="broker unreachable")
+        return None
     try:
         result = await run_in_threadpool(
             celery_client.send_task,

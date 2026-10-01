@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from pathlib import Path
 
@@ -57,7 +58,8 @@ async def upload_audio(
     ext = Path(file.filename or "audio.mp3").suffix or ".mp3"
     object_name = f"audio/{track_id}{ext}"
 
-    upload_file(object_name, file_data, file.content_type or "audio/mpeg")
+    # Off the event loop: the MinIO client is blocking.
+    await asyncio.to_thread(upload_file, object_name, file_data, file.content_type or "audio/mpeg")
 
     # Extract metadata with mutagen
     metadata = {}
@@ -239,7 +241,8 @@ async def upload_cover(
     ext = Path(file.filename or "cover.jpg").suffix or ".jpg"
     object_name = f"covers/{entity_type}/{entity_id}{ext}"
 
-    upload_file(object_name, file_data, file.content_type or "image/jpeg")
+    # Off the event loop: the MinIO client is blocking.
+    await asyncio.to_thread(upload_file, object_name, file_data, file.content_type or "image/jpeg")
 
     return {
         "url": object_name,

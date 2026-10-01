@@ -287,6 +287,7 @@ const en = {
   'admin.purge_error': 'Cleanup failed',
   'admin.check.catalogue_clutter': '{count} tracks without audio, used nowhere, clutter the catalogue (search leftovers)',
   'admin.check.catalogue_clean': 'No unused empty track in the catalogue',
+  'admin.upload_failed': 'Upload failed. Please try again.',
   'admin.load_error': 'Could not load the overview.',
   'admin.overview_subtitle': 'Users, availability and configuration of this instance',
   'admin.updated_at': 'Updated {time}',

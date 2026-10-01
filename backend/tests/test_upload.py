@@ -176,3 +176,39 @@ async def test_transcode_missing_only_queues_tracks_without_hls(client: AsyncCli
     assert response.status_code == 202
     assert response.json() == {"queued": 2}
     assert celery_client.send_task.call_count == 2
+
+
+async def test_upload_audio_storage_down_answers_503(client: AsyncClient, admin_headers, auth_headers):
+    from unittest.mock import patch
+
+    with patch("app.core.minio.get_minio_client", side_effect=ConnectionError("minio down")):
+        response = await client.post(
+            "/api/v1/upload/audio",
+            headers=admin_headers,
+            files={"file": ("song.mp3", io.BytesIO(b"ID3" * 100), "audio/mpeg")},
+            data={"title": "Lost", "artist": "Nobody"},
+        )
+    assert response.status_code == 503
+    assert "Storage" in response.json()["detail"]
+    # Nothing half-created when the file could not be stored.
+    titles = [t["title"] for t in (await client.get("/api/v1/tracks", headers=auth_headers)).json()["items"]]
+    assert "Lost" not in titles
+
+
+async def test_upload_cover_storage_down_answers_503(client: AsyncClient, admin_headers):
+    from unittest.mock import patch
+
+    with patch("app.core.minio.get_minio_client", side_effect=ConnectionError("minio down")):
+        response = await client.post(
+            "/api/v1/upload/cover",
+            headers=admin_headers,
+            files={"file": ("c.png", io.BytesIO(b"\x89PNG\r\n\x1a\n"), "image/png")},
+        )
+    assert response.status_code == 503
+
+
+async def test_enqueue_skips_unreachable_broker(monkeypatch):
+    from app.core import tasks
+
+    monkeypatch.setattr(tasks, "_broker_reachable", lambda: False)
+    assert await tasks.enqueue_transcode("x", "audio/x.mp3") is None

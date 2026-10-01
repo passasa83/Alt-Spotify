@@ -39,6 +39,13 @@ class RateLimitError(AppException):
     detail = "Rate limit exceeded"
 
 
+class StorageUnavailableError(AppException):
+    """Object storage (MinIO) unreachable: answer fast with a clear message."""
+
+    status_code = 503
+    detail = "Storage (MinIO) is unavailable: the file could not be saved. Try again later or contact the admin."
+
+
 async def app_exception_handler(request: Request, exc: AppException):
     request_id = getattr(request.state, "request_id", "-")
     user_id = getattr(request.state, "user_id", "-")

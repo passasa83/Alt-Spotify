@@ -106,8 +106,9 @@ const AdminUpload = () => {
       setArtist('');
       setAlbum('');
       setGenre('');
-    } catch (err) {
-      setError('Upload failed. Please try again.');
+    } catch (err: any) {
+      // 503 = storage (MinIO) down: show the server's explanation.
+      setError(err?.response?.data?.detail || t('admin.upload_failed'));
     } finally {
       setUploading(false);
     }
