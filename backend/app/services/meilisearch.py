@@ -49,16 +49,17 @@ async def reindex_all():
 
             tracks = (await db.execute(select(Track))).scalars().all()
             if tracks:
+                artist_ids = {t.artist_id for t in tracks if t.artist_id}
+                artists_map = {}
+                if artist_ids:
+                    rows = (await db.execute(select(Artist).where(Artist.id.in_(artist_ids)))).scalars().all()
+                    artists_map = {a.id: a.name for a in rows}
                 track_docs = []
                 for t in tracks:
-                    artist = None
-                    if t.artist_id:
-                        a = (await db.execute(select(Artist).where(Artist.id == t.artist_id))).scalar_one_or_none()
-                        artist = a.name if a else None
                     track_docs.append({
                         "id": str(t.id),
                         "title": t.title,
-                        "artist": artist or "",
+                        "artist": artists_map.get(t.artist_id) or "",
                         "genre": t.genre or "",
                         "bpm": t.bpm,
                         "key": t.key or "",

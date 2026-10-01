@@ -113,12 +113,18 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
     if not audio_files:
         return {"scanned": 0, "imported": 0, "skipped": 0, "message": "No audio files found"}
 
+    existing_urls = set((await db.execute(select(Track.file_url))).scalars().all())
+
     imported = 0
     skipped = 0
     errors = 0
 
     for file_path in audio_files:
         try:
+            if f"local:{file_path}" in existing_urls:
+                skipped += 1
+                continue
+
             filename = os.path.basename(file_path)
 
             metadata = extract_metadata(file_path)
