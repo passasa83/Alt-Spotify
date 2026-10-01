@@ -168,9 +168,9 @@ describe('Player', () => {
     vi.unstubAllGlobals();
   });
 
-  it('records a play once the track has played for 10 seconds', async () => {
+  it('records the time really listened when the track ends, ignoring seeks', async () => {
     playTrackMock.mockClear();
-    const state = { ...defaultPlayerState, currentTrack: createTrack('42', 'Counted'), isPlaying: true, useHls: false };
+    const state = { ...defaultPlayerState, currentTrack: createTrack('42', 'Counted'), isPlaying: true, useHls: false, restartCurrent: vi.fn() };
     vi.mocked(usePlayerStore).mockReturnValue(state as any);
     (usePlayerStore as any).getState = () => state;
     const created: HTMLAudioElement[] = [];
@@ -183,16 +183,42 @@ describe('Player', () => {
       </MemoryRouter>
     );
     const audio = created[0]!;
-    const tick = (t: number) => {
+    const at = (t: number) => {
       Object.defineProperty(audio, 'currentTime', { configurable: true, get: () => t, set: () => {} });
       audio.dispatchEvent(new Event('timeupdate'));
     };
-    tick(5);
-    expect(playTrackMock).not.toHaveBeenCalled();
-    tick(10.5);
-    tick(15);
+    // 0 -> 6 s listened, then a seek to 100 s (not listening), then 100 -> 106 s.
+    for (let t = 0; t <= 6; t += 0.5) at(t);
+    for (let t = 100; t <= 106; t += 0.5) at(t);
+    expect(playTrackMock).not.toHaveBeenCalled(); // sent when the listen ends
+
+    audio.dispatchEvent(new Event('ended'));
     expect(playTrackMock).toHaveBeenCalledTimes(1);
-    expect(playTrackMock).toHaveBeenCalledWith('42');
+    expect(playTrackMock).toHaveBeenCalledWith('42', 12);
+    vi.unstubAllGlobals();
+  });
+
+  it('does not record a listen shorter than 10 seconds', async () => {
+    playTrackMock.mockClear();
+    const state = { ...defaultPlayerState, currentTrack: createTrack('7', 'Skipped'), isPlaying: true, useHls: false };
+    vi.mocked(usePlayerStore).mockReturnValue(state as any);
+    (usePlayerStore as any).getState = () => state;
+    const created: HTMLAudioElement[] = [];
+    const RealAudio = window.Audio;
+    vi.stubGlobal('Audio', class extends RealAudio { constructor() { super(); created.push(this); } });
+
+    render(
+      <MemoryRouter>
+        <Player />
+      </MemoryRouter>
+    );
+    const audio = created[0]!;
+    for (let t = 0; t <= 5; t += 0.5) {
+      Object.defineProperty(audio, 'currentTime', { configurable: true, get: () => t, set: () => {} });
+      audio.dispatchEvent(new Event('timeupdate'));
+    }
+    audio.dispatchEvent(new Event('ended'));
+    expect(playTrackMock).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 });

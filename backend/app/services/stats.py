@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -141,7 +141,12 @@ async def get_listening_streak(user_id: uuid.UUID, db: AsyncSession) -> dict:
         .distinct()
         .order_by(func.date(ListeningHistory.played_at).desc())
     )
-    dates = [row.listen_date for row in result.all()]
+    # func.date() gives a date on PostgreSQL but an ISO string on SQLite.
+    dates = [
+        d if isinstance(d, date) else date.fromisoformat(str(d)[:10])
+        for d in (row.listen_date for row in result.all())
+        if d is not None
+    ]
 
     if not dates:
         return {"current_streak": 0, "longest_streak": 0}
@@ -190,7 +195,8 @@ async def get_annual_wrapped(user_id: uuid.UUID, year: int, db: AsyncSession) ->
             func.count(ListeningHistory.id).label("total_plays"),
             func.sum(ListeningHistory.duration_listened_seconds).label("total_seconds"),
             func.count(func.distinct(ListeningHistory.track_id)).label("unique_tracks"),
-            func.count(func.distinct(ListeningHistory.played_at)).label("active_days"),
+            # Days, not timestamps: one day with ten plays is one active day.
+            func.count(func.distinct(func.date(ListeningHistory.played_at))).label("active_days"),
         )
         .where(ListeningHistory.user_id == user_id)
         .where(ListeningHistory.played_at >= year_start)

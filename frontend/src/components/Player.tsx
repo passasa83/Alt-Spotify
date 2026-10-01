@@ -114,8 +114,13 @@ const Player = () => {
   const crossfadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const consecutiveErrorsRef = useRef(0);
   const authRetriedTrackIdRef = useRef<string | null>(null);
-  // Track whose current play was already sent to /tracks/{id}/play.
-  const recordedPlayRef = useRef<string | null>(null);
+  // Seconds really listened to the current track (seeks excluded), sent
+  // with the play once the listen ends.
+  const listenRef = useRef<{ trackId: string | null; seconds: number; lastTime: number | null }>({
+    trackId: null,
+    seconds: 0,
+    lastTime: null,
+  });
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
   const [isLiked, setIsLiked] = useState(false);
@@ -217,6 +222,15 @@ const Player = () => {
 
   // Listeners are attached once per element and ignore every element but the
   // current one: the Player swaps elements on each crossfade.
+  // Record the listen that just ended (track change, end, restart, tab closed).
+  const flushListen = useCallback(() => {
+    const { trackId, seconds } = listenRef.current;
+    if (trackId && seconds >= PLAY_RECORD_THRESHOLD) {
+      playTrack(trackId, Math.round(seconds)).catch(() => {});
+    }
+    listenRef.current = { trackId: null, seconds: 0, lastTime: null };
+  }, []);
+
   const createAudio = useCallback(() => {
     const audio = new Audio();
 
@@ -240,9 +254,17 @@ const Player = () => {
         store.seek(audio.currentTime);
       }
       const playing = store.currentTrack;
-      if (playing && audio.currentTime >= PLAY_RECORD_THRESHOLD && recordedPlayRef.current !== playing.id) {
-        recordedPlayRef.current = playing.id;
-        playTrack(playing.id).catch(() => {});
+      if (playing) {
+        const listen = listenRef.current;
+        if (listen.trackId !== playing.id) {
+          flushListen();
+          listenRef.current = { trackId: playing.id, seconds: 0, lastTime: audio.currentTime };
+        } else {
+          // Small forward steps are listening; bigger jumps are seeks.
+          const step = audio.currentTime - (listen.lastTime ?? audio.currentTime);
+          if (step > 0 && step < 2) listen.seconds += step / (audio.playbackRate || 1);
+          listen.lastTime = audio.currentTime;
+        }
       }
       const remaining = audio.duration - audio.currentTime;
       if (
@@ -264,6 +286,7 @@ const Player = () => {
 
     audio.addEventListener('ended', () => {
       if (audio !== audioRef.current) return;
+      flushListen();
       const store = usePlayerStore.getState();
       if (store.repeat === 'one') {
         store.restartCurrent();
@@ -278,7 +301,7 @@ const Player = () => {
     });
 
     return audio;
-  }, [startCrossfadeTransition, handlePlaybackError]);
+  }, [startCrossfadeTransition, handlePlaybackError, flushListen]);
 
   const preloadNextTrack = useCallback(() => {
     const nextTrack = getNextTrack();
@@ -337,9 +360,18 @@ const Player = () => {
     }
   }, [isPlaying]);
 
+  // A restart (repeat one) is a new listen; closing the tab ends the current one.
   useEffect(() => {
-    recordedPlayRef.current = null;
-  }, [currentTrack, restartTick]);
+    if (restartTick > 0) flushListen();
+  }, [restartTick, flushListen]);
+
+  useEffect(() => {
+    window.addEventListener('pagehide', flushListen);
+    return () => {
+      window.removeEventListener('pagehide', flushListen);
+      flushListen();
+    };
+  }, [flushListen]);
 
   useEffect(() => {
     if (restartTick === 0 || !audioRef.current) return;

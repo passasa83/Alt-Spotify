@@ -37,8 +37,15 @@ export const getTrack = async (id: string): Promise<Track> => {
   return response.data;
 };
 
-export const playTrack = async (trackId: string): Promise<void> => {
-  await client.post(`/tracks/${trackId}/play`);
+// `keepalive`: the request survives the tab being closed (pagehide).
+export const playTrack = async (trackId: string, durationSeconds = 0): Promise<void> => {
+  const token = localStorage.getItem('access_token');
+  await fetch(`/api/v1/tracks/${trackId}/play`, {
+    method: 'POST',
+    keepalive: true,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ duration_listened_seconds: durationSeconds }),
+  });
 };
 
 export const searchTracks = async (query: string): Promise<Track[]> => {

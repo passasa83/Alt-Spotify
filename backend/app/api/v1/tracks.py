@@ -5,6 +5,7 @@ from typing import Literal
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy import String, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -187,9 +188,15 @@ async def delete_track(
     await db.delete(track)
 
 
+class PlayBody(BaseModel):
+    # Seconds actually listened (seeks excluded); capped to a day.
+    duration_listened_seconds: int = Field(0, ge=0, le=86_400)
+
+
 @router.post("/{track_id}/play")
 async def play_track(
     track_id: uuid.UUID,
+    body: PlayBody | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -203,7 +210,7 @@ async def play_track(
         user_id=current_user.id,
         track_id=track_id,
         played_at=datetime.now(timezone.utc).replace(tzinfo=None),
-        duration_listened_seconds=0,
+        duration_listened_seconds=body.duration_listened_seconds if body else 0,
     )
     db.add(history)
     await db.flush()
