@@ -145,3 +145,27 @@ async def test_autoplay_hides_explicit_for_child_accounts(client: AsyncClient, a
     )
     titles = {t["title"] for t in response.json()["tracks"]}
     assert "explicit" not in titles
+
+
+async def test_recommendation_endpoints_return_playable_full_tracks(client: AsyncClient, auth_headers, db_session):
+    tracks = await _seed_playable(db_session)
+
+    for path in (
+        "/api/v1/recommendations/discover",
+        f"/api/v1/recommendations/radio/{tracks['seed'].id}",
+        f"/api/v1/recommendations/similar/{tracks['seed'].id}",
+    ):
+        response = await client.get(path, headers=auth_headers)
+        assert response.status_code == 200, path
+        items = response.json()["tracks"]
+        assert items, path
+        for item in items:
+            # Same shape as the rest of the API, so the web player can play it.
+            assert item["id"] and item["track_id"] == item["id"]
+            assert item["file_url"]
+            assert item["artist"]["name"]
+        assert "no_audio" not in {i["title"] for i in items}, path
+
+    mixes = (await client.get("/api/v1/recommendations/daily-mix", headers=auth_headers)).json()["mixes"]
+    assert mixes and all(m["track_count"] == len(m["tracks"]) > 0 for m in mixes)
+    assert all(t["file_url"] for m in mixes for t in m["tracks"])
