@@ -1,12 +1,12 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select, extract
+from sqlalchemy import extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.artist import Artist
 from app.models.listening_history import ListeningHistory
 from app.models.track import Track
-from app.models.artist import Artist
 
 
 async def get_user_top_tracks(

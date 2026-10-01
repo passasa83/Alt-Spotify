@@ -37,3 +37,6 @@ htmlcov/
 *.swo
 *~
 data/
+
+# Local music library mounted into Docker (MUSIC_SCAN_DIR default)
+music/

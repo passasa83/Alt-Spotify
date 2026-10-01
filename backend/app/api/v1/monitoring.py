@@ -1,16 +1,16 @@
 import time
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, func, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.redis import get_redis
+from app.models.podcast import Episode, Podcast
+from app.models.track import Track
+from app.models.user import User
 from app.utils.deps import require_admin
 from app.utils.storage import get_disk_usage
-from app.models.user import User
-from app.models.track import Track
-from app.models.podcast import Podcast, Episode
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
@@ -78,10 +78,6 @@ async def system_stats(
 
 @router.get("/metrics")
 async def prometheus_metrics(db: AsyncSession = Depends(get_db)):
-    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Gauge
-
-    total_users = (await db.execute(text("SELECT COUNT(*) FROM users"))).scalar() or 0
-    total_tracks = (await db.execute(select(func.count(Track.id)))).scalar() or 0
-
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
     from starlette.responses import Response
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)

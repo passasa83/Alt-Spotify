@@ -1,20 +1,19 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, text, desc
+from sqlalchemy import desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.core.database import get_db
-from app.utils.deps import require_admin
-from app.utils.storage import get_storage_used
-from app.models.user import User, UserRole
-from app.models.track import Track
 from app.models.album import Album
 from app.models.artist import Artist
-from app.models.listening_history import ListeningHistory
 from app.models.jam import JamSession
+from app.models.listening_history import ListeningHistory
+from app.models.track import Track
+from app.models.user import User, UserRole
 from app.schemas.user import UserResponse
+from app.utils.deps import require_admin
+from app.utils.storage import get_storage_used
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 

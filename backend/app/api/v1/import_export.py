@@ -3,22 +3,25 @@ import io
 import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.models.album import Album
+from app.models.artist import Artist
 from app.models.playlist import Playlist
 from app.models.playlist_track import PlaylistTrack
 from app.models.track import Track
-from app.models.artist import Artist
-from app.models.album import Album
-from app.schemas.common import MessageResponse
-from app.utils.deps import get_current_user
 from app.models.user import User
-from app.services.spotify import extract_playlist_id as extract_spotify_id, fetch_spotify_playlist, is_configured as spotify_configured
-from app.services.deezer import extract_playlist_id as extract_deezer_id, fetch_deezer_playlist
+from app.services.deezer import extract_playlist_id as extract_deezer_id
+from app.services.deezer import fetch_deezer_playlist
+from app.services.spotify import extract_playlist_id as extract_spotify_id
+from app.services.spotify import fetch_spotify_playlist
+from app.services.spotify import is_configured as spotify_configured
+from app.utils.deps import get_current_user
 
 router = APIRouter(prefix="/playlists/import-export", tags=["import-export"])
 
@@ -230,9 +233,6 @@ async def export_json(
         media_type="application/json",
         headers={"Content-Disposition": f"attachment; filename={playlist.title}.json"},
     )
-
-
-from pydantic import BaseModel
 
 
 class SpotifyImportRequest(BaseModel):

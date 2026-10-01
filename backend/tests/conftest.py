@@ -1,16 +1,25 @@
 import asyncio
+from contextlib import asynccontextmanager
+import os
 import sqlite3
 import uuid
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
+# Must be set before the app is imported: the rate limiter reads it at import time.
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-" + "0" * 32)
+
+import fakeredis
 import pytest
 import pytest_asyncio
 import sqlalchemy as sa
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+import app.core.redis as app_redis
 from app.core.database import Base, get_db
+from app.core.tasks import celery_client
 from app.core.security import create_access_token, create_refresh_token, hash_password
 from app.models.user import User, UserRole
 from app.main import app
@@ -42,6 +51,15 @@ def event_loop():
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def fake_redis():
+    """Replace the shared Redis pool so tests never need a running Redis."""
+    app_redis.redis_pool = fakeredis.FakeAsyncRedis(decode_responses=True)
+    yield app_redis.redis_pool
+    await app_redis.redis_pool.aclose()
+    app_redis.redis_pool = None
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -118,7 +136,15 @@ async def client(
 
     app.dependency_overrides[get_db] = _override_get_db
 
-    with patch("app.core.minio.get_minio_client") as mock_minio:
+    @asynccontextmanager
+    async def _shared_session():
+        # A second SQLite session would share the connection and roll the
+        # test's transaction back when closed.
+        yield db_session
+
+    # Code that opens its own session (push notifications...) must hit the
+    # test database, not a Postgres server that isn't running.
+    with patch("app.core.minio.get_minio_client") as mock_minio,             patch.object(celery_client, "send_task", return_value=MagicMock(id="test-task-id")),             patch("app.core.database.async_session", _shared_session):
         mock_client = MagicMock()
         mock_client.bucket_exists.return_value = True
         mock_client.presigned_get_object.return_value = "http://minio/test"

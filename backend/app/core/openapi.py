@@ -1,6 +1,4 @@
-from fastapi import Request
 from fastapi.openapi.utils import get_openapi
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 
 def custom_openapi(app):

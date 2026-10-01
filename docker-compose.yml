@@ -5,8 +5,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-altspotify}
       POSTGRES_USER: ${POSTGRES_USER:-altspotify}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-    ports:
-      - "5432:5432"
+    # Pas de ports publiés : ce service n'est raccordé qu'à backend-net
+    # ("internal: true") où Docker ne publie rien de toute façon. Et sur cette
+    # machine, PostgreSQL tourne déjà en natif sur 5432 (bind refusé sinon).
     volumes:
       - ${POSTGRES_DATA_DIR:-./data/postgres}:/var/lib/postgresql/data
     healthcheck:
@@ -19,8 +20,8 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # Pas de ports publiés : backend-net est un réseau "internal: true" et un
+    # redis-server natif écoute déjà sur 6379 (bind refusé sinon).
     volumes:
       - ${REDIS_DATA_DIR:-./data/redis}:/data
     healthcheck:
@@ -32,16 +33,28 @@ services:
       - backend-net
 
   minio:
-    image: minio/minio:latest
+    # minio/minio a été retiré de Docker Hub et quay.io/minio/minio refuse le
+    # pull anonyme ; l'image AIStor officielle (quay.io/minio/aistor/minio)
+    # exige une licence. C'est le build archivé de Bitnami du serveur
+    # communautaire AGPL, gelé en 07/2025 (399 MB).
+    # Vérifié en local : healthcheck 200, console WebUI sur 9001, curl présent,
+    # MINIO_ROOT_USER / MINIO_ROOT_PASSWORD bien repris par MinIO.
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+    # Comme l'ancienne image minio/minio : en root, sinon le bind mount de
+    # MINIO_DATA_DIR doit appartenir à uid 1001 sur l'hôte.
+    user: "0"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     volumes:
       - ${MINIO_DATA_DIR:-./data/minio}:/data
     command: server /data --console-address ":9001"
+    ports:
+      # Console (9001) + API S3 (9000) publiés sur l'IP de la machine. backend-net
+      # est "internal: true" — testé : Docker n'y publie aucun port — d'où ce
+      # second réseau routable qui ne sert qu'à ces deux bindings.
+      - "${BIND_IP:-0.0.0.0}:9000:9000"
+      - "${BIND_IP:-0.0.0.0}:9001:9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
@@ -49,14 +62,13 @@ services:
       retries: 5
     networks:
       - backend-net
+      - minio-net
 
   meilisearch:
     image: getmeili/meilisearch:v1.7
     environment:
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-changeme}
       MEILI_ENV: development
-    ports:
-      - "7700:7700"
     volumes:
       - ${MEILISEARCH_DATA_DIR:-./data/meilisearch}:/meili_data
     healthcheck:
@@ -68,28 +80,56 @@ services:
       - backend-net
 
   backend:
-    build:
-      context: https://github.com/passasa83/Alt-Spotify.git#Akajox:backend
+    image: ghcr.io/passasa83/alt-spotify-backend:main
     ports:
-      - "8000:8000"
+      # Comme la plupart des stacks Docker : publié sur toutes les interfaces
+      # (BIND_IP), donc joignable via l'IP de la machine. Mettre une IP fixe
+      # dans le .env pour restreindre l'exposition.
+      - "${BIND_IP:-0.0.0.0}:8000:8000"
+    # --proxy-headers makes uvicorn trust X-Forwarded-For / X-Forwarded-Proto so
+    # that request.client.host is the real client and not the proxy's IP,
+    # which the rate limiter is keyed on. "*" is required because the proxy
+    # container has a dynamic IP on the Docker network.
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - "*"
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-altspotify}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-altspotify}
       REDIS_URL: redis://redis:6379/0
-      MINIO_ENDPOINT: minio:9000
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-alt-spotify}
-      SECRET_KEY: ${SECRET_KEY:-changeme}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env (openssl rand -hex 32)}
       ALGORITHM: ${ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      # false (défaut) : seul le PREMIER compte est créable librement (il devient
+      # admin) ; ensuite l'inscription se ferme et il faut des invitations admin.
+      OPEN_REGISTRATION: ${OPEN_REGISTRATION:-false}
+      # URL de base des liens générés (partage, invitations admin) : doit être
+      # atteignable depuis le navigateur du visiteur → IP de la machine ou
+      # domaine public, jamais "localhost" hors de cette machine.
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       RATE_LIMIT_DEFAULT: ${RATE_LIMIT_DEFAULT:-100/minute}
       RATE_LIMIT_AUTH: ${RATE_LIMIT_AUTH:-10/minute}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: ${LOG_FORMAT:-json}
+      MUSIC_SCAN_DIR: /music
+      MUSIC_DOWNLOAD_DIR: /app/downloads
+    volumes:
+      - ${MUSIC_SCAN_DIR:-./music}:/music:ro
+      - ${MUSIC_DOWNLOAD_DIR:-./data/downloads}:/app/downloads
     depends_on:
       postgres:
         condition: service_healthy
@@ -105,76 +145,60 @@ services:
     networks:
       - backend-net
       - frontend-net
+      - proxy
 
   worker:
-    build:
-      context: https://github.com/passasa83/Alt-Spotify.git#Akajox:worker
+    image: ghcr.io/passasa83/alt-spotify-worker:main
     environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-altspotify}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-altspotify}
       REDIS_URL: redis://redis:6379/0
-      MINIO_ENDPOINT: minio:9000
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-alt-spotify}
+    volumes:
+      # Same music folders as the backend, so local tracks can be transcoded.
+      - ${MUSIC_SCAN_DIR:-./music}:/music:ro
+      - ${MUSIC_DOWNLOAD_DIR:-./data/downloads}:/app/downloads:ro
     depends_on:
-      - backend
-      - redis
-      - minio
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     networks:
       - backend-net
 
   frontend:
-    build:
-      context: https://github.com/passasa83/Alt-Spotify.git#Akajox:frontend
+    image: ghcr.io/passasa83/alt-spotify-frontend:main
     ports:
-      - "3000:80"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
-      - "traefik.http.routers.frontend.entrypoints=web"
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
-      - "traefik.http.routers.frontend.middlewares=sec-headers,compress"
-      # Middlewares intégrés (Remplace dynamic.yml)
-      - "traefik.http.middlewares.sec-headers.headers.stsSeconds=31536000"
-      - "traefik.http.middlewares.sec-headers.headers.stsIncludeSubdomains=true"
-      - "traefik.http.middlewares.sec-headers.headers.stsPreload=true"
-      - "traefik.http.middlewares.sec-headers.headers.forceSTSHeader=true"
-      - "traefik.http.middlewares.sec-headers.headers.contentTypeNosniff=true"
-      - "traefik.http.middlewares.sec-headers.headers.browserXssFilter=true"
-      - "traefik.http.middlewares.sec-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
-      - "traefik.http.middlewares.sec-headers.headers.frameDeny=true"
-      - "traefik.http.middlewares.compress.compress=true"
+      # Publié sur BIND_IP : joignable via l'IP de la machine (pas seulement en
+      # loopback), et le reverse proxy peut aussi viser http://IP:3000.
+      - "${BIND_IP:-0.0.0.0}:3000:80"
     depends_on:
       - backend
     networks:
       - frontend-net
+      - proxy
 
-  traefik:
-    image: traefik:v2.11
-    command:
-      - "--entryPoints.web.address=:80"
-      - "--entryPoints.websecure.address=:443"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedByDefault=false"
-      - "--providers.docker.network=frontend-net"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - traefik_certs:/letsencrypt
-    depends_on:
-      - backend
-      - frontend
-    networks:
-      - frontend-net
-      - backend-net
-
-volumes:
-  traefik_certs:
 
 networks:
   frontend-net:
     driver: bridge
+  minio-net:
+    driver: bridge
   backend-net:
     driver: bridge
     internal: true
+  # Réseau partagé avec le reverse proxy (Nginx Proxy Manager, Traefik, ...).
+  # Deux modes, via PROXY_NETWORK / PROXY_EXTERNAL du .env :
+  #  - défaut : ce projet crée `altspotify-proxy`, et le proxy le rejoint en
+  #    `external: true` (voir README) ;
+  #  - PROXY_EXTERNAL=true + PROXY_NETWORK=npm-network : on rejoint le réseau
+  #    déjà créé par le proxy — son compose reste intact et aucun ordre de
+  #    démarrage n'est à respecter.
+  # Dans les deux cas, `backend` et `frontend` y sont joignables par leur nom.
+  proxy:
+    name: ${PROXY_NETWORK:-altspotify-proxy}
+    external: ${PROXY_EXTERNAL:-false}

@@ -1,127 +1,232 @@
+import os
+import re
 import uuid
+from collections.abc import Callable, Iterator
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response, StreamingResponse
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-import io
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.minio import get_minio_client
-from app.core.config import settings
 from app.models.track import Track
+from app.models.user import User
+from app.utils.deps import get_current_user_stream
+from app.utils.track_access import get_track_for_user
 
 router = APIRouter(prefix="/stream", tags=["stream"])
 
+# Tracks from the music folders / YouTube downloads: ``local:<path on the server>``.
+LOCAL_PREFIX = "local:"
 
-@router.get("/{track_id}/master.m3u8")
-async def get_master_playlist(track_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Track).where(Track.id == track_id))
-    track = result.scalar_one_or_none()
-    if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
-    if not track.hls_path:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="HLS not available for this track")
+_RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
+_CHUNK_SIZE = 64 * 1024
 
-    client = get_minio_client()
-    master_key = f"{track.hls_path}/master.m3u8"
-    try:
-        response = client.get_object(settings.MINIO_BUCKET, master_key)
-        content = response.read()
-        response.close()
-        response.release_conn()
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Master playlist not found")
-
-    return Response(content=content, media_type="application/vnd.apple.mpegurl")
+_AUDIO_CONTENT_TYPES = {
+    "mp3": "audio/mpeg",
+    "flac": "audio/flac",
+    "ogg": "audio/ogg",
+    "wav": "audio/wav",
+    "m4a": "audio/mp4",
+    "aac": "audio/aac",
+    "opus": "audio/ogg",
+}
 
 
-@router.get("/{track_id}/{quality}/playlist.m3u8")
-async def get_variant_playlist(track_id: uuid.UUID, quality: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Track).where(Track.id == track_id))
-    track = result.scalar_one_or_none()
-    if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
-    if not track.hls_path:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="HLS not available for this track")
-
-    valid_qualities = {"128k", "192k", "320k"}
-    if quality not in valid_qualities:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid quality. Use: {valid_qualities}")
-
-    client = get_minio_client()
-    playlist_key = f"{track.hls_path}/{quality}/playlist.m3u8"
-    try:
-        response = client.get_object(settings.MINIO_BUCKET, playlist_key)
-        content = response.read()
-        response.close()
-        response.release_conn()
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant playlist not found")
-
-    return Response(content=content, media_type="application/vnd.apple.mpegurl")
+def _content_type_for(name: str, stat_content_type=None) -> str:
+    if isinstance(stat_content_type, str) and stat_content_type and stat_content_type != "application/octet-stream":
+        return stat_content_type
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    return _AUDIO_CONTENT_TYPES.get(ext, "audio/mpeg")
 
 
-@router.get("/{track_id}/{quality}/{segment}")
-async def get_hls_segment(track_id: uuid.UUID, quality: str, segment: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Track).where(Track.id == track_id))
-    track = result.scalar_one_or_none()
-    if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
-    if not track.hls_path:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="HLS not available for this track")
+def _ranged_response(
+    request: Request,
+    total_size: int,
+    media_type: str,
+    read_range: Callable[[int, int], Iterator[bytes]],
+) -> Response:
+    """Serve ``total_size`` bytes, honouring an HTTP ``Range`` header.
 
-    valid_qualities = {"128k", "192k", "320k"}
-    if quality not in valid_qualities:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid quality. Use: {valid_qualities}")
-    if not segment.endswith(".ts"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid segment file")
+    ``read_range(start, length)`` yields the requested bytes.
+    """
+    headers = {"Accept-Ranges": "bytes"}
+    start, end = 0, max(total_size - 1, 0)
+    response_status = status.HTTP_200_OK
 
-    client = get_minio_client()
-    segment_key = f"{track.hls_path}/{quality}/{segment}"
-    try:
-        response = client.get_object(settings.MINIO_BUCKET, segment_key)
-        content = response.read()
-        response.close()
-        response.release_conn()
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Segment not found")
+    range_header = request.headers.get("range")
+    match = _RANGE_RE.match(range_header.strip()) if range_header else None
+    if match and (match.group(1) or match.group(2)):
+        first, last = match.group(1), match.group(2)
+        if first:
+            start = int(first)
+            end = int(last) if last else total_size - 1
+        else:
+            start = max(total_size - int(last), 0)
+            end = total_size - 1
+        if start >= total_size or start > end:
+            return Response(
+                status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+                headers={"Content-Range": f"bytes */{total_size}"},
+            )
+        end = min(end, total_size - 1)
+        response_status = status.HTTP_206_PARTIAL_CONTENT
+        headers["Content-Range"] = f"bytes {start}-{end}/{total_size}"
 
-    return Response(content=content, media_type="video/mp2t")
+    length = end - start + 1
+    headers["Content-Length"] = str(length)
+    return StreamingResponse(read_range(start, length), status_code=response_status, media_type=media_type, headers=headers)
 
 
-@router.get("/{track_id}/download")
-async def download_track(track_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Track).where(Track.id == track_id))
-    track = result.scalar_one_or_none()
-    if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
-    if not track.file_path:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track file not available")
+def stream_object_response(request: Request, object_name: str) -> Response:
+    """Proxy an object stored in MinIO with HTTP Range support.
 
+    The audio element of the browser cannot send an Authorization header, so
+    this helper is only ever reached after the caller validated the JWT
+    (header or ``?token=`` query parameter).
+    """
     client = get_minio_client()
     try:
-        response = client.get_object(settings.MINIO_BUCKET, track.file_path)
-        content = response.read()
-        response.close()
-        response.release_conn()
+        stat = client.stat_object(settings.MINIO_BUCKET, object_name)
     except Exception:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track file not found")
 
-    file_ext = track.file_path.rsplit(".", 1)[-1] if "." in track.file_path else "mp3"
-    content_type = {
-        "mp3": "audio/mpeg",
-        "flac": "audio/flac",
-        "ogg": "audio/ogg",
-        "wav": "audio/wav",
-        "m4a": "audio/mp4",
-    }.get(file_ext, "audio/mpeg")
+    def read_range(start: int, length: int):
+        obj = client.get_object(settings.MINIO_BUCKET, object_name, offset=start, length=length)
+        try:
+            remaining = length
+            while remaining > 0:
+                chunk = obj.read(min(_CHUNK_SIZE, remaining))
+                if not chunk:
+                    break
+                chunk = chunk[:remaining]
+                remaining -= len(chunk)
+                yield chunk
+        finally:
+            obj.close()
+            obj.release_conn()
 
+    media_type = _content_type_for(object_name, getattr(stat, "content_type", None))
+    return _ranged_response(request, int(stat.size), media_type, read_range)
+
+
+def stream_local_response(request: Request, path: str) -> Response:
+    """Serve a file from the server's music folders with HTTP Range support."""
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Local file not found")
+
+    def read_range(start: int, length: int):
+        with open(path, "rb") as f:
+            f.seek(start)
+            remaining = length
+            while remaining > 0:
+                chunk = f.read(min(_CHUNK_SIZE, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+
+    return _ranged_response(request, os.path.getsize(path), _content_type_for(path), read_range)
+
+
+def stream_track_file(request: Request, file_url: str) -> Response:
+    """Stream a track's source file: a local file (``local:<path>``) or a MinIO object."""
+    if file_url.startswith(LOCAL_PREFIX):
+        return stream_local_response(request, file_url[len(LOCAL_PREFIX):])
+    return stream_object_response(request, file_url)
+
+
+_HLS_QUALITIES = frozenset({"128k", "192k", "320k"})
+_SEGMENT_RE = re.compile(r"segment_\d{3,}\.ts")
+_PLAYLIST_MEDIA_TYPE = "application/vnd.apple.mpegurl"
+
+
+async def _get_hls_track(track_id: uuid.UUID, user: User, db: AsyncSession) -> Track:
+    track = await get_track_for_user(track_id, user, db)
+    if not track.hls_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="HLS not available for this track")
+    return track
+
+
+def _check_quality(quality: str) -> None:
+    if quality not in _HLS_QUALITIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid quality. Use: {sorted(_HLS_QUALITIES)}",
+        )
+
+
+def _read_object(object_name: str, not_found_detail: str) -> bytes:
+    client = get_minio_client()
+    try:
+        response = client.get_object(settings.MINIO_BUCKET, object_name)
+        try:
+            return response.read()
+        finally:
+            response.close()
+            response.release_conn()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail)
+
+
+# HLS requests are authenticated like the direct stream (header or ``?token=``).
+# HLS.js sends the Authorization header on every playlist/segment request.
+@router.get("/{track_id}/master.m3u8")
+async def get_master_playlist(
+    track_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_stream),
+):
+    track = await _get_hls_track(track_id, current_user, db)
+    content = _read_object(f"{track.hls_path}/master.m3u8", "Master playlist not found")
+    return Response(content=content, media_type=_PLAYLIST_MEDIA_TYPE, headers={"Cache-Control": "private, no-cache"})
+
+
+@router.get("/{track_id}/{quality}/playlist.m3u8")
+async def get_variant_playlist(
+    track_id: uuid.UUID,
+    quality: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_stream),
+):
+    _check_quality(quality)
+    track = await _get_hls_track(track_id, current_user, db)
+    content = _read_object(f"{track.hls_path}/{quality}/playlist.m3u8", "Variant playlist not found")
+    return Response(content=content, media_type=_PLAYLIST_MEDIA_TYPE, headers={"Cache-Control": "private, no-cache"})
+
+
+@router.get("/{track_id}/{quality}/{segment}")
+async def get_hls_segment(
+    track_id: uuid.UUID,
+    quality: str,
+    segment: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_stream),
+):
+    _check_quality(quality)
+    if not _SEGMENT_RE.fullmatch(segment):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid segment file")
+    track = await _get_hls_track(track_id, current_user, db)
+    content = _read_object(f"{track.hls_path}/{quality}/{segment}", "Segment not found")
+    # Segments never change once written (a re-transcode rewrites the playlists).
+    return Response(content=content, media_type="video/mp2t", headers={"Cache-Control": "private, max-age=86400"})
+
+
+@router.get("/{track_id}/download")
+async def download_track(
+    track_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_stream),
+):
+    track = await get_track_for_user(track_id, current_user, db)
+    if not track.file_url:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track file not available")
+
+    file_ext = track.file_url.rsplit(".", 1)[-1] if "." in track.file_url else "mp3"
     filename = f"{track.artist.name if track.artist else 'Unknown'} - {track.title}.{file_ext}"
-    return Response(
-        content=content,
-        media_type=content_type,
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-        },
-    )
+
+    response = stream_track_file(request, track.file_url)
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response

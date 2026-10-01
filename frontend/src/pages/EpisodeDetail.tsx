@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getPodcast, playEpisode, getEpisodeStreamUrl } from '@/api/podcasts';
+import { getEpisode, getPodcast, playEpisode, getEpisodeStreamUrl } from '@/api/podcasts';
 import type { Podcast, Episode } from '@/types';
 import { ArrowLeft, Play, Pause, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatDurationHm, formatDate } from '@/utils/formatTime';
-import client from '@/api/client';
+import { usePlayerStore } from '@/stores/playerStore';
 
 const EpisodeDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -14,31 +14,22 @@ const EpisodeDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const playRecordedRef = useRef(false);
 
   useEffect(() => {
     if (!id) return;
 
     const loadEpisode = async () => {
       setLoading(true);
+      setError(null);
+      playRecordedRef.current = false;
       try {
-        const podcastsRes = await client.get('/podcasts', { params: { page_size: 100 } });
-        const podcastsData = podcastsRes.data;
-
-        for (const p of podcastsData.items) {
-          const podcastData = await getPodcast(p.id);
-          const found = podcastData.episodes?.find((ep) => ep.id === id);
-          if (found) {
-            setPodcast(podcastData);
-            setEpisode(found);
-            break;
-          }
-        }
-
-        if (!episode) {
-          setError('Episode not found');
-        }
-      } catch {
-        setError('Failed to load episode');
+        const found = await getEpisode(id);
+        setEpisode(found);
+        setPodcast(await getPodcast(found.podcast_id));
+      } catch (err: any) {
+        setError(err?.response?.status === 404 ? 'Episode not found' : 'Failed to load episode');
       } finally {
         setLoading(false);
       }
@@ -47,13 +38,19 @@ const EpisodeDetail = () => {
     loadEpisode();
   }, [id]);
 
-  const handlePlay = async () => {
-    if (!episode) return;
-    try {
-      await playEpisode(episode.id);
-      setIsPlaying(!isPlaying);
-    } catch (error) {
-      console.error('Failed to record play:', error);
+  const handlePlay = () => {
+    const audio = audioRef.current;
+    if (!episode || !audio) return;
+    if (!audio.paused) {
+      audio.pause();
+      return;
+    }
+    // Only one thing plays at a time: stop the music player first.
+    usePlayerStore.getState().pause();
+    audio.play().catch((err) => console.error('Failed to play episode:', err));
+    if (!playRecordedRef.current) {
+      playRecordedRef.current = true;
+      playEpisode(episode.id).catch((err) => console.error('Failed to record play:', err));
     }
   };
 
@@ -126,6 +123,17 @@ const EpisodeDetail = () => {
           </span>
         )}
       </div>
+
+      <audio
+        ref={audioRef}
+        src={getEpisodeStreamUrl(podcast.id, episode.id)}
+        controls
+        preload="none"
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => setIsPlaying(false)}
+        className="w-full"
+      />
 
       {episode.description && (
         <div className="rounded-lg bg-gray-800 p-6">

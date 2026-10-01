@@ -1,5 +1,6 @@
 import httpx
 import structlog
+
 from app.core.config import settings
 
 logger = structlog.get_logger("app")
@@ -35,11 +36,12 @@ async def ensure_indexes():
 
 async def reindex_all():
     """Reindex all data from the database into Meilisearch."""
-    from app.core.database import async_session
-    from app.models.track import Track
-    from app.models.artist import Artist
-    from app.models.album import Album
     from sqlalchemy import select
+
+    from app.core.database import async_session
+    from app.models.album import Album
+    from app.models.artist import Artist
+    from app.models.track import Track
 
     async with async_session() as db:
         async with httpx.AsyncClient() as client:

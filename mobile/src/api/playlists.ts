@@ -2,7 +2,7 @@ import client from './client';
 import type { Playlist, PlaylistTrack, PaginatedResponse } from '../types';
 
 export const getPlaylists = async (page = 1, perPage = 20): Promise<PaginatedResponse<Playlist>> => {
-  const response = await client.get('/playlists', { params: { page, per_page: perPage } });
+  const response = await client.get('/playlists', { params: { page, page_size: perPage } });
   return response.data;
 };
 

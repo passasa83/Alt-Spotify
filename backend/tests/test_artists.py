@@ -37,7 +37,7 @@ async def test_list_artists(client: AsyncClient, admin_headers):
         headers=admin_headers,
         json={"name": "Artist Two"},
     )
-    response = await client.get("/api/v1/artists")
+    response = await client.get("/api/v1/artists", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["total"] >= 2
@@ -52,14 +52,14 @@ async def test_get_artist(client: AsyncClient, admin_headers):
     )
     artist_id = create_resp.json()["id"]
 
-    response = await client.get(f"/api/v1/artists/{artist_id}")
+    response = await client.get(f"/api/v1/artists/{artist_id}", headers=admin_headers)
     assert response.status_code == 200
     assert response.json()["name"] == "Get Me Artist"
 
 
-async def test_get_artist_not_found(client: AsyncClient):
+async def test_get_artist_not_found(client: AsyncClient, auth_headers):
     fake_id = uuid.uuid4()
-    response = await client.get(f"/api/v1/artists/{fake_id}")
+    response = await client.get(f"/api/v1/artists/{fake_id}", headers=auth_headers)
     assert response.status_code == 404
 
 
@@ -95,5 +95,5 @@ async def test_delete_artist(client: AsyncClient, admin_headers):
     )
     assert response.status_code == 204
 
-    get_resp = await client.get(f"/api/v1/artists/{artist_id}")
+    get_resp = await client.get(f"/api/v1/artists/{artist_id}", headers=admin_headers)
     assert get_resp.status_code == 404

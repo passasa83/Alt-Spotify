@@ -8,6 +8,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     pseudo: str
+    invite_token: str | None = None
 
 
 class UserLogin(BaseModel):

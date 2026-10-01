@@ -50,7 +50,7 @@ async def test_list_albums(client: AsyncClient, admin_headers):
         headers=admin_headers,
         json={"title": "Album One", "artist_id": str(artist_id)},
     )
-    response = await client.get("/api/v1/albums")
+    response = await client.get("/api/v1/albums", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["total"] >= 1
@@ -66,14 +66,14 @@ async def test_get_album(client: AsyncClient, admin_headers):
     )
     album_id = create_resp.json()["id"]
 
-    response = await client.get(f"/api/v1/albums/{album_id}")
+    response = await client.get(f"/api/v1/albums/{album_id}", headers=admin_headers)
     assert response.status_code == 200
     assert response.json()["title"] == "Get Me Album"
 
 
-async def test_get_album_not_found(client: AsyncClient):
+async def test_get_album_not_found(client: AsyncClient, auth_headers):
     fake_id = uuid.uuid4()
-    response = await client.get(f"/api/v1/albums/{fake_id}")
+    response = await client.get(f"/api/v1/albums/{fake_id}", headers=auth_headers)
     assert response.status_code == 404
 
 
@@ -97,7 +97,7 @@ async def test_get_album_tracks(client: AsyncClient, admin_headers):
         },
     )
 
-    response = await client.get(f"/api/v1/albums/{album_id}/tracks")
+    response = await client.get(f"/api/v1/albums/{album_id}/tracks", headers=admin_headers)
     assert response.status_code == 200
     tracks = response.json()
     assert len(tracks) >= 1
@@ -137,5 +137,5 @@ async def test_delete_album(client: AsyncClient, admin_headers):
     )
     assert response.status_code == 204
 
-    get_resp = await client.get(f"/api/v1/albums/{album_id}")
+    get_resp = await client.get(f"/api/v1/albums/{album_id}", headers=admin_headers)
     assert get_resp.status_code == 404

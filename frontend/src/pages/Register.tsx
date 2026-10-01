@@ -4,6 +4,9 @@ import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
 
 const Register = () => {
+  const [searchParams] = useSearchParams();
+  // Invite links from the admin page look like /register?invite=<token>.
+  const [inviteToken, setInviteToken] = useState(searchParams.get('invite') ?? '');
   const [email, setEmail] = useState('');
   const [pseudo, setPseudo] = useState('');
   const [password, setPassword] = useState('');
@@ -12,8 +15,6 @@ const Register = () => {
   const { register, isLoading } = useAuthStore();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [searchParams] = useSearchParams();
-  const inviteToken = searchParams.get('invite');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,10 +31,11 @@ const Register = () => {
     }
 
     try {
-      await register(email, pseudo, password, inviteToken || undefined);
+      await register(email, pseudo, password, inviteToken.trim() || undefined);
       navigate('/login');
-    } catch {
-      setError(t('auth.registration_failed'));
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setError(detail || t('auth.registration_failed'));
     }
   };
 
@@ -48,18 +50,6 @@ const Register = () => {
         </div>
 
         <h1 className="mb-6 text-center text-2xl font-bold text-white">{t('auth.register_title')}</h1>
-
-        {inviteToken ? (
-          <div className="mb-4 rounded-md bg-green-500/20 p-3 text-center text-sm text-green-400">
-            {t('auth.invite_valid')}
-          </div>
-        ) : (
-          <div className="mb-4 rounded-md bg-yellow-500/20 p-3 text-center text-sm text-yellow-400">
-            {t('auth.invite_required')}
-            <br />
-            <span className="text-xs opacity-75">{t('auth.no_invite')}</span>
-          </div>
-        )}
 
         {error && (
           <div className="mb-4 rounded-md bg-red-500/20 p-3 text-center text-sm text-red-400" role="alert">
@@ -122,6 +112,21 @@ const Register = () => {
               className="w-full rounded-md border border-gray-600 bg-gray-800 px-4 py-3 text-white placeholder-gray-400 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
               placeholder={t('auth.confirm_your_password')}
             />
+          </div>
+
+          <div>
+            <label htmlFor="reg-invite" className="mb-1 block text-sm font-medium text-gray-300">{t('auth.invite_code')}</label>
+            <input
+              id="reg-invite"
+              type="text"
+              value={inviteToken}
+              onChange={(e) => setInviteToken(e.target.value)}
+              aria-label={t('auth.invite_code')}
+              autoComplete="off"
+              className="w-full rounded-md border border-gray-600 bg-gray-800 px-4 py-3 text-white placeholder-gray-400 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              placeholder={t('auth.enter_invite_code')}
+            />
+            <p className="mt-1 text-xs text-gray-400">{t('auth.no_invite')}</p>
           </div>
 
           <button

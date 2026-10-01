@@ -31,6 +31,7 @@ interface PlayerState {
   crossfadeDuration: number;
   replayGainEnabled: boolean;
   playbackRate: number;
+  restartTick: number;
   offlineTracks: Map<string, Blob>;
   deviceId: string;
   connectedDevices: Device[];
@@ -38,17 +39,19 @@ interface PlayerState {
   play: () => void;
   pause: () => void;
   togglePlay: () => void;
-  next: () => void;
+  // `preferred`: a queued track to advance to (the one the Player preloaded).
+  next: (preferred?: Track) => void;
   prev: () => void;
   setVolume: (volume: number) => void;
   seek: (progress: number) => void;
   setDuration: (duration: number) => void;
   addToQueue: (track: Track) => void;
-  removeFromQueue: (trackId: number) => void;
+  removeFromQueue: (trackId: string) => void;
   clearQueue: () => void;
   setPlaylistAsQueue: (tracks: Track[], startIndex?: number) => void;
   toggleShuffle: () => void;
   toggleRepeat: () => void;
+  restartCurrent: () => void;
   setLyrics: (lyrics: LyricsLine[]) => void;
   toggleLyrics: () => void;
   setUseHls: (use: boolean) => void;
@@ -73,12 +76,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   duration: 0,
   shuffle: false,
   repeat: 'off',
-  useHls: false,
+  useHls: true,
   lyrics: [],
   showLyrics: false,
   crossfadeDuration: 0,
   replayGainEnabled: true,
   playbackRate: 1,
+  restartTick: 0,
   offlineTracks: new Map(),
   deviceId: generateDeviceId(),
   connectedDevices: [],
@@ -122,6 +126,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   setTrack: (track) => {
+    if (!track.file_url && !track.hls_path) return;
     const { currentTrack, history } = get();
     if (currentTrack) {
       set({ history: [currentTrack, ...history].slice(0, 50) });
@@ -137,19 +142,22 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     set({ isPlaying: !isPlaying });
   },
 
-  next: () => {
+  next: (preferred) => {
     const { queue, currentTrack, history, shuffle, repeat } = get();
     if (queue.length === 0) {
-      if (repeat === 'all' && currentTrack) {
-        set({ currentTrack, progress: 0, isPlaying: true });
+      if ((repeat === 'all' || repeat === 'one') && currentTrack) {
+        get().restartCurrent();
       } else {
         set({ isPlaying: false });
       }
       return;
     }
-    const nextTrack = shuffle
-      ? queue[Math.floor(Math.random() * queue.length)]
-      : queue[0]!;
+    const queued = preferred && queue.find((t) => t.id === preferred.id);
+    const nextTrack = queued
+      ? queued
+      : shuffle
+        ? queue[Math.floor(Math.random() * queue.length)]
+        : queue[0]!;
     const newQueue = queue.filter((t) => t.id !== nextTrack.id);
     if (currentTrack) {
       set({ history: [currentTrack, ...history].slice(0, 50) });
@@ -209,6 +217,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const modes: RepeatMode[] = ['off', 'all', 'one'];
     const currentIndex = modes.indexOf(repeat);
     set({ repeat: modes[(currentIndex + 1) % modes.length]! });
+  },
+
+  restartCurrent: () => {
+    set({ restartTick: get().restartTick + 1, isPlaying: true, progress: 0 });
   },
 
   setLyrics: (lyrics) => set({ lyrics }),

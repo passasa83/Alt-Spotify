@@ -110,7 +110,7 @@ async def test_enriched_search_musicbrainz_plus_jiosaavn(mock_httpx, client: Asy
 
     with patch("app.services.jiosaavn.upload_file"):
         response = await client.get(
-            "/api/v1/search/enriched?q=Bohemian+Rhapsody&auto_import=true"
+            "/api/v1/search/enriched?q=Bohemian+Rhapsody&auto_import=true", headers=admin_headers,
         )
         assert response.status_code == 200
         data = response.json()
@@ -137,7 +137,7 @@ async def test_enriched_search_no_download_url(mock_httpx, client: AsyncClient, 
     mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
 
     response = await client.get(
-        "/api/v1/search/enriched?q=Bohemian+Rhapsody&auto_import=true"
+        "/api/v1/search/enriched?q=Bohemian+Rhapsody&auto_import=true", headers=admin_headers,
     )
     assert response.status_code == 200
     data = response.json()
@@ -167,7 +167,7 @@ async def test_search_local_results_prioritized(mock_deezer, client: AsyncClient
 
     mock_deezer.return_value = []
 
-    response = await client.get("/api/v1/search?q=Local+Priority&type=tracks")
+    response = await client.get("/api/v1/search?q=Local+Priority&type=tracks", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     assert "tracks" in data

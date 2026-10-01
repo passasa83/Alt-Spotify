@@ -1,7 +1,7 @@
 import uuid
+
 import httpx
 import structlog
-from pathlib import Path
 
 from app.core.minio import upload_file
 
@@ -70,8 +70,8 @@ async def import_from_jiosaavn(song_data: dict, db) -> uuid.UUID | None:
     """Download a song from JioSaavn and import it into the database.
     Returns the track_id if successful, None otherwise.
     """
+
     from app.models.track import Track
-    from sqlalchemy import select
 
     download_url = song_data.get("download_url")
     if not download_url:
@@ -120,11 +120,10 @@ async def import_from_jiosaavn(song_data: dict, db) -> uuid.UUID | None:
             artist=artist_name,
         )
 
-        try:
-            from worker.tasks import transcode_audio
-            transcode_audio.delay(object_name, f"hls/{track_id}", str(track_id))
-        except Exception as e:
-            logger.warning("celery_transcode_dispatch_failed", error=str(e))
+        # Commit before queueing so the worker always finds the track row.
+        await db.commit()
+        from app.core.tasks import enqueue_transcode
+        await enqueue_transcode(track_id, object_name)
 
         return track_id
 

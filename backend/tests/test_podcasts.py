@@ -38,7 +38,7 @@ async def test_list_podcasts(client: AsyncClient, admin_headers):
         json={"title": "List Podcast"},
     )
 
-    response = await client.get("/api/v1/podcasts")
+    response = await client.get("/api/v1/podcasts", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["total"] >= 1
@@ -53,16 +53,16 @@ async def test_get_podcast(client: AsyncClient, admin_headers):
     )
     podcast_id = create_resp.json()["id"]
 
-    response = await client.get(f"/api/v1/podcasts/{podcast_id}")
+    response = await client.get(f"/api/v1/podcasts/{podcast_id}", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "Get Podcast"
     assert "episodes" in data
 
 
-async def test_get_podcast_not_found(client: AsyncClient):
+async def test_get_podcast_not_found(client: AsyncClient, auth_headers):
     fake_id = uuid.uuid4()
-    response = await client.get(f"/api/v1/podcasts/{fake_id}")
+    response = await client.get(f"/api/v1/podcasts/{fake_id}", headers=auth_headers)
     assert response.status_code == 404
 
 

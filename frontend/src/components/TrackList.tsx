@@ -8,7 +8,7 @@ import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import type { Track } from '@/types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
-import { deleteTrack } from '@/api/tracks';
+import { deleteTrack, resolveCoverUrl } from '@/api/tracks';
 import { formatTime } from '@/utils/formatTime';
 import { usePlaylistModals } from '@/hooks/usePlaylistModals';
 
@@ -24,7 +24,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
   const { setTrack, setPlaylistAsQueue, currentTrack, isPlaying } = usePlayerStore();
   const { t } = useTranslation();
   const { user } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'ADMIN';
   const { playlistModalTrack, showCreateModal, openAddToPlaylist, openCreatePlaylist, closeAddToPlaylist, closeCreatePlaylist } = usePlaylistModals();
 
   const handlePlayTrack = (track: Track) => {
@@ -88,28 +88,36 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
                   <span className={`text-sm ${isCurrentTrack ? 'text-green-500' : 'text-gray-400 group-hover:hidden'}`}>
                     {isCurrentTrack && isPlaying ? '♪' : index + 1}
                   </span>
-                  <button
-                    onClick={() => handlePlayTrack(track)}
-                    className="hidden text-white group-hover:block"
-                    aria-label={`${t('player.play')} ${track.title}`}
-                  >
-                    <Play size={14} fill="currentColor" />
-                  </button>
+                  {(track.file_url || track.hls_path) ? (
+                    <button
+                      onClick={() => handlePlayTrack(track)}
+                      className="hidden text-white group-hover:block"
+                      aria-label={`${t('player.play')} ${track.title}`}
+                    >
+                      <Play size={14} fill="currentColor" />
+                    </button>
+                  ) : (
+                    <span className="hidden text-gray-600 group-hover:block">—</span>
+                  )}
                 </div>
               )}
 
               <div className="flex items-center gap-3">
                 {!showIndex && (
-                  <button
-                    onClick={() => handlePlayTrack(track)}
-                    className="hidden text-white group-hover:block"
-                    aria-label={`${t('player.play')} ${track.title}`}
-                  >
-                    <Play size={14} fill="currentColor" />
-                  </button>
+                  (track.file_url || track.hls_path) ? (
+                    <button
+                      onClick={() => handlePlayTrack(track)}
+                      className="hidden text-white group-hover:block"
+                      aria-label={`${t('player.play')} ${track.title}`}
+                    >
+                      <Play size={14} fill="currentColor" />
+                    </button>
+                  ) : (
+                    <span className="hidden text-gray-600 group-hover:block">—</span>
+                  )
                 )}
                 <img
-                  src={track.cover_url || track.album?.cover_url || '/placeholder-album.svg'}
+                  src={resolveCoverUrl(track.cover_url || track.album?.cover_url)}
                   alt={track.title}
                   className="h-10 w-10 rounded object-cover"
                 />

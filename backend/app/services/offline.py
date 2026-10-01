@@ -1,5 +1,4 @@
 import hashlib
-import hmac
 import time
 import uuid
 from urllib.parse import urlencode
@@ -30,13 +29,6 @@ def encrypt_track(file_data: bytes, user_id: str, device_id: str) -> bytes:
 
 def generate_download_url(track_id: uuid.UUID, user_id: str, device_id: str) -> str:
     client = get_minio_client()
-
-    metadata = {
-        "user_id": user_id,
-        "device_id": device_id,
-        "track_id": str(track_id),
-        "encrypted": "true",
-    }
 
     expires = 86400
 

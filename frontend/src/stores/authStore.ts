@@ -33,7 +33,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  register: async (email, pseudo, password, inviteToken?: string) => {
+  register: async (email, pseudo, password, inviteToken) => {
     set({ isLoading: true });
     try {
       await authApi.register(email, pseudo, password, inviteToken);

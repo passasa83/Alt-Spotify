@@ -1,6 +1,6 @@
-import uuid as uuid_mod
 from datetime import datetime, timezone
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -8,11 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.redis import get_redis
-from app.utils.deps import get_current_user
-from app.models.user import User
 from app.models.device_session import DeviceSession
+from app.models.user import User
+from app.utils.deps import get_current_user
 
 router = APIRouter(prefix="/devices", tags=["devices"])
+
+logger = structlog.get_logger("app")
 
 
 class DeviceRegister(BaseModel):
@@ -62,6 +64,7 @@ async def register_device(
     await db.flush()
     await db.refresh(device)
 
+    logger.info("device_registered", user_id=str(current_user.id), device_id=body.device_id, device_type=body.device_type)
     return DeviceResponse(
         id=str(device.id),
         device_id=device.device_id,

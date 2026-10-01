@@ -1,5 +1,6 @@
 import { usePlayerStore, type RepeatMode } from '@/stores/playerStore';
-import { getTrackStreamUrl } from '@/api/tracks';
+import type { Track } from '@/types';
+import { resolveCoverUrl } from '@/api/tracks';
 import { addFavorite, removeFavorite, checkFavorite } from '@/api/favorites';
 import {
   Play,
@@ -26,6 +27,7 @@ import DownloadButton from './DownloadButton';
 import Equalizer from './Equalizer';
 import { useTranslation } from '@/hooks/useTranslation';
 import { formatTime } from '@/utils/formatTime';
+import { attachSource, detachSource } from '@/utils/audioSource';
 
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 
@@ -46,12 +48,13 @@ const Player = () => {
     crossfadeDuration,
     replayGainEnabled,
     playbackRate,
+    useHls,
+    restartTick,
     togglePlay,
     next,
     prev,
     setVolume,
     seek,
-    setDuration,
     toggleShuffle,
     toggleRepeat,
     toggleLyrics,
@@ -62,6 +65,12 @@ const Player = () => {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const nextAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Track loaded in nextAudioRef, handed to the store when the crossfade starts.
+  const nextTrackRef = useRef<Track | null>(null);
+  // Set when a crossfade already started the new track, so the store update
+  // that follows doesn't reload it from the beginning.
+  const handedOverTrackIdRef = useRef<string | null>(null);
+  const crossfadingRef = useRef(false);
   const crossfadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume);
@@ -70,132 +79,142 @@ const Player = () => {
   const [showEqualizer, setShowEqualizer] = useState(false);
 
   const getNextTrack = useCallback(() => {
-    const store = usePlayerStore.getState();
-    const { queue, shuffle: sh, repeat: rp } = store;
-    if (queue.length === 0) {
-      if (rp === 'all' && store.currentTrack) return store.currentTrack;
-      return null;
-    }
+    const { queue, shuffle: sh } = usePlayerStore.getState();
+    if (queue.length === 0) return null;
     return sh ? queue[Math.floor(Math.random() * queue.length)] : queue[0];
   }, []);
 
-  const preloadNextTrack = useCallback(() => {
-    const nextTrack = getNextTrack();
-    if (!nextTrack) {
-      if (nextAudioRef.current) {
-        nextAudioRef.current.pause();
-        nextAudioRef.current.src = '';
-        nextAudioRef.current = null;
-      }
-      return;
-    }
-    if (!nextAudioRef.current) {
-      nextAudioRef.current = new Audio();
-      nextAudioRef.current.preload = 'auto';
-    }
-    nextAudioRef.current.src = getTrackStreamUrl(nextTrack.id);
-  }, [getNextTrack]);
-
-  useEffect(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.volume = volume;
-    }
-
-    const audio = audioRef.current;
-
-    const handleTimeUpdate = () => {
-      if (audio.currentTime) {
-        seek(audio.currentTime);
-      }
-    };
-
-    const handleLoadedMetadata = () => {
-      if (audio.duration) {
-        setDuration(audio.duration);
-      }
-    };
-
-    const handleEnded = () => {
-      if (crossfadeDuration > 0 && nextAudioRef.current) {
-        startCrossfadeTransition();
-      } else if (nextAudioRef.current && nextAudioRef.current.src) {
-        nextAudioRef.current.play().catch(() => {});
-        audioRef.current?.pause();
-        audioRef.current = nextAudioRef.current;
-        nextAudioRef.current = null;
-        next();
-        setDuration(audioRef.current?.duration || 0);
-      } else {
-        next();
-      }
-    };
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('ended', handleEnded);
-
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('ended', handleEnded);
-    };
-  }, [crossfadeDuration]);
-
-  const startCrossfadeTransition = useCallback(() => {
-    if (crossfadeTimerRef.current) {
-      clearInterval(crossfadeTimerRef.current);
-    }
-
-    const currentAudio = audioRef.current;
-    const nextAudio = nextAudioRef.current;
-    if (!currentAudio || !nextAudio || !nextAudio.src) {
-      next();
-      return;
-    }
+  const startCrossfadeTransition = useCallback((fadeSeconds: number) => {
+    const oldAudio = audioRef.current;
+    const newAudio = nextAudioRef.current;
+    const newTrack = nextTrackRef.current;
+    if (crossfadingRef.current || !oldAudio || !newAudio || !newTrack) return;
+    crossfadingRef.current = true;
 
     const store = usePlayerStore.getState();
+    newAudio.volume = 0;
+    newAudio.playbackRate = store.playbackRate;
+    newAudio.play().catch(() => {});
+
+    // Hand over right away: the incoming track drives the UI and the events,
+    // the outgoing one only fades out.
+    audioRef.current = newAudio;
+    nextAudioRef.current = null;
+    nextTrackRef.current = null;
+    handedOverTrackIdRef.current = newTrack.id;
+    store.setDuration(newAudio.duration || 0);
+    store.next(newTrack);
+
     const fadeSteps = 20;
-    const fadeInterval = (crossfadeDuration * 1000) / fadeSteps;
     let step = 0;
-
-    nextAudio.volume = 0;
-    nextAudio.play().catch(() => {});
-
     crossfadeTimerRef.current = setInterval(() => {
       step++;
       const progress = step / fadeSteps;
-      currentAudio.volume = Math.max(0, (1 - progress) * store.volume);
-      nextAudio.volume = Math.min(1, progress * store.volume);
+      const target = usePlayerStore.getState().volume;
+      oldAudio.volume = Math.max(0, (1 - progress) * target);
+      newAudio.volume = Math.min(1, progress * target);
 
       if (step >= fadeSteps) {
         if (crossfadeTimerRef.current) {
           clearInterval(crossfadeTimerRef.current);
           crossfadeTimerRef.current = null;
         }
-        currentAudio.pause();
-        currentAudio.src = '';
-        audioRef.current = nextAudio;
-        nextAudioRef.current = null;
-        next();
-        setDuration(nextAudio.duration || 0);
+        oldAudio.pause();
+        detachSource(oldAudio);
+        oldAudio.src = '';
+        crossfadingRef.current = false;
       }
-    }, fadeInterval);
-  }, [crossfadeDuration, next, setDuration]);
+    }, (fadeSeconds * 1000) / fadeSteps);
+  }, []);
+
+  // Listeners are attached once per element and ignore every element but the
+  // current one: the Player swaps elements on each crossfade.
+  const createAudio = useCallback(() => {
+    const audio = new Audio();
+
+    audio.addEventListener('timeupdate', () => {
+      if (audio !== audioRef.current) return;
+      const store = usePlayerStore.getState();
+      if (audio.currentTime) {
+        store.seek(audio.currentTime);
+      }
+      const remaining = audio.duration - audio.currentTime;
+      if (
+        store.crossfadeDuration > 0 &&
+        store.repeat !== 'one' &&
+        Number.isFinite(remaining) &&
+        remaining <= store.crossfadeDuration
+      ) {
+        startCrossfadeTransition(Math.max(remaining, 0.5));
+      }
+    });
+
+    audio.addEventListener('loadedmetadata', () => {
+      if (audio !== audioRef.current) return;
+      if (audio.duration) {
+        usePlayerStore.getState().setDuration(audio.duration);
+      }
+    });
+
+    audio.addEventListener('ended', () => {
+      if (audio !== audioRef.current) return;
+      const store = usePlayerStore.getState();
+      if (store.repeat === 'one' || (store.repeat === 'all' && store.queue.length === 0)) {
+        store.restartCurrent();
+        return;
+      }
+      store.next();
+    });
+
+    return audio;
+  }, [startCrossfadeTransition]);
+
+  const preloadNextTrack = useCallback(() => {
+    const nextTrack = getNextTrack();
+    if (!nextTrack) {
+      if (nextAudioRef.current) {
+        nextAudioRef.current.pause();
+        detachSource(nextAudioRef.current);
+        nextAudioRef.current.src = '';
+        nextAudioRef.current = null;
+      }
+      nextTrackRef.current = null;
+      return;
+    }
+    if (nextAudioRef.current && nextTrackRef.current?.id === nextTrack.id) return;
+    if (!nextAudioRef.current) {
+      nextAudioRef.current = createAudio();
+      nextAudioRef.current.preload = 'auto';
+    }
+    attachSource(nextAudioRef.current, nextTrack, usePlayerStore.getState().useHls);
+    nextTrackRef.current = nextTrack;
+  }, [getNextTrack, createAudio]);
 
   useEffect(() => {
-    if (audioRef.current && currentTrack) {
-      audioRef.current.src = getTrackStreamUrl(currentTrack.id);
-      audioRef.current.load();
-      if (isPlaying) {
-        audioRef.current.play().catch(() => {});
+    if (!audioRef.current) {
+      audioRef.current = createAudio();
+      audioRef.current.volume = volume;
+    }
+  }, [createAudio]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio && currentTrack) {
+      if (handedOverTrackIdRef.current === currentTrack.id) {
+        // Already playing: the crossfade started it.
+        handedOverTrackIdRef.current = null;
+      } else {
+        attachSource(audio, currentTrack, useHls);
+        if (isPlaying) {
+          audio.play().catch(() => {});
+        }
       }
       checkFavorite('track', String(currentTrack.id))
         .then((res) => setIsLiked(res))
         .catch(() => setIsLiked(false));
     }
     preloadNextTrack();
-  }, [currentTrack]);
+  }, [currentTrack, useHls]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -206,6 +225,15 @@ const Player = () => {
       }
     }
   }, [isPlaying]);
+
+  useEffect(() => {
+    if (restartTick === 0 || !audioRef.current) return;
+    const audio = audioRef.current;
+    audio.currentTime = 0;
+    if (usePlayerStore.getState().isPlaying) {
+      audio.play().catch(() => {});
+    }
+  }, [restartTick]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -228,8 +256,12 @@ const Player = () => {
       if (crossfadeTimerRef.current) {
         clearInterval(crossfadeTimerRef.current);
       }
+      if (audioRef.current) {
+        detachSource(audioRef.current);
+      }
       if (nextAudioRef.current) {
         nextAudioRef.current.pause();
+        detachSource(nextAudioRef.current);
         nextAudioRef.current = null;
       }
     };
@@ -275,7 +307,7 @@ const Player = () => {
       <div className="flex w-1/4 items-center gap-3">
         <Link to={`/track/${currentTrack.id}`}>
           <img
-            src={currentTrack.cover_url || '/placeholder-album.svg'}
+            src={resolveCoverUrl(currentTrack.cover_url)}
             alt={currentTrack.title}
             className="h-14 w-14 rounded object-cover"
           />
@@ -336,7 +368,7 @@ const Player = () => {
           >
             {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
           </button>
-          <button onClick={next} className="p-1 text-gray-400 hover:text-white" aria-label={t('player.next')}>
+          <button onClick={() => next()} className="p-1 text-gray-400 hover:text-white" aria-label={t('player.next')}>
             <SkipForward size={20} fill="currentColor" />
           </button>
           <button

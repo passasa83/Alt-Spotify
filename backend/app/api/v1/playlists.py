@@ -1,32 +1,41 @@
 import uuid
+from datetime import datetime
 from math import ceil
-from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import select, func, update, delete, and_, extract
-from sqlalchemy.orm import selectinload
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.models.listening_history import ListeningHistory
 from app.models.playlist import Playlist
 from app.models.playlist_track import PlaylistTrack
 from app.models.track import Track
-from app.models.listening_history import ListeningHistory
+from app.models.user import User
+from app.schemas.common import PaginatedResponse
 from app.schemas.playlist import (
     PlaylistCreate,
-    PlaylistUpdate,
     PlaylistResponse,
     PlaylistTrackAdd,
     PlaylistTrackReorder,
+    PlaylistUpdate,
 )
-from app.schemas.track import TrackResponse
-from app.schemas.common import PaginatedResponse
 from app.utils.deps import get_current_user
 from app.utils.track_serializer import serialize_track
-from app.models.user import User
 
 router = APIRouter(prefix="/playlists", tags=["playlists"])
+
+
+async def _get_visible_playlist(playlist_id: uuid.UUID, user: User, db: AsyncSession) -> Playlist:
+    """Load a playlist the user may read: public, collaborative or their own."""
+    result = await db.execute(select(Playlist).where(Playlist.id == playlist_id))
+    playlist = result.scalar_one_or_none()
+    # 404 rather than 403 so private playlist ids can't be probed.
+    if not playlist or not (playlist.is_public or playlist.is_collaborative or playlist.owner_id == user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found")
+    return playlist
 
 
 @router.get("", response_model=PaginatedResponse[PlaylistResponse])
@@ -169,11 +178,12 @@ async def get_user_history(
 
 
 @router.get("/{playlist_id}")
-async def get_playlist(playlist_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Playlist).where(Playlist.id == playlist_id))
-    playlist = result.scalar_one_or_none()
-    if not playlist:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found")
+async def get_playlist(
+    playlist_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    playlist = await _get_visible_playlist(playlist_id, current_user, db)
 
     owner_result = await db.execute(select(User.pseudo).where(User.id == playlist.owner_id))
     owner_name = owner_result.scalar_one_or_none()
@@ -197,7 +207,12 @@ async def get_playlist(playlist_id: uuid.UUID, db: AsyncSession = Depends(get_db
 
 
 @router.get("/{playlist_id}/tracks")
-async def get_playlist_tracks(playlist_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_playlist_tracks(
+    playlist_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_visible_playlist(playlist_id, current_user, db)
     result = await db.execute(
         select(PlaylistTrack)
         .where(PlaylistTrack.playlist_id == playlist_id)
@@ -454,7 +469,7 @@ async def update_smart_playlist_rules(
     playlist.max_tracks = body.max_tracks
 
     from app.services.smart_playlist import evaluate_smart_playlist
-    count = await evaluate_smart_playlist(playlist, db)
+    await evaluate_smart_playlist(playlist, db)
     await db.flush()
     await db.refresh(playlist)
 
@@ -558,10 +573,7 @@ async def find_duplicates(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Playlist).where(Playlist.id == playlist_id))
-    playlist = result.scalar_one_or_none()
-    if not playlist:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found")
+    await _get_visible_playlist(playlist_id, current_user, db)
 
     result = await db.execute(
         select(PlaylistTrack, Track)

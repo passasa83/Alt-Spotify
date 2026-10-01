@@ -11,6 +11,10 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 FROM python:3.12-slim
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=builder /install /usr/local
@@ -19,8 +23,12 @@ COPY . .
 
 RUN mkdir -p /app/logs
 
-VOLUME /app/logs
+VOLUME ["/app/logs", "/music"]
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --proxy-headers + --forwarded-allow-ips: trust X-Forwarded-For/-Proto from the
+# reverse proxy so request.client.host is the real client (the rate limiter is
+# keyed on it). Only safe if the port is NOT published on 0.0.0.0, otherwise a
+# direct client could spoof its IP.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]

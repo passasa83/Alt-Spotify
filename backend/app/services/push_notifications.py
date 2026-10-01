@@ -1,15 +1,14 @@
-import asyncio
 import uuid
 from datetime import datetime, timezone
 
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.push_token import PushToken
-from app.models.user import User
 
 EXPO_PUSH_API = "https://exp.host/--/api/v2/push/send"
+EXPO_BATCH_SIZE = 100
 
 
 async def register_push_token(
@@ -85,26 +84,21 @@ async def _send_to_tokens(tokens: list, title: str, body: str, data: dict | None
             "channelId": "default",
         })
 
+    # Expo accepts up to 100 messages per request and answers with one ticket
+    # per message, in order.
     sent = 0
     failed = 0
-    async with httpx.AsyncClient() as client:
-        for message in messages:
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for i in range(0, len(messages), EXPO_BATCH_SIZE):
+            batch = messages[i:i + EXPO_BATCH_SIZE]
             try:
-                response = await client.post(
-                    EXPO_PUSH_API,
-                    json=message,
-                    timeout=10.0,
-                )
-                if response.status_code == 200:
-                    resp_data = response.json()
-                    if resp_data.get("data", {}).get("status") == "ok":
-                        sent += 1
-                    else:
-                        failed += 1
-                else:
-                    failed += 1
+                response = await client.post(EXPO_PUSH_API, json=batch)
+                tickets = response.json().get("data", []) if response.status_code == 200 else []
             except Exception:
-                failed += 1
+                tickets = []
+            ok = sum(1 for ticket in tickets if isinstance(ticket, dict) and ticket.get("status") == "ok")
+            sent += ok
+            failed += len(batch) - ok
 
     return {"sent": sent, "failed": failed}
 

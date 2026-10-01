@@ -9,6 +9,8 @@ import type { Track } from '@/types';
 vi.mock('@/stores/playerStore');
 vi.mock('@/api/tracks', () => ({
   getTrackStreamUrl: (id: string) => `/api/v1/tracks/${id}/stream`,
+  getHlsStreamUrl: (id: string) => `/api/v1/stream/${id}/master.m3u8`,
+  resolveCoverUrl: (url: string | null | undefined) => url || '/placeholder-album.svg',
 }));
 vi.mock('@/components/SynchronizedLyrics', () => ({
   default: () => <div data-testid="lyrics">Lyrics</div>,
@@ -26,6 +28,7 @@ const createTrack = (id: string, title = 'Test Track'): Track => ({
   artist_id: 'artist-1',
   duration_seconds: 180,
   play_count: 0,
+  is_explicit: false,
   created_at: '2024-01-01',
   artist: { id: 'artist-1', name: 'Test Artist', created_at: '2024-01-01' },
 });

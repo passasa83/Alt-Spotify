@@ -1,12 +1,11 @@
-import uuid
 import random
+import uuid
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.track import Track
 from app.models.listening_history import ListeningHistory
-from app.models.user import User
+from app.models.track import Track
 
 
 async def get_similar_tracks(track_id: uuid.UUID, db: AsyncSession, limit: int = 10) -> list[Track]:

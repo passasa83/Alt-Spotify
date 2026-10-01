@@ -1,17 +1,12 @@
 import os
-import re
-import html
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
 
 logger = structlog.get_logger("app")
 
 HSTS_ENABLED = os.environ.get("HSTS_ENABLED", "true").lower() == "true"
-
-DANGEROUS_CHARS = re.compile(r"[<>&\"'/;(){}]")
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -35,16 +30,3 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             )
 
         return response
-
-
-class InputSanitizationMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        if request.query_params:
-            sanitized = {}
-            for key, value in request.query_params.items():
-                sanitized[key] = DANGEROUS_CHARS.sub("", value)
-            request.scope["query_string"] = "&".join(
-                f"{k}={v}" for k, v in sanitized.items()
-            ).encode("utf-8")
-
-        return await call_next(request)

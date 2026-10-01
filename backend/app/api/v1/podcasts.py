@@ -1,25 +1,26 @@
 import uuid
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import RedirectResponse
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.stream import stream_object_response
 from app.core.database import get_db
-from app.core.minio import get_file_url
-from app.models.podcast import Podcast, Episode
+from app.models.podcast import Episode, Podcast
+from app.models.user import User
+from app.schemas.common import PaginatedResponse
 from app.schemas.podcast import (
-    PodcastCreate,
-    PodcastUpdate,
-    PodcastResponse,
-    PodcastWithEpisodesResponse,
     EpisodeCreate,
     EpisodeResponse,
+    PodcastCreate,
+    PodcastResponse,
+    PodcastUpdate,
+    PodcastWithEpisodesResponse,
     RSSImportRequest,
 )
-from app.schemas.common import PaginatedResponse
-from app.utils.deps import get_current_user, require_admin
-from app.models.user import User
+from app.utils.deps import get_current_user, get_current_user_stream, require_admin
 
 router = APIRouter(prefix="/podcasts", tags=["podcasts"])
 
@@ -31,6 +32,7 @@ async def list_podcasts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
 ):
     query = select(Podcast)
     count_query = select(func.count(Podcast.id))
@@ -73,7 +75,11 @@ async def list_podcasts(
 
 
 @router.get("/{podcast_id}", response_model=PodcastWithEpisodesResponse)
-async def get_podcast(podcast_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_podcast(
+    podcast_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
     result = await db.execute(select(Podcast).where(Podcast.id == podcast_id))
     podcast = result.scalar_one_or_none()
     if not podcast:
@@ -174,6 +180,7 @@ async def list_episodes(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Podcast).where(Podcast.id == podcast_id))
     if not result.scalar_one_or_none():
@@ -259,6 +266,19 @@ async def import_from_feed(
     )
 
 
+@router.get("/episodes/{episode_id}", response_model=EpisodeResponse)
+async def get_episode(
+    episode_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Episode).where(Episode.id == episode_id))
+    episode = result.scalar_one_or_none()
+    if not episode:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Episode not found")
+    return episode
+
+
 @router.post("/episodes/{episode_id}/play")
 async def play_episode(
     episode_id: uuid.UUID,
@@ -279,7 +299,9 @@ async def play_episode(
 async def stream_episode(
     podcast_id: uuid.UUID,
     episode_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user_stream),
 ):
     result = await db.execute(
         select(Episode).where(Episode.id == episode_id, Episode.podcast_id == podcast_id)
@@ -289,5 +311,9 @@ async def stream_episode(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Episode not found")
     if not episode.audio_url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No audio file available")
-    url = get_file_url(episode.audio_url)
-    return {"stream_url": url}
+    # RSS episodes point at the publisher's server: let the browser fetch it
+    # directly. Uploaded episodes live in MinIO, which is not reachable from
+    # the browser, so they are proxied like tracks.
+    if episode.audio_url.startswith(("http://", "https://")):
+        return RedirectResponse(episode.audio_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    return stream_object_response(request, episode.audio_url)

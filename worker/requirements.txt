@@ -3,3 +3,4 @@ redis==5.0.8
 minio==7.2.7
 python-magic==0.4.27
 mutagen==1.47.0
+psycopg[binary]==3.2.3

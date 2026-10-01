@@ -6,6 +6,7 @@ import TrackList from '@/components/TrackList';
 import { Play, Heart, MoreHorizontal, Shuffle } from 'lucide-react';
 import type { Album, Track } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
+import { resolveCoverUrl } from '@/api/tracks';
 
 const AlbumDetail = () => {
   const { t } = useTranslation();
@@ -13,15 +14,15 @@ const AlbumDetail = () => {
   const [album, setAlbum] = useState<Album | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { setTrack, currentTrack, isPlaying, togglePlay } = usePlayerStore();
+  const { setPlaylistAsQueue } = usePlayerStore();
 
   useEffect(() => {
     const loadAlbum = async () => {
       if (!id) return;
       try {
         const [albumData, tracksData] = await Promise.all([
-          getAlbum(parseInt(id)),
-          getAlbumTracks(parseInt(id)),
+          getAlbum(id),
+          getAlbumTracks(id),
         ]);
         setAlbum(albumData);
         setTracks(tracksData);
@@ -50,12 +51,15 @@ const AlbumDetail = () => {
     );
   }
 
-  const totalDuration = tracks.reduce((acc, track) => acc + track.duration, 0);
+  const totalDuration = tracks.reduce((acc, track) => acc + track.duration_seconds, 0);
   const minutes = Math.floor(totalDuration / 60);
+  const releaseYear = album.release_date
+    ? new Date(album.release_date).getFullYear()
+    : new Date(album.created_at).getFullYear();
 
   const handlePlayAll = () => {
     if (tracks.length > 0) {
-      setTrack(tracks[0]!);
+      setPlaylistAsQueue(tracks, 0);
     }
   };
 
@@ -63,7 +67,7 @@ const AlbumDetail = () => {
     <div className="pb-24">
       <div className="mb-6 flex flex-col gap-6 md:flex-row md:items-end">
         <img
-          src={album.cover_url || '/placeholder-album.svg'}
+          src={resolveCoverUrl(album.cover_url)}
           alt={album.title}
           className="h-48 w-48 rounded-md object-cover shadow-2xl md:h-56 md:w-56"
         />
@@ -75,7 +79,7 @@ const AlbumDetail = () => {
               {album.artist?.name || t('player.unknown_artist')}
             </Link>
             <span>•</span>
-            <span>{album.release_year || new Date(album.created_at).getFullYear()}</span>
+            <span>{releaseYear}</span>
             <span>•</span>
             <span>{t('album.songs_about_min', { count: tracks.length, minutes })}</span>
           </div>

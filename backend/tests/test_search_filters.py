@@ -34,7 +34,7 @@ async def test_search_by_bpm_range(client: AsyncClient, admin_headers):
     await _create_track_with_metadata(client, admin_headers, artist_id, title="Fast Song", bpm=140)
     await _create_track_with_metadata(client, admin_headers, artist_id, title="Mid Song", bpm=110)
 
-    response = await client.get("/api/v1/search?q=Song&min_bpm=100&max_bpm=120")
+    response = await client.get("/api/v1/search?q=Song&min_bpm=100&max_bpm=120", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     assert "tracks" in data
@@ -56,7 +56,7 @@ async def test_search_by_key(client: AsyncClient, admin_headers):
     await _create_track_with_metadata(client, admin_headers, artist_id, title="C Major Song", key="C")
     await _create_track_with_metadata(client, admin_headers, artist_id, title="A Minor Song", key="Am")
 
-    response = await client.get("/api/v1/search?q=Song&key=Am")
+    response = await client.get("/api/v1/search?q=Song&key=Am", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     titles = [t["title"] for t in data["tracks"]]
@@ -76,7 +76,7 @@ async def test_search_by_mood(client: AsyncClient, admin_headers):
     await _create_track_with_metadata(client, admin_headers, artist_id, title="Happy Song", mood="happy,energetic")
     await _create_track_with_metadata(client, admin_headers, artist_id, title="Sad Song", mood="sad,melancholic")
 
-    response = await client.get("/api/v1/search?q=Song&mood=happy")
+    response = await client.get("/api/v1/search?q=Song&mood=happy", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     titles = [t["title"] for t in data["tracks"]]
@@ -96,7 +96,7 @@ async def test_search_by_duration(client: AsyncClient, admin_headers):
     await _create_track_with_metadata(client, admin_headers, artist_id, title="Short Song", duration_seconds=120)
     await _create_track_with_metadata(client, admin_headers, artist_id, title="Long Song", duration_seconds=360)
 
-    response = await client.get("/api/v1/search?q=Song&min_duration=200&max_duration=400")
+    response = await client.get("/api/v1/search?q=Song&min_duration=200&max_duration=400", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     titles = [t["title"] for t in data["tracks"]]
@@ -124,7 +124,7 @@ async def test_search_by_lyrics(client: AsyncClient, admin_headers):
         lyrics_lrc="[00:00.00]Party all night\n[00:05.00]Dance with me",
     )
 
-    response = await client.get("/api/v1/search?q=Song&lyrics=tonight")
+    response = await client.get("/api/v1/search?q=Song&lyrics=tonight", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     titles = [t["title"] for t in data["tracks"]]
@@ -154,7 +154,7 @@ async def test_search_combined_filters(client: AsyncClient, admin_headers):
         title="Jazz Fast", genre="jazz", bpm=140, mood="energetic",
     )
 
-    response = await client.get("/api/v1/search?q=Fast&genre=rock&min_bpm=120")
+    response = await client.get("/api/v1/search?q=Fast&genre=rock&min_bpm=120", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     titles = [t["title"] for t in data["tracks"]]

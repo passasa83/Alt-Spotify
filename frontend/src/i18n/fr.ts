@@ -44,6 +44,14 @@ const fr = {
   'history.genre_filter': 'Filtrer par genre...',
   'history.empty': 'Aucun historique d\'écoute',
 
+  // Local Music
+  'local.title': 'Ma musique',
+  'local.track': 'titre',
+  'local.tracks': 'titres',
+  'local.empty': 'Aucune musique locale trouvée',
+  'local.empty_hint': 'Ajoutez des fichiers musicaux à votre répertoire de scan pour les voir ici',
+  'local.load_more': 'Charger plus',
+
   // Smart Playlists
   'smart.create_title': 'Créer une playlist intelligente',
   'smart.playlist_name': 'Nom de la playlist',
@@ -112,6 +120,8 @@ const fr = {
   'auth.invite_required': 'Une invitation est requise pour créer un compte',
   'auth.invite_valid': 'Invitation validée',
   'auth.no_invite': 'Vous n\'avez pas d\'invitation ? Contactez un administrateur.',
+  'auth.invite_code': 'Code d\'invitation',
+  'auth.enter_invite_code': 'Collez votre code d\'invitation',
 
   // Settings
   'settings.title': 'Paramètres',

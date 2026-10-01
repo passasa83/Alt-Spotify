@@ -1,26 +1,26 @@
-import asyncio
 import json
-import random
+import secrets
 import string
 import uuid
-from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, status
 from fastapi.responses import Response
-from sqlalchemy import select, delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import async_session, get_db
 from app.core.redis import get_redis
-from app.models.jam import JamSession, JamSessionStatus, JamParticipant
+from app.core.security import verify_token
+from app.models.jam import JamParticipant, JamSession, JamSessionStatus
 from app.models.user import User
 from app.utils.deps import get_current_user
+from app.utils.ws import relay_channel
 
 router = APIRouter(prefix="/jam", tags=["jam"])
 
 
 def generate_session_code() -> str:
-    return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    return "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
 
 
 def _serialize_jam_session(session, participants, users_map) -> dict:
@@ -90,8 +90,9 @@ async def get_session_qr(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
     try:
-        import qrcode
         import io
+
+        import qrcode
         qr = qrcode.QRCode(version=1, box_size=10, border=4)
         qr.add_data(session.code)
         qr.make(fit=True)
@@ -189,6 +190,13 @@ async def leave_session(
     )
     await db.flush()
 
+    remaining = await db.execute(
+        select(func.count(JamParticipant.id)).where(JamParticipant.session_id == session_id)
+    )
+    if (remaining.scalar() or 0) == 0:
+        session.status = JamSessionStatus.ENDED
+        await db.flush()
+
     try:
         r = await get_redis()
         await r.publish(
@@ -205,6 +213,7 @@ async def leave_session(
 async def get_session(
     session_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(JamSession).where(JamSession.id == session_id))
     session = result.scalar_one_or_none()
@@ -223,94 +232,75 @@ async def get_session(
     return _serialize_jam_session(session, participants, users_map)
 
 
+async def _handle_client_message(r, session_id: uuid.UUID, user_id: str, data: dict, websocket: WebSocket) -> None:
+    channel = f"jam:{session_id}"
+    msg_type = data.get("type")
+
+    if msg_type in ("track_changed", "queue_updated"):
+        async with async_session() as db_session:
+            perm_result = await db_session.execute(
+                select(JamParticipant).where(
+                    JamParticipant.session_id == session_id,
+                    JamParticipant.user_id == uuid.UUID(user_id),
+                )
+            )
+            sender = perm_result.scalar_one_or_none()
+        if not sender or sender.role == "GUEST":
+            await websocket.send_text(json.dumps({"type": "error", "message": "Insufficient permissions"}))
+            return
+        if msg_type == "track_changed":
+            # Skip votes only apply to the track that was playing.
+            await r.delete(f"jam:votes:{session_id}")
+        await r.publish(channel, json.dumps({**data, "user_id": user_id}))
+
+    elif msg_type == "vote_skip":
+        vote_key = f"jam:votes:{session_id}"
+        await r.sadd(vote_key, user_id)
+        vote_count = await r.scard(vote_key)
+
+        async with async_session() as db_session:
+            count_result = await db_session.execute(
+                select(func.count(JamParticipant.id)).where(JamParticipant.session_id == session_id)
+            )
+            participant_count = count_result.scalar() or 0
+
+        threshold = (participant_count // 2) + 1
+        if vote_count >= threshold:
+            await r.publish(channel, json.dumps({"type": "track_skipped", "user_id": user_id, "votes": vote_count}))
+            await r.delete(vote_key)
+        else:
+            await r.publish(channel, json.dumps({"type": "vote_update", "votes": vote_count, "threshold": threshold}))
+
+    elif msg_type in ("position_update", "playback_state", "chat"):
+        await r.publish(channel, json.dumps({**data, "user_id": user_id}))
+
+
 @router.websocket("/{session_id}/ws")
 async def jam_websocket(websocket: WebSocket, session_id: uuid.UUID):
     await websocket.accept()
 
     # Authenticate via query param token
     token = websocket.query_params.get("token")
-    if not token:
-        await websocket.close(code=4001, reason="Missing token")
-        return
-
-    from app.core.security import verify_token
-    user_id = verify_token(token, token_type="access")
+    user_id = verify_token(token, token_type="access") if token else None
     if not user_id:
         await websocket.close(code=4001, reason="Invalid token")
         return
 
-    # Subscribe to Redis pub/sub for this session
-    from app.core.database import async_session
+    # Only participants of the session may follow it (it carries the chat).
+    async with async_session() as db_session:
+        member = await db_session.execute(
+            select(JamParticipant.id).where(
+                JamParticipant.session_id == session_id,
+                JamParticipant.user_id == uuid.UUID(user_id),
+            )
+        )
+        if member.scalar_one_or_none() is None:
+            await websocket.close(code=4003, reason="Not a participant of this session")
+            return
+
     r = await get_redis()
-    pubsub = r.pubsub()
-    await pubsub.subscribe(f"jam:{session_id}")
 
-    try:
-        while True:
-            # Check for incoming messages from client
-            try:
-                message = await asyncio.wait_for(websocket.receive_text(), timeout=0.1)
-                data = json.loads(message)
-                msg_type = data.get("type")
+    async def on_client_message(data: dict) -> None:
+        await _handle_client_message(r, session_id, user_id, data, websocket)
 
-                if msg_type in ("track_changed", "queue_updated"):
-                    # Permission check
-                    async with async_session() as db_session:
-                        from sqlalchemy import select as sa_select
-                        perm_result = await db_session.execute(
-                            sa_select(JamParticipant).where(
-                                JamParticipant.session_id == session_id,
-                                JamParticipant.user_id == uuid.UUID(user_id),
-                            )
-                        )
-                        sender = perm_result.scalar_one_or_none()
-                        if not sender or sender.role == "GUEST":
-                            await websocket.send_text(json.dumps({"type": "error", "message": "Insufficient permissions"}))
-                            continue
-
-                    await r.publish(
-                        f"jam:{session_id}",
-                        json.dumps({**data, "user_id": user_id}),
-                    )
-                elif msg_type == "vote_skip":
-                    vote_key = f"jam:votes:{session_id}"
-                    await r.sadd(vote_key, user_id)
-                    vote_count = await r.scard(vote_key)
-
-                    async with async_session() as db_session:
-                        from sqlalchemy import select as sa_select, func
-                        count_result = await db_session.execute(
-                            sa_select(func.count(JamParticipant.id)).where(JamParticipant.session_id == session_id)
-                        )
-                        participant_count = count_result.scalar() or 0
-
-                    threshold = (participant_count // 2) + 1
-                    if vote_count >= threshold:
-                        await r.publish(
-                            f"jam:{session_id}",
-                            json.dumps({"type": "track_skipped", "user_id": user_id, "votes": vote_count}),
-                        )
-                        await r.delete(vote_key)
-                    else:
-                        await r.publish(
-                            f"jam:{session_id}",
-                            json.dumps({"type": "vote_update", "votes": vote_count, "threshold": threshold}),
-                        )
-                elif msg_type in ("position_update", "playback_state", "chat"):
-                    await r.publish(
-                        f"jam:{session_id}",
-                        json.dumps({**data, "user_id": user_id}),
-                    )
-            except Exception:
-                pass
-
-            # Check for messages from Redis pub/sub
-            pub_message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=0.1)
-            if pub_message and pub_message["type"] == "message":
-                await websocket.send_text(pub_message["data"])
-
-    except WebSocketDisconnect:
-        pass
-    finally:
-        await pubsub.unsubscribe(f"jam:{session_id}")
-        await r.aclose()
+    await relay_channel(websocket, f"jam:{session_id}", on_client_message)

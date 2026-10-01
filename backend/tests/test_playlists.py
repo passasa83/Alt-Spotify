@@ -54,14 +54,14 @@ async def test_get_playlist(client: AsyncClient, auth_headers):
     )
     playlist_id = create_resp.json()["id"]
 
-    response = await client.get(f"/api/v1/playlists/{playlist_id}")
+    response = await client.get(f"/api/v1/playlists/{playlist_id}", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["title"] == "Get Playlist"
 
 
-async def test_get_playlist_not_found(client: AsyncClient):
+async def test_get_playlist_not_found(client: AsyncClient, auth_headers):
     fake_id = uuid.uuid4()
-    response = await client.get(f"/api/v1/playlists/{fake_id}")
+    response = await client.get(f"/api/v1/playlists/{fake_id}", headers=auth_headers)
     assert response.status_code == 404
 
 
@@ -130,7 +130,7 @@ async def test_delete_playlist(client: AsyncClient, auth_headers):
     )
     assert response.status_code == 204
 
-    get_resp = await client.get(f"/api/v1/playlists/{playlist_id}")
+    get_resp = await client.get(f"/api/v1/playlists/{playlist_id}", headers=auth_headers)
     assert get_resp.status_code == 404
 
 

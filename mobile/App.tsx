@@ -96,7 +96,7 @@ function MainApp() {
               />
             </>
           )}
-        </NavigationContainer>
+        </Stack.Navigator>
       </NavigationContainer>
     </>
   );

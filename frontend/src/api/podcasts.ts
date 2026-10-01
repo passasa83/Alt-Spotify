@@ -1,4 +1,5 @@
 import client from './client';
+import { withToken } from './tracks';
 import type { Podcast, Episode, PaginatedResponse } from '@/types';
 
 export const getPodcasts = async (page = 1, pageSize = 20, category?: string): Promise<PaginatedResponse<Podcast>> => {
@@ -24,8 +25,13 @@ export const playEpisode = async (episodeId: string): Promise<void> => {
   await client.post(`/podcasts/episodes/${episodeId}/play`);
 };
 
+export const getEpisode = async (episodeId: string): Promise<Episode> => {
+  const response = await client.get(`/podcasts/episodes/${episodeId}`);
+  return response.data;
+};
+
 export const getEpisodeStreamUrl = (podcastId: string, episodeId: string): string => {
-  return `/api/v1/podcasts/${podcastId}/episodes/${episodeId}/stream`;
+  return withToken(`/api/v1/podcasts/${podcastId}/episodes/${episodeId}/stream`);
 };
 
 export const createPodcast = async (data: {

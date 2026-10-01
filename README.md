@@ -54,10 +54,13 @@ cp .env.example .env
 # 3. Lancer tous les services
 docker compose up -d
 
-# 4. Accéder à l'application
-# Frontend  → http://localhost:3000
-# API Docs  → http://localhost:8000/docs
-# MinIO     → http://localhost:9001
+# 4. Accéder à l'application (depuis cette machine ou depuis le LAN)
+# Frontend  → http://localhost:3000      ou http://<IP_MACHINE>:3000
+# API Docs  → http://localhost:8000/docs ou http://<IP_MACHINE>:8000/docs
+# MinIO     → http://localhost:9001      ou http://<IP_MACHINE>:9001
+# Les ports sont publiés sur BIND_IP (0.0.0.0 par défaut = toutes les
+# interfaces), donc joignables via l'IP de la machine, comme la plupart des
+# stacks Docker. Mettre une IP fixe dans BIND_IP pour restreindre l'accès.
 ```
 
 ## Variables d'environnement
@@ -71,6 +74,8 @@ Voir `.env.example` pour la liste complète. Variables critiques :
 | `MINIO_ACCESS_KEY` | Clé d'accès MinIO |
 | `MINIO_SECRET_KEY` | Clé secrète MinIO |
 | `MEILI_MASTER_KEY` | Clé maître Meilisearch |
+| `BIND_IP` | IP de publication des ports (défaut `0.0.0.0` → IP de la machine) |
+| `BASE_URL` | URL de base des liens générés : partage, invitations (jamais `localhost` hors de la machine) |
 
 ## Structure du projet
 
@@ -98,7 +103,7 @@ Alt-Spotify/
 │   └── src/
 ├── worker/             # Celery workers (transcodage FFmpeg)
 ├── monitoring/         # Prometheus + Grafana
-├── traefik/            # Configuration reverse proxy
+├── nginx/             # Exemple de config reverse proxy (voir ci-dessous)
 ├── scripts/            # Scripts utilitaires (backup, setup)
 └── docker-compose.yml  # Orchestration Docker
 ```
@@ -129,12 +134,176 @@ cd backend && pytest -v
 cd frontend && npm test
 ```
 
+## Reverse proxy (nginx)
+
+Les ports publiés (frontend `3000`, backend `8000`, MinIO `9000`/`9001`) le sont
+sur `BIND_IP`, `0.0.0.0` par défaut : ils sont donc joignables **via l'IP de la
+machine**, comme dans la plupart des stacks Docker. PostgreSQL, Redis,
+Meilisearch et les workers, eux, ne sont raccordés qu'au réseau interne
+`backend-net` et ne publient rien.
+
+`backend` et `frontend` rejoignent en plus le réseau Docker partagé avec votre
+reverse proxy externe, où ils sont joignables sous `backend:8000` et
+`frontend:80` :
+
+**1. Partager le réseau — deux modes :**
+
+| | `.env` de ce stack | Compose du reverse proxy | Ordre de démarrage |
+|---|---|---|---|
+| **A** — le proxy rejoint le stack (défaut) | `PROXY_NETWORK=altspotify-proxy` | ajouter le réseau en `external: true` | le stack doit avoir créé le réseau |
+| **B** — le stack rejoint le proxy | `PROXY_NETWORK=npm-network` + `PROXY_EXTERNAL=true` | aucune modification | aucun |
+
+**Mode A — rejoindre le réseau depuis le compose du reverse proxy :**
+
+```yaml
+services:
+  nginx:
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: altspotify-proxy   # valeur de PROXY_NETWORK dans le .env
+```
+
+**Mode B — rejoindre le réseau du reverse proxy (le sien existe déjà) :**
+
+```env
+PROXY_NETWORK=npm-network    # le réseau déclaré external: true par le proxy
+PROXY_EXTERNAL=true
+```
+
+**2. Proxy API + WebSockets (dans votre `server` block) :**
+
+```nginx
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+location /api/ {
+    proxy_pass              http://backend:8000;
+    proxy_set_header        Host              $host;
+    proxy_set_header        X-Real-IP         $remote_addr;
+    # Edge = on écrase (et on n'append pas) : uvicorn lit la PREMIÈRE entrée.
+    proxy_set_header        X-Forwarded-For   $remote_addr;
+    proxy_set_header        X-Forwarded-Proto $scheme;
+    proxy_http_version      1.1;
+    proxy_read_timeout      300s;
+    client_max_body_size    100m;   # uploads audio (100 Mo max)
+}
+
+# WebSockets : /api/v1/notifications/ws et /api/v1/jam/{id}/ws
+location ~ ^/api/v1/(notifications|jam)/.*ws$ {
+    proxy_pass              http://backend:8000;
+    proxy_http_version      1.1;
+    proxy_set_header        Upgrade             $http_upgrade;
+    proxy_set_header        Connection          $connection_upgrade;
+    proxy_set_header        Host                $host;
+    proxy_set_header        X-Forwarded-For     $remote_addr;
+    proxy_set_header        X-Forwarded-Proto   $scheme;
+    proxy_read_timeout      86400s;   # pas de heartbeat sur ces sockets
+}
+```
+
+Le frontend se sert sur `http://frontend:80`.
+
+**Pourquoi c'est important :**
+
+- uvicorn tourne avec `--proxy-headers --forwarded-allow-ips=*` : le rate
+  limiting est cléé sur `request.client.host`, donc sans ces flags **tous les
+  visiteurs partagent l'IP du proxy** (100 req/min global, 10 req/min sur
+  l'auth).
+- Comme tout le monde est "trusted", un client qui atteindrait `backend:8000`
+  directement pourrait spoof `X-Forwarded-For` : d'où le bind `127.0.0.1` et le
+  réseau `proxy` réservé au reverse proxy.
+- `nginx/nginx.conf` est un exemple de config complète (front + API) ; le vrai
+  reverse proxy vit dans son propre projet Docker.
+
+### Avec Nginx Proxy Manager
+
+NPM tourne dans son propre compose avec son réseau `npm-network` (déjà déclaré
+`external: true`) : le plus simple est le **mode B** — ce stack rejoint
+`npm-network`, le compose de NPM reste intact :
+
+```env
+PROXY_NETWORK=npm-network
+PROXY_EXTERNAL=true
+```
+
+Puis `docker compose up -d` ici (`docker network create npm-network` si le
+réseau n'existe pas encore). Vérifié en conditions réelles : les conteneurs
+passent sur `npm-network` et, depuis un container posé sur ce réseau, `frontend`
+répond HTTP 200 et `backend` `/health` → `{"status":"ok"}` — les noms de service
+y sont bien résolus.
+
+Alternative (**mode A**) : laisser `PROXY_NETWORK=altspotify-proxy` et ajouter
+dans le compose de NPM :
+
+```yaml
+services:
+  npm:
+    # ... inchangé ...
+    networks:
+      - npm-network
+      - altspotify-proxy          # ajouté
+
+networks:
+  npm-network:
+    external: true
+  altspotify-proxy:               # ajouté
+    external: true
+    name: altspotify-proxy
+```
+
+Puis `docker compose up -d` dans le dossier de NPM. Le réseau doit déjà exister
+(sinon : `network "altspotify-proxy" not found` → lance d'abord ce stack), et
+surtout **ce stack doit rester démarré** : un `docker compose down` de ce côté
+supprime le réseau et NPM échouera au prochain boot.
+
+**Un seul Proxy Host suffit** — le nginx du conteneur `frontend` relaie déjà
+`/api/` vers `backend:8000` :
+
+| Champ | Valeur |
+|---|---|
+| Domain Names | `app.exemple.com` |
+| Forward Scheme / Host | `http` → `frontend:80` |
+| Websockets Support | ✓ requis (`/api/v1/notifications/ws`, `/api/v1/jam/{id}/ws`) |
+| SSL | Let's Encrypt |
+
+Onglet **Advanced** :
+
+```nginx
+client_max_body_size 100m;                     # uploads audio (100 Mo max)
+proxy_set_header X-Forwarded-For $remote_addr; # uvicorn lit la 1re entrée
+```
+
+- `client_max_body_size` se pose **sur NPM** : sinon nginx rejette les uploads
+  de plus de 1 Mo avant qu'ils n'atteignent le conteneur.
+- NPM fait un append de l'IP (`$proxy_add_x_forwarded_for`) : un client peut
+  préfaire le header et spoofer son IP pour contourner le rate limiting — d'où
+  l'écrasement par `$remote_addr`. À retirer si NPM est lui-même derrière
+  Cloudflare.
+- Alternative : `app.exemple.com` → `frontend:80` **+**
+  `app.exemple.com/api` → `backend:8000` (saute le nginx du front). Un
+  sous-domaine `api.exemple.com` → `backend:8000` impose d'ajouter l'origine du
+  front dans `CORS_ORIGINS`.
+- NPM sur **une autre machine** : impossible de partager un réseau Docker, mais
+  les ports sont publiés sur `BIND_IP` — viser `http://<IP_MACHINE>:3000` (ou
+  `:8000` pour l'API directement).
+- **Téléchargement hors-ligne du mobile** : `offline.py` génère des URLs
+  pré-signées MinIO dont l'hôte vient de `MINIO_ENDPOINT` (`minio:9000` par
+  défaut, non résolvable depuis un téléphone). Pour l'activer, poser
+  `MINIO_ENDPOINT=<IP_MACHINE>:9000` : testé joignable depuis un container
+  comme depuis le LAN, les ports `9000`/`9001` étant publiés sur `BIND_IP`.
+
 ## Déploiement NAS + VPS
 
 Pour un déploiement hybride (NAS local + VPS cloud) :
 
 1. **NAS** : Héberger MinIO, PostgreSQL, Redis, Meilisearch, Celery workers, FFmpeg
-2. **VPS** : Héberger Traefik (reverse proxy + SSL) et l'API FastAPI
+2. **VPS** : Héberger nginx (reverse proxy + SSL) et l'API FastAPI
 3. **Tunnel** : Connecter NAS ↔ VPS via Tailscale ou WireGuard
 
 ## Licence

@@ -1,8 +1,29 @@
 import client from './client';
 import type { Track, PaginatedResponse } from '@/types';
 
+export interface UploadResult {
+  track_id: string;
+  task_id?: string;
+  status?: string;
+  message?: string;
+}
+export const resolveCoverUrl = (url: string | null | undefined): string => {
+  if (!url) return '/placeholder-album.svg';
+  if (url.startsWith('local_cover:')) {
+    const token = localStorage.getItem('access_token');
+    const path = url.substring('local_cover:'.length);
+    return `/api/v1/local/covers${path.startsWith('/') ? path : `/${path}`}${token ? `?token=${token}` : ''}`;
+  }
+  return url;
+};
+
 export const getTracks = async (page = 1, pageSize = 20): Promise<PaginatedResponse<Track>> => {
   const response = await client.get('/tracks', { params: { page, page_size: pageSize } });
+  return response.data;
+};
+
+export const getLocalTracks = async (page = 1, pageSize = 50): Promise<PaginatedResponse<Track>> => {
+  const response = await client.get('/tracks', { params: { page, page_size: pageSize, local_only: true, sort: 'created_at', order: 'desc' } });
   return response.data;
 };
 
@@ -20,15 +41,23 @@ export const searchTracks = async (query: string): Promise<Track[]> => {
   return response.data.items;
 };
 
-export const getTrackStreamUrl = (trackId: string): string => {
-  return `/api/v1/tracks/${trackId}/stream`;
+// <audio> can't send an Authorization header: media URLs carry the token.
+export const withToken = (url: string): string => {
+  const token = localStorage.getItem('access_token');
+  return token ? `${url}?token=${encodeURIComponent(token)}` : url;
 };
 
+export const getTrackStreamUrl = (trackId: string): string => {
+  return withToken(`/api/v1/tracks/${trackId}/stream`);
+};
+
+// No token in the URL: HLS.js authenticates each request with a header, and
+// relative playlist/segment URLs would drop the query string anyway.
 export const getHlsStreamUrl = (trackId: string): string => {
   return `/api/v1/stream/${trackId}/master.m3u8`;
 };
 
-export const uploadTrack = async (file: File, metadata: Record<string, any>): Promise<Track> => {
+export const uploadTrack = async (file: File, metadata: Record<string, any>): Promise<UploadResult> => {
   const formData = new FormData();
   formData.append('file', file);
   Object.entries(metadata).forEach(([key, value]) => {
@@ -61,5 +90,18 @@ export const uploadLyrics = async (trackId: string, file: File): Promise<{ messa
   const response = await client.post(`/upload/lyrics/${trackId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+  return response.data;
+};
+
+export const fetchFromYoutube = async (trackId: string, youtubeUrl?: string): Promise<any> => {
+  const response = await client.post(`/tracks/${trackId}/fetch-youtube`, youtubeUrl ? { youtube_url: youtubeUrl } : {});
+  return response.data;
+};
+
+export const fetchFromYoutubeUrl = async (youtubeUrl: string, title?: string, artist?: string): Promise<any> => {
+  const params = new URLSearchParams({ youtube_url: youtubeUrl });
+  if (title) params.append('title', title);
+  if (artist) params.append('artist', artist);
+  const response = await client.post(`/tracks/fetch-url?${params.toString()}`);
   return response.data;
 };

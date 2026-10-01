@@ -17,8 +17,9 @@ const Login = () => {
     try {
       await login(email, password);
       navigate('/');
-    } catch {
-      setError(t('auth.invalid_credentials'));
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setError(detail || t('auth.invalid_credentials'));
     }
   };
 

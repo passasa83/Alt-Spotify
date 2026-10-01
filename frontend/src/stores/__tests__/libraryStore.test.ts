@@ -8,6 +8,13 @@ vi.mock('@/api/playlists', () => ({
   deletePlaylist: vi.fn(),
 }));
 
+vi.mock('@/api/favorites', () => ({
+  getFavorites: vi.fn(),
+  addFavorite: vi.fn().mockResolvedValue({}),
+  removeFavorite: vi.fn().mockResolvedValue({}),
+  checkFavorite: vi.fn(),
+}));
+
 import * as playlistsApi from '@/api/playlists';
 
 const mockGetPlaylists = vi.mocked(playlistsApi.getPlaylists);
@@ -18,6 +25,7 @@ const createTrack = (id: string, title = 'Test Track'): Track => ({
   artist_id: 'artist-1',
   duration_seconds: 180,
   play_count: 0,
+  is_explicit: false,
   created_at: '2024-01-01',
 });
 
@@ -57,29 +65,28 @@ describe('libraryStore', () => {
     expect(useLibraryStore.getState().isLoading).toBe(false);
   });
 
-  it('addToFavorites adds track', () => {
+  it('addToFavorites adds track', async () => {
     const track = createTrack('1');
-    useLibraryStore.getState().addToFavorites(track);
+    await useLibraryStore.getState().addToFavorites(track);
 
     expect(useLibraryStore.getState().favorites).toEqual([track]);
-    expect(JSON.parse(localStorage.getItem('favorites') || '[]')).toEqual([track]);
   });
 
-  it('addToFavorites does not duplicate', () => {
+  it('addToFavorites does not duplicate', async () => {
     const track = createTrack('1');
-    useLibraryStore.getState().addToFavorites(track);
-    useLibraryStore.getState().addToFavorites(track);
+    await useLibraryStore.getState().addToFavorites(track);
+    await useLibraryStore.getState().addToFavorites(track);
 
     expect(useLibraryStore.getState().favorites).toHaveLength(1);
   });
 
-  it('removeFromFavorites removes track', () => {
+  it('removeFromFavorites removes track', async () => {
     const track1 = createTrack('1');
     const track2 = createTrack('2');
-    useLibraryStore.getState().addToFavorites(track1);
-    useLibraryStore.getState().addToFavorites(track2);
+    await useLibraryStore.getState().addToFavorites(track1);
+    await useLibraryStore.getState().addToFavorites(track2);
 
-    useLibraryStore.getState().removeFromFavorites('1');
+    await useLibraryStore.getState().removeFromFavorites('1');
 
     expect(useLibraryStore.getState().favorites).toHaveLength(1);
     expect(useLibraryStore.getState().favorites[0].id).toBe('2');
