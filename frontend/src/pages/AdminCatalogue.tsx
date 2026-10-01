@@ -1,66 +1,146 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Trash2 } from 'lucide-react';
 import { getTracks } from '@/api/tracks';
+import { purgeUnplayableTracks } from '@/api/admin';
 import type { PaginatedResponse, Track } from '@/types';
 import TrackList from '@/components/TrackList';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useToastStore } from '@/stores/toastStore';
+
+type AudioFilter = 'all' | 'playable' | 'unplayable';
+
+const FILTER_PARAM: Record<AudioFilter, boolean | undefined> = {
+  all: undefined,
+  playable: true,
+  unplayable: false,
+};
 
 const AdminCatalogue = () => {
   const { t } = useTranslation();
+  const addToast = useToastStore((s) => s.addToast);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<AudioFilter>('all');
+  const [purgeable, setPurgeable] = useState<number | null>(null);
+  const [purging, setPurging] = useState(false);
 
-  const fetchTracks = useCallback(async (p: number) => {
+  const fetchTracks = useCallback(async (p: number, f: AudioFilter) => {
     setLoading(true);
     try {
-      const data: PaginatedResponse<Track> = await getTracks(p, 20);
+      const data: PaginatedResponse<Track> = await getTracks(p, 20, { playable: FILTER_PARAM[f] });
       setTracks(data.items);
-      setTotalPages(data.pages);
-    } catch (err) {
+      setTotalPages(Math.max(1, data.pages));
+      setTotal(data.total);
+    } catch {
       console.error('Failed to load tracks');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchTracks(page);
-  }, [page, fetchTracks]);
+  const refreshPurgeable = useCallback(async () => {
+    try {
+      setPurgeable((await purgeUnplayableTracks(true)).count);
+    } catch {
+      setPurgeable(null);
+    }
+  }, []);
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-green-500 border-t-transparent" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    fetchTracks(page, filter);
+  }, [page, filter, fetchTracks]);
+
+  useEffect(() => {
+    refreshPurgeable();
+  }, [refreshPurgeable]);
+
+  const handlePurge = async () => {
+    if (!purgeable || !confirm(t('admin.purge_confirm', { count: purgeable }))) return;
+    setPurging(true);
+    try {
+      const { deleted } = await purgeUnplayableTracks(false);
+      addToast(t('admin.purge_done', { count: deleted }));
+      await Promise.all([fetchTracks(page, filter), refreshPurgeable()]);
+    } catch {
+      addToast(t('admin.purge_error'));
+    } finally {
+      setPurging(false);
+    }
+  };
+
+  const filters: { value: AudioFilter; label: string }[] = [
+    { value: 'all', label: t('admin.filter_all') },
+    { value: 'playable', label: t('admin.filter_playable') },
+    { value: 'unplayable', label: t('admin.filter_unplayable') },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">{t('admin.catalogue')}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold text-white">{t('admin.catalogue')}</h1>
+          <p className="text-sm text-gray-400">{t('admin.catalogue_count', { count: total })}</p>
+        </div>
+        <button
+          onClick={handlePurge}
+          disabled={!purgeable || purging}
+          className="flex items-center gap-2 rounded-full bg-gray-800 px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 disabled:opacity-40"
+          title={t('admin.purge_hint')}
+        >
+          <Trash2 size={16} aria-hidden="true" />
+          {purging ? t('admin.purging') : t('admin.purge_button', { count: purgeable ?? 0 })}
+        </button>
       </div>
-      
-      <div className="rounded-lg bg-gray-900 p-4">
-        <TrackList tracks={tracks} onRefresh={() => fetchTracks(page)} />
+
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label={t('admin.catalogue')}>
+        {filters.map(({ value, label }) => (
+          <button
+            key={value}
+            role="tab"
+            aria-selected={filter === value}
+            onClick={() => {
+              setFilter(value);
+              setPage(1);
+            }}
+            className={`rounded-full px-3 py-1.5 text-sm ${
+              filter === value ? 'bg-white text-black' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
-      
+
+      {loading ? (
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-green-500 border-t-transparent" />
+        </div>
+      ) : (
+        <div className="rounded-lg bg-gray-900 p-4">
+          <TrackList tracks={tracks} onRefresh={() => fetchTracks(page, filter)} />
+        </div>
+      )}
+
       <div className="flex items-center justify-center gap-4">
-        <button 
-          onClick={() => setPage(p => Math.max(1, p - 1))}
+        <button
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page === 1}
           className="rounded-full bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          Previous
+          {t('action.back')}
         </button>
-        <span className="text-sm text-gray-400">Page {page} of {totalPages}</span>
-        <button 
-          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+        <span className="text-sm text-gray-400">
+          {page} / {totalPages}
+        </span>
+        <button
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           disabled={page === totalPages}
           className="rounded-full bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          Next
+          {t('player.next')}
         </button>
       </div>
     </div>

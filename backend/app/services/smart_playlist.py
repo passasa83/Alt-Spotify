@@ -24,7 +24,8 @@ SMART_RULE_TYPES = {
 def _build_track_query(rules: dict, user_id: uuid.UUID, db: AsyncSession):
     """Build a SQLAlchemy query based on smart playlist rules."""
     query = select(Track).distinct()
-    conditions = []
+    # Only tracks that can actually be played (search leftovers have no audio).
+    conditions = [or_(Track.file_url.isnot(None), Track.hls_path.isnot(None))]
 
     if "genre" in rules:
         genre_rules = rules["genre"]

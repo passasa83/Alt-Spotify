@@ -22,7 +22,7 @@ const Home = () => {
     const loadData = async () => {
       try {
         const [tracksRes, artistsRes, playlistsRes] = await Promise.all([
-          getTracks(1, 10),
+          getTracks(1, 10, { playable: true }),
           getArtists(1, 8),
           getPlaylists(1, 8),
         ]);

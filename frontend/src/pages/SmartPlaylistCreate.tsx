@@ -15,6 +15,7 @@ const SmartPlaylistCreate = () => {
   const [title, setTitle] = useState('');
   const [maxTracks, setMaxTracks] = useState(50);
   const [rules, setRules] = useState<Rule[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const addRule = () => {
@@ -57,6 +58,12 @@ const SmartPlaylistCreate = () => {
 
   const handleSave = async () => {
     if (!title.trim()) return;
+    // An empty rule is dropped from the payload: no rule left means "everything".
+    if (Object.keys(buildRulesPayload()).length === 0) {
+      setError(t('smart.rule_required'));
+      return;
+    }
+    setError(null);
     setSaving(true);
     try {
       const token = localStorage.getItem('access_token');
@@ -75,6 +82,8 @@ const SmartPlaylistCreate = () => {
       if (resp.ok) {
         const data = await resp.json();
         navigate(`/playlist/${data.id}`);
+      } else {
+        setError(t('smart.create_error'));
       }
     } finally {
       setSaving(false);
@@ -173,6 +182,12 @@ const SmartPlaylistCreate = () => {
             <Plus size={14} /> {t('smart.add_rule')}
           </button>
         </div>
+
+        {error && (
+          <p role="alert" className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            {error}
+          </p>
+        )}
 
         <button
           onClick={handleSave}

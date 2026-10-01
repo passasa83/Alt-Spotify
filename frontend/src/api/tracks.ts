@@ -17,8 +17,13 @@ export const resolveCoverUrl = (url: string | null | undefined): string => {
   return url;
 };
 
-export const getTracks = async (page = 1, pageSize = 20): Promise<PaginatedResponse<Track>> => {
-  const response = await client.get('/tracks', { params: { page, page_size: pageSize } });
+// `playable`: true = only tracks with audio, false = only tracks without.
+export const getTracks = async (
+  page = 1,
+  pageSize = 20,
+  opts: { playable?: boolean } = {},
+): Promise<PaginatedResponse<Track>> => {
+  const response = await client.get('/tracks', { params: { page, page_size: pageSize, playable: opts.playable } });
   return response.data;
 };
 

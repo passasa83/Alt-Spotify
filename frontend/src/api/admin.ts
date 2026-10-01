@@ -61,6 +61,7 @@ export interface AdminOverview {
     hls: number;
     missing_files: number;
     missing_examples: string[];
+    purgeable?: number;
   };
   music_dirs: MusicDirStatus[];
   services: Record<string, { ok: boolean; detail?: string | null }>;
@@ -200,4 +201,10 @@ export async function createInvite(
 
 export async function revokeInvite(inviteId: string): Promise<void> {
   await client.delete(`/admin/invites/${inviteId}`);
+}
+
+/** Tracks without audio that nothing uses. `dryRun` only counts them. */
+export async function purgeUnplayableTracks(dryRun: boolean): Promise<{ count: number; deleted: number }> {
+  const response = await client.post('/admin/catalogue/purge-unplayable', null, { params: { dry_run: dryRun } });
+  return response.data;
 }

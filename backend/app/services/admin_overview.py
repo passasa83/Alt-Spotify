@@ -200,6 +200,10 @@ def _checks(catalogue: dict, dirs: list[dict], services: dict, users: dict) -> l
         add("playback", "error", "missing_files", missing=catalogue["missing_files"], total=catalogue["local_files"])
     elif catalogue["local_files"]:
         add("playback", "ok", "files_ok", total=catalogue["local_files"])
+    if catalogue.get("purgeable"):
+        add("playback", "warning", "catalogue_clutter", count=catalogue["purgeable"])
+    else:
+        add("playback", "ok", "catalogue_clean")
     if catalogue["hls"]:
         add("playback", "ok", "hls_ok", count=catalogue["hls"])
     elif catalogue["total"] > catalogue["no_audio"]:
@@ -259,6 +263,7 @@ def _areas(checks: list[dict]) -> list[dict]:
 async def get_overview(db: AsyncSession) -> dict:
     users = await _users_summary(db)
     catalogue = await _catalogue_summary(db)
+    catalogue["purgeable"] = (await purge_unplayable_tracks(db, dry_run=True))["count"]
     dirs = []
     for setting, path in music_dirs():
         info = await asyncio.to_thread(_inspect_dir, path)
@@ -279,3 +284,30 @@ async def get_overview(db: AsyncSession) -> dict:
             {"level": c["status"], "code": c["code"], "params": c["params"]} for c in checks if c["status"] != "ok"
         ],
     }
+
+
+async def purge_unplayable_tracks(db: AsyncSession, dry_run: bool = True) -> dict:
+    """Tracks without audio that nothing points to (search leftovers).
+
+    Kept: tracks in a playlist, a favorite, someone's history or a jam, so
+    nothing a user saved disappears. ``dry_run`` only counts them.
+    """
+    from sqlalchemy import delete, exists
+
+    from app.models.favorite import Favorite
+    from app.models.jam import JamSession
+    from app.models.playlist_track import PlaylistTrack
+
+    unplayable = select(Track.id).where(
+        Track.file_url.is_(None),
+        Track.hls_path.is_(None),
+        ~exists().where(PlaylistTrack.track_id == Track.id),
+        ~exists().where(ListeningHistory.track_id == Track.id),
+        ~exists().where(Favorite.entity_type == "track", Favorite.entity_id == Track.id),
+        ~exists().where(JamSession.current_track_id == Track.id),
+    )
+    ids = list((await db.execute(unplayable)).scalars().all())
+    if not dry_run and ids:
+        await db.execute(delete(Track).where(Track.id.in_(ids)))
+        await db.flush()
+    return {"count": len(ids), "deleted": 0 if dry_run else len(ids)}

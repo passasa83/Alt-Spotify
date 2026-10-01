@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -80,6 +80,20 @@ def _track_to_response(track: Track, artist_name: str = "", artist_image_url: st
         play_count=track.play_count,
         created_at=track.created_at or datetime.now(timezone.utc).replace(tzinfo=None),
     )
+
+
+async def _find_existing_track(db: AsyncSession, isrc: str | None, title: str, artist_name: str) -> Track | None:
+    """Exact match only (same ISRC, or same title and artist): no fuzzy guess."""
+    if isrc:
+        found = (await db.execute(select(Track).where(Track.isrc == isrc).limit(1))).scalars().first()
+        if found:
+            return found
+    artist_ids = select(Artist.id).where(func.lower(Artist.name) == artist_name.lower()).scalar_subquery()
+    return (
+        await db.execute(
+            select(Track).where(func.lower(Track.title) == title.lower(), Track.artist_id.in_(artist_ids)).limit(1)
+        )
+    ).scalars().first()
 
 
 async def _find_local_track(db: AsyncSession, isrc: str | None, title: str, artist_name: str) -> Track | None:
@@ -327,6 +341,17 @@ async def search(
                     else:
                         if ext_dedup_key not in seen_keys:
                             artist_picture = ext.get("artist_picture")
+                            # Reuse the row an earlier search created instead of
+                            # adding one more empty track per search.
+                            existing = await _find_existing_track(db, ext.get("isrc"), ext["title"], ext["artist"])
+                            if existing is not None:
+                                if str(existing.id) not in seen_track_ids:
+                                    tracks.append(_track_to_response(existing, ext["artist"], artist_picture))
+                                    seen_track_ids.add(str(existing.id))
+                                seen_keys.add(ext_dedup_key)
+                                if ext_isrc:
+                                    seen_isrcs.add(ext_isrc)
+                                continue
                             artist_id = await ensure_artist(db, ext["artist"], artist_picture)
                             stub = Track(
                                 title=ext["title"],

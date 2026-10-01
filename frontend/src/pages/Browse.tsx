@@ -29,13 +29,13 @@ const Browse = () => {
       setLoading(true);
       try {
         if (tab === 'new') {
-          const res = await client.get('/tracks', { params: { sort: 'created_at', order: 'desc', page_size: 50 } });
+          const res = await client.get('/tracks', { params: { sort: 'created_at', order: 'desc', page_size: 50, playable: true } });
           setTracks(res.data.items || res.data);
         } else if (tab === 'trending') {
-          const res = await client.get('/tracks', { params: { sort: 'play_count', order: 'desc', page_size: 50 } });
+          const res = await client.get('/tracks', { params: { sort: 'play_count', order: 'desc', page_size: 50, playable: true } });
           setTracks(res.data.items || res.data);
         } else if (tab === 'genres' && selectedGenre) {
-          const res = await client.get('/tracks', { params: { genre: selectedGenre, page_size: 50 } });
+          const res = await client.get('/tracks', { params: { genre: selectedGenre, page_size: 50, playable: true } });
           setTracks(res.data.items || res.data);
         }
       } catch {

@@ -5,7 +5,7 @@ from typing import Literal
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import String, cast, func, select, update
+from sqlalchemy import String, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -50,6 +50,8 @@ async def list_tracks(
     album_id: uuid.UUID | None = None,
     genre: str | None = None,
     local_only: bool = False,
+    # True: only tracks with audio; False: only tracks without (catalogue cleanup).
+    playable: bool | None = None,
     min_duration: int | None = None,
     max_duration: int | None = None,
     min_bpm: float | None = None,
@@ -113,6 +115,11 @@ async def list_tracks(
         local_filter = Track.file_url.like("local:%")
         query = query.where(local_filter)
         count_query = count_query.where(local_filter)
+    if playable is not None:
+        has_audio = or_(Track.file_url.isnot(None), Track.hls_path.isnot(None))
+        audio_filter = has_audio if playable else ~has_audio
+        query = query.where(audio_filter)
+        count_query = count_query.where(audio_filter)
 
     total = (await db.execute(count_query)).scalar() or 0
     sort_column = getattr(Track, sort)

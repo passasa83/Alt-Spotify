@@ -406,6 +406,9 @@ async def create_smart_playlist(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Without a rule the playlist would just be "the whole catalogue".
+    if not body.rules:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one complete rule is required")
     playlist = Playlist(
         title=body.title,
         owner_id=current_user.id,
