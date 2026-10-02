@@ -14,7 +14,7 @@ from app.models.playlist import Playlist
 from app.models.track import Track
 from app.models.user import User, UserRole
 from app.schemas.user import UserResponse
-from app.services.admin_overview import get_overview, purge_unplayable_tracks
+from app.services.admin_overview import get_overview, merge_missing_duplicates, purge_unplayable_tracks
 from app.utils.deps import require_admin
 from app.utils.storage import get_storage_used
 
@@ -141,6 +141,16 @@ async def purge_unplayable(
 ):
     """Delete tracks without audio that no playlist, favorite or history uses."""
     return await purge_unplayable_tracks(db, dry_run=dry_run)
+
+
+@router.post("/catalogue/merge-missing-duplicates")
+async def merge_missing(
+    dry_run: bool = Query(True, description="Only count what would be merged"),
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Merge tracks whose file is missing into the identical track that still exists."""
+    return await merge_missing_duplicates(db, dry_run=dry_run)
 
 
 @router.get("/overview")

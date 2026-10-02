@@ -135,6 +135,11 @@ const AdminOverview = () => {
             <span><span className="text-red-400">■</span> {c.missing_files} {t('admin.catalogue_missing')}</span>
             <span><span className="text-gray-400">■</span> {c.no_audio} {t('admin.catalogue_no_audio')}</span>
           </p>
+          {!!c.mergeable && (
+            <Link to="/admin/catalogue" className="mt-3 mr-4 inline-block text-sm text-green-400 hover:underline">
+              {t('admin.merge_button', { count: c.mergeable })} →
+            </Link>
+          )}
           {!!c.purgeable && (
             <Link to="/admin/catalogue" className="mt-3 inline-block text-sm text-green-400 hover:underline">
               {t('admin.purge_button', { count: c.purgeable })} →

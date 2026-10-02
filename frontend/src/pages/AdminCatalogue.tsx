@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Merge } from 'lucide-react';
 import { getTracks } from '@/api/tracks';
-import { purgeUnplayableTracks } from '@/api/admin';
+import { purgeUnplayableTracks, mergeMissingDuplicates } from '@/api/admin';
 import type { PaginatedResponse, Track } from '@/types';
 import TrackList from '@/components/TrackList';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -26,6 +26,8 @@ const AdminCatalogue = () => {
   const [filter, setFilter] = useState<AudioFilter>('all');
   const [purgeable, setPurgeable] = useState<number | null>(null);
   const [purging, setPurging] = useState(false);
+  const [mergeable, setMergeable] = useState<number | null>(null);
+  const [merging, setMerging] = useState(false);
 
   const fetchTracks = useCallback(async (p: number, f: AudioFilter) => {
     setLoading(true);
@@ -53,9 +55,32 @@ const AdminCatalogue = () => {
     fetchTracks(page, filter);
   }, [page, filter, fetchTracks]);
 
+  const refreshMergeable = useCallback(async () => {
+    try {
+      setMergeable((await mergeMissingDuplicates(true)).count);
+    } catch {
+      setMergeable(null);
+    }
+  }, []);
+
   useEffect(() => {
     refreshPurgeable();
-  }, [refreshPurgeable]);
+    refreshMergeable();
+  }, [refreshPurgeable, refreshMergeable]);
+
+  const handleMerge = async () => {
+    if (!mergeable || !confirm(t('admin.merge_confirm', { count: mergeable }))) return;
+    setMerging(true);
+    try {
+      const { merged } = await mergeMissingDuplicates(false);
+      addToast(t('admin.merge_done', { count: merged }));
+      await Promise.all([fetchTracks(page, filter), refreshMergeable(), refreshPurgeable()]);
+    } catch {
+      addToast(t('admin.merge_error'));
+    } finally {
+      setMerging(false);
+    }
+  };
 
   const handlePurge = async () => {
     if (!purgeable || !confirm(t('admin.purge_confirm', { count: purgeable }))) return;
@@ -84,6 +109,16 @@ const AdminCatalogue = () => {
           <h1 className="text-3xl font-bold text-white">{t('admin.catalogue')}</h1>
           <p className="text-sm text-gray-400">{t('admin.catalogue_count', { count: total })}</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        <button
+          onClick={handleMerge}
+          disabled={!mergeable || merging}
+          className="flex items-center gap-2 rounded-full bg-gray-800 px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 disabled:opacity-40"
+          title={t('admin.merge_hint')}
+        >
+          <Merge size={16} aria-hidden="true" />
+          {merging ? t('admin.merging') : t('admin.merge_button', { count: mergeable ?? 0 })}
+        </button>
         <button
           onClick={handlePurge}
           disabled={!purgeable || purging}
@@ -93,6 +128,7 @@ const AdminCatalogue = () => {
           <Trash2 size={16} aria-hidden="true" />
           {purging ? t('admin.purging') : t('admin.purge_button', { count: purgeable ?? 0 })}
         </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2" role="tablist" aria-label={t('admin.catalogue')}>

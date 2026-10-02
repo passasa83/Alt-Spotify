@@ -198,6 +198,8 @@ def _checks(catalogue: dict, dirs: list[dict], services: dict, users: dict) -> l
             add("playback", "ok", "music_dir_ok", count=d["audio_files"], **params)
     if catalogue["missing_files"]:
         add("playback", "error", "missing_files", missing=catalogue["missing_files"], total=catalogue["local_files"])
+    if catalogue.get("mergeable"):
+        add("playback", "warning", "duplicate_missing", count=catalogue["mergeable"])
     elif catalogue["local_files"]:
         add("playback", "ok", "files_ok", total=catalogue["local_files"])
     if catalogue.get("purgeable"):
@@ -264,6 +266,7 @@ async def get_overview(db: AsyncSession) -> dict:
     users = await _users_summary(db)
     catalogue = await _catalogue_summary(db)
     catalogue["purgeable"] = (await purge_unplayable_tracks(db, dry_run=True))["count"]
+    catalogue["mergeable"] = (await merge_missing_duplicates(db, dry_run=True))["count"] if catalogue["missing_files"] else 0
     dirs = []
     for setting, path in music_dirs():
         info = await asyncio.to_thread(_inspect_dir, path)
@@ -311,3 +314,115 @@ async def purge_unplayable_tracks(db: AsyncSession, dry_run: bool = True) -> dic
         await db.execute(delete(Track).where(Track.id.in_(ids)))
         await db.flush()
     return {"count": len(ids), "deleted": 0 if dry_run else len(ids)}
+
+
+_KNOWN_ROOTS = ("/music", "/app/downloads")
+
+
+def _relative_key(path: str, roots: list[str]) -> str:
+    """Path relative to its music root, so /music/X and /app/downloads/X match.
+
+    Unknown roots fall back to the last three components (artist/album/file).
+    """
+    normalized = path.replace("\\", "/")
+    for root in roots:
+        root = root.replace("\\", "/").rstrip("/")
+        if normalized.startswith(root + "/"):
+            return normalized[len(root) + 1:].lower()
+    return "/".join(normalized.split("/")[-3:]).lower()
+
+
+async def merge_missing_duplicates(db: AsyncSession, dry_run: bool = True) -> dict:
+    """Merge tracks whose local file is gone into the copy that still exists.
+
+    The same library was once scanned from two roots (/music and
+    /app/downloads): one copy of each track now points to a missing file.
+    Everything users attached to the dead copy (playlists, favorites,
+    history, jams, play count, lyrics, cover) moves to the live one, then the
+    dead copy is deleted. ``dry_run`` only counts.
+    """
+    from sqlalchemy import delete, update
+
+    from app.models.favorite import Favorite
+    from app.models.jam import JamSession
+    from app.models.playlist_track import PlaylistTrack
+
+    roots = sorted({*(p for _, p in music_dirs()), *_KNOWN_ROOTS}, key=len, reverse=True)
+    rows = (
+        await db.execute(select(Track).where(Track.file_url.startswith(LOCAL_PREFIX)))
+    ).scalars().all()
+    paths = {t.id: t.file_url[len(LOCAL_PREFIX):] for t in rows}
+    exists = await asyncio.to_thread(lambda: {tid: os.path.isfile(p) for tid, p in paths.items()})
+
+    live_by_key: dict[str, Track] = {}
+    for t in rows:
+        if exists[t.id]:
+            live_by_key.setdefault(_relative_key(paths[t.id], roots), t)
+
+    pairs: list[tuple[Track, Track]] = []
+    unresolved = 0
+    for t in rows:
+        if exists[t.id]:
+            continue
+        target = live_by_key.get(_relative_key(paths[t.id], roots))
+        if target is None:
+            unresolved += 1
+        else:
+            pairs.append((t, target))
+
+    result = {
+        "count": len(pairs),
+        "merged": 0,
+        "unresolved": unresolved,
+        "examples": [{"from": paths[d.id], "to": paths[t.id]} for d, t in pairs[:5]],
+    }
+    if dry_run or not pairs:
+        return result
+
+    for dup, target in pairs:
+        # Playlists: the (playlist_id, track_id) primary key forbids two rows
+        # for the same playlist, so drop the dead row where both are present.
+        in_playlists = set(
+            (await db.execute(select(PlaylistTrack.playlist_id).where(PlaylistTrack.track_id == target.id))).scalars()
+        )
+        if in_playlists:
+            await db.execute(
+                delete(PlaylistTrack).where(
+                    PlaylistTrack.track_id == dup.id, PlaylistTrack.playlist_id.in_(in_playlists)
+                )
+            )
+        await db.execute(update(PlaylistTrack).where(PlaylistTrack.track_id == dup.id).values(track_id=target.id))
+
+        # Favorites: same idea, one favorite per user and track.
+        fav_users = set(
+            (
+                await db.execute(
+                    select(Favorite.user_id).where(Favorite.entity_type == "track", Favorite.entity_id == target.id)
+                )
+            ).scalars()
+        )
+        if fav_users:
+            await db.execute(
+                delete(Favorite).where(
+                    Favorite.entity_type == "track", Favorite.entity_id == dup.id, Favorite.user_id.in_(fav_users)
+                )
+            )
+        await db.execute(
+            update(Favorite)
+            .where(Favorite.entity_type == "track", Favorite.entity_id == dup.id)
+            .values(entity_id=target.id)
+        )
+
+        await db.execute(update(ListeningHistory).where(ListeningHistory.track_id == dup.id).values(track_id=target.id))
+        await db.execute(update(JamSession).where(JamSession.current_track_id == dup.id).values(current_track_id=target.id))
+
+        target.play_count = (target.play_count or 0) + (dup.play_count or 0)
+        if not target.lyrics_lrc and dup.lyrics_lrc:
+            target.lyrics_lrc = dup.lyrics_lrc
+        if not target.cover_url and dup.cover_url:
+            target.cover_url = dup.cover_url
+        await db.delete(dup)
+        result["merged"] += 1
+
+    await db.flush()
+    return result
