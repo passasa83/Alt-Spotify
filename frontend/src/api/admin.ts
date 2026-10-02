@@ -222,3 +222,9 @@ export async function mergeMissingDuplicates(dryRun: boolean): Promise<MergeDupl
   const response = await client.post('/admin/catalogue/merge-missing-duplicates', null, { params: { dry_run: dryRun } });
   return response.data;
 }
+
+/** Queue HLS transcoding for every track with a source file but no HLS yet. */
+export async function transcodeMissing(): Promise<{ queued: number }> {
+  const response = await client.post('/upload/transcode-missing');
+  return response.data;
+}

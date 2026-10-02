@@ -116,6 +116,7 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
     existing_urls = set((await db.execute(select(Track.file_url))).scalars().all())
 
     imported = 0
+    new_tracks: list[tuple[uuid.UUID, str]] = []
     skipped = 0
     errors = 0
 
@@ -178,6 +179,7 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
                 is_explicit=False,
             )
             db.add(track)
+            new_tracks.append((track.id, track.file_url))
             imported += 1
         except Exception as e:
             errors += 1
@@ -185,8 +187,19 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
 
     await db.commit()
 
+    # Queue HLS for what was just imported (nothing else ever does for
+    # scanned files). Stop at the first failure: the queue is down.
+    from app.core.tasks import enqueue_transcode
+
+    transcode_queued = 0
+    for track_id, file_url in new_tracks:
+        if not await enqueue_transcode(track_id, file_url):
+            break
+        transcode_queued += 1
+
     logger.info(
         "music_scan_completed",
+        transcode_queued=transcode_queued,
         scanned=len(audio_files),
         imported=imported,
         skipped=skipped,
@@ -198,6 +211,7 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
         "imported": imported,
         "skipped": skipped,
         "errors": errors,
+        "transcode_queued": transcode_queued,
         "directory": scan_dir,
     }
 

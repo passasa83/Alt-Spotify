@@ -1,4 +1,5 @@
 import asyncio
+import os
 import uuid
 from pathlib import Path
 
@@ -206,7 +207,12 @@ async def transcode_missing(
     result = await db.execute(
         select(Track.id, Track.file_url).where(Track.file_url.is_not(None), Track.hls_path.is_(None))
     )
-    rows = result.all()
+    # Local files that no longer exist would only make the worker fail.
+    rows = [
+        (track_id, file_url)
+        for track_id, file_url in result.all()
+        if not file_url.startswith("local:") or os.path.isfile(file_url[len("local:"):])
+    ]
     queued = 0
     for track_id, file_url in rows:
         if not await enqueue_transcode(track_id, file_url):

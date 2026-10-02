@@ -212,3 +212,41 @@ async def test_enqueue_skips_unreachable_broker(monkeypatch):
 
     monkeypatch.setattr(tasks, "_broker_reachable", lambda: False)
     assert await tasks.enqueue_transcode("x", "audio/x.mp3") is None
+
+
+async def test_transcode_missing_skips_local_files_that_are_gone(client: AsyncClient, db_session, admin_headers, tmp_path):
+    present = tmp_path / "here.flac"
+    present.write_bytes(b"fLaC")
+    await _track(db_session, file_url=f"local:{present}")
+    await _track(db_session, file_url=f"local:{tmp_path / 'gone.flac'}")
+
+    response = await client.post("/api/v1/upload/transcode-missing", headers=admin_headers)
+    assert response.json() == {"queued": 1}
+    assert celery_client.send_task.call_count == 1
+
+
+async def test_scan_queues_hls_for_imported_tracks(client: AsyncClient, db_session, admin_headers, tmp_path, monkeypatch):
+    import math
+    import struct
+    import wave
+
+    from unittest.mock import patch
+
+    folder = tmp_path / "Scan Artist" / "Scan Album"
+    folder.mkdir(parents=True)
+    for n in (1, 2):
+        with wave.open(str(folder / f"0{n} - Scan Artist - Song {n}.wav"), "w") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(8000)
+            w.writeframes(b"".join(struct.pack("<h", int(1000 * math.sin(i / 3))) for i in range(800)))
+    monkeypatch.setenv("MUSIC_SCAN_DIR", str(tmp_path))
+
+    with patch("app.services.cover_service.fetch_cover", return_value=None), \
+         patch("app.core.database.async_session"):
+        response = await client.post("/api/v1/scan", headers=admin_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["imported"] == 2
+    assert data["transcode_queued"] == 2
+    assert celery_client.send_task.call_count == 2
