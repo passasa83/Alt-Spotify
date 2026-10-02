@@ -11,6 +11,7 @@ from mutagen import File as MutagenFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.utils.local_files import is_inside, music_roots
 from app.core.database import get_db
 from app.models.album import Album
 from app.models.artist import Artist
@@ -334,23 +335,6 @@ async def fix_covers(
 _COVER_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp")
 
 
-def _music_roots() -> list[str]:
-    roots = {
-        os.environ.get("MUSIC_SCAN_DIR", "/music"),
-        os.environ.get("MUSIC_DOWNLOAD_DIR", "/app/downloads"),
-        "/music",
-        "/app/downloads",
-    }
-    return [os.path.realpath(r) for r in roots if r and os.path.isdir(r)]
-
-
-def _inside(path: str, root: str) -> bool:
-    try:
-        return os.path.commonpath([path, root]) == root
-    except ValueError:  # different drives on Windows
-        return False
-
-
 def resolve_local_cover(cover_path: str) -> str | None:
     """Real path of an image inside a music folder, or None.
 
@@ -358,7 +342,7 @@ def resolve_local_cover(cover_path: str) -> str | None:
     read any file the backend can (/proc/self/environ holds SECRET_KEY and
     the database / MinIO passwords).
     """
-    roots = _music_roots()
+    roots = music_roots()
     raw = cover_path.replace("\\", "/")
     absolute = raw if re.match(r"^[A-Za-z]:/", raw) else "/" + raw.lstrip("/")
     candidates = [absolute]
@@ -373,7 +357,7 @@ def resolve_local_cover(cover_path: str) -> str | None:
         if (
             real.lower().endswith(_COVER_EXTENSIONS)
             and os.path.isfile(real)
-            and any(_inside(real, root) for root in roots)
+            and any(is_inside(real, root) for root in roots)
         ):
             return real
     return None

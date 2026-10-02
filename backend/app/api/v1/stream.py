@@ -13,6 +13,7 @@ from app.core.minio import get_minio_client
 from app.models.track import Track
 from app.models.user import User
 from app.utils.deps import get_current_user_stream
+from app.utils.local_files import safe_music_file
 from app.utils.track_access import get_track_for_user
 
 router = APIRouter(prefix="/stream", tags=["stream"])
@@ -113,8 +114,12 @@ def stream_object_response(request: Request, object_name: str) -> Response:
 
 def stream_local_response(request: Request, path: str) -> Response:
     """Serve a file from the server's music folders with HTTP Range support."""
-    if not os.path.isfile(path):
+    # file_url can be set through the admin API: never serve anything outside
+    # the music folders (defence in depth against /etc/..., /proc/...).
+    safe = safe_music_file(path)
+    if safe is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Local file not found")
+    path = safe
 
     def read_range(start: int, length: int):
         with open(path, "rb") as f:
