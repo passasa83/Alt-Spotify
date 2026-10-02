@@ -60,5 +60,7 @@ for table in Base.metadata.tables.values():
 app_redis.redis_pool = fakeredis.FakeAsyncRedis(decode_responses=True)
 
 if __name__ == "__main__":
-    print(f"Local API on http://127.0.0.1:8000 (data in {LOCAL_DIR})")
-    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")
+    # PORT lets a second instance run next to the first (front: VITE_API_PROXY).
+    port = int(os.environ.get("PORT", "8000"))
+    print(f"Local API on http://127.0.0.1:{port} (data in {LOCAL_DIR})")
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")

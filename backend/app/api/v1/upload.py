@@ -17,6 +17,7 @@ from app.models.album import Album
 from app.models.artist import Artist
 from app.models.track import Track
 from app.models.user import User
+from app.services import transcode_progress
 from app.utils.deps import require_admin
 
 logger = structlog.get_logger("app")
@@ -203,25 +204,49 @@ async def transcode_missing(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    """Queue HLS transcoding for every track that has a source file but no HLS yet."""
+    """Queue HLS transcoding for every track that has a source file but no HLS yet.
+
+    Tracks still waiting in the current batch are not queued twice: they are
+    carried over into the new batch, whose progress ``/transcode-status`` reports.
+    """
     result = await db.execute(
         select(Track.id, Track.file_url).where(Track.file_url.is_not(None), Track.hls_path.is_(None))
     )
+    previous = await transcode_progress.load_batch()
+    pending = await transcode_progress.pending_track_ids()
+    carried = [tuple(t) for t in (previous or {}).get("tasks", []) if t[1] in pending]
     # Local files that no longer exist would only make the worker fail.
     rows = [
         (track_id, file_url)
         for track_id, file_url in result.all()
-        if not file_url.startswith("local:") or os.path.isfile(file_url[len("local:"):])
+        if str(uuid.UUID(str(track_id))) not in pending
+        and (not file_url.startswith("local:") or os.path.isfile(file_url[len("local:"):]))
     ]
-    queued = 0
-    for track_id, file_url in rows:
-        if not await enqueue_transcode(track_id, file_url):
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Transcoding queue unavailable ({queued}/{len(rows)} tracks queued)",
-            )
-        queued += 1
-    return {"queued": queued}
+    tasks: list[tuple[str, str]] = []
+    try:
+        for track_id, file_url in rows:
+            task_id = await enqueue_transcode(track_id, file_url)
+            if not task_id:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"Transcoding queue unavailable ({len(tasks)}/{len(rows)} tracks queued)",
+                )
+            tasks.append((task_id, str(uuid.UUID(str(track_id)))))
+    finally:
+        if tasks:
+            # A batch still running keeps its start time, so the estimate stays right.
+            started_at = previous["started_at"] if carried and previous else None
+            await transcode_progress.save_batch(carried + tasks, started_at)
+    return {"queued": len(tasks), "already_queued": len(carried)}
+
+
+@router.get("/transcode-status")
+async def transcode_status(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """HLS coverage of the catalogue and progress of the last transcoding batch."""
+    return await transcode_progress.transcode_progress(db)
 
 
 @router.post("/cover", status_code=status.HTTP_201_CREATED)

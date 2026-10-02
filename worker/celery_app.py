@@ -16,6 +16,8 @@ app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    # The admin's transcoding progress reads failures from these results.
+    result_expires=7 * 86400,
 )
 
 import tasks  # noqa: F401

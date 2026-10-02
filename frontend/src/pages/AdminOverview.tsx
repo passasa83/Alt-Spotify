@@ -26,8 +26,7 @@ import {
 import { useTranslation } from '@/hooks/useTranslation';
 import type { TranslationKey } from '@/i18n/en';
 import { formatRelative } from '@/utils/formatTime';
-import { transcodeMissing } from '@/api/admin';
-import { useToastStore } from '@/stores/toastStore';
+import TranscodeProgress from '@/components/TranscodeProgress';
 
 const STATUS: Record<CheckStatus, { icon: typeof Info; text: string; badge: string; ring: string }> = {
   ok: { icon: CheckCircle2, text: 'text-green-400', badge: 'bg-green-500/15 text-green-300', ring: 'ring-gray-800' },
@@ -83,21 +82,6 @@ const AdminOverview = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
-  const [transcoding, setTranscoding] = useState(false);
-  const addToast = useToastStore((s) => s.addToast);
-
-  const handleTranscode = async () => {
-    setTranscoding(true);
-    try {
-      const { queued } = await transcodeMissing();
-      addToast(t('admin.transcode_queued', { count: queued }));
-    } catch (err: any) {
-      addToast(err?.response?.data?.detail || t('admin.transcode_error'));
-    } finally {
-      setTranscoding(false);
-    }
-  };
-
   const load = async () => {
     setLoading(true);
     setError(false);
@@ -151,16 +135,6 @@ const AdminOverview = () => {
             <span><span className="text-red-400">■</span> {c.missing_files} {t('admin.catalogue_missing')}</span>
             <span><span className="text-gray-400">■</span> {c.no_audio} {t('admin.catalogue_no_audio')}</span>
           </p>
-          {c.hls < c.playable && (
-            <button
-              onClick={handleTranscode}
-              disabled={transcoding}
-              className="mt-3 mr-4 inline-block text-sm text-green-400 hover:underline disabled:opacity-50"
-              title={t('admin.transcode_hint')}
-            >
-              {transcoding ? t('admin.transcoding') : t('admin.transcode_button', { count: c.playable - c.hls })}
-            </button>
-          )}
           {!!c.mergeable && (
             <Link to="/admin/catalogue" className="mt-3 mr-4 inline-block text-sm text-green-400 hover:underline">
               {t('admin.merge_button', { count: c.mergeable })} →
@@ -181,6 +155,7 @@ const AdminOverview = () => {
               </ul>
             </details>
           )}
+          <TranscodeProgress />
         </div>
       );
     }

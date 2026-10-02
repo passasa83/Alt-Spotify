@@ -226,7 +226,40 @@ export async function mergeMissingDuplicates(dryRun: boolean): Promise<MergeDupl
 }
 
 /** Queue HLS transcoding for every track with a source file but no HLS yet. */
-export async function transcodeMissing(): Promise<{ queued: number }> {
+export async function transcodeMissing(): Promise<{ queued: number; already_queued: number }> {
   const response = await client.post('/upload/transcode-missing');
+  return response.data;
+}
+
+export interface TranscodeTrack {
+  id: string;
+  title?: string;
+  artist?: string | null;
+  error?: string;
+}
+
+export interface TranscodeStatus {
+  /** Tracks already available in HLS. */
+  hls: number;
+  /** Tracks with a source file (the ones that can be transcoded). */
+  with_source: number;
+  /** Tasks waiting in the worker queue (null if Redis can't be read). */
+  queue_length: number | null;
+  /** Last batch started from the admin, null if none in the last 7 days. */
+  batch: {
+    started_at: number;
+    total: number;
+    done: number;
+    running: number;
+    queued: number;
+    failed: number;
+    eta_seconds: number | null;
+    running_tracks: TranscodeTrack[];
+    failed_tracks: TranscodeTrack[];
+  } | null;
+}
+
+export async function getTranscodeStatus(): Promise<TranscodeStatus> {
+  const response = await client.get('/upload/transcode-status');
   return response.data;
 }

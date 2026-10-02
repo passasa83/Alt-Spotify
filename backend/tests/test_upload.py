@@ -174,7 +174,7 @@ async def test_transcode_missing_only_queues_tracks_without_hls(client: AsyncCli
 
     response = await client.post("/api/v1/upload/transcode-missing", headers=admin_headers)
     assert response.status_code == 202
-    assert response.json() == {"queued": 2}
+    assert response.json() == {"queued": 2, "already_queued": 0}
     assert celery_client.send_task.call_count == 2
 
 
@@ -221,7 +221,7 @@ async def test_transcode_missing_skips_local_files_that_are_gone(client: AsyncCl
     await _track(db_session, file_url=f"local:{tmp_path / 'gone.flac'}")
 
     response = await client.post("/api/v1/upload/transcode-missing", headers=admin_headers)
-    assert response.json() == {"queued": 1}
+    assert response.json() == {"queued": 1, "already_queued": 0}
     assert celery_client.send_task.call_count == 1
 
 
@@ -250,3 +250,64 @@ async def test_scan_queues_hls_for_imported_tracks(client: AsyncClient, db_sessi
     assert data["imported"] == 2
     assert data["transcode_queued"] == 2
     assert celery_client.send_task.call_count == 2
+
+
+async def _set_task_result(redis, task_id, status, result=None):
+    import json
+
+    await redis.set(f"celery-task-meta-{task_id}", json.dumps({"status": status, "result": result}))
+
+
+async def test_transcode_status_reports_batch_progress(client: AsyncClient, db_session, admin_headers, fake_redis):
+    from unittest.mock import MagicMock
+
+    tracks = [await _track(db_session, file_url=f"audio/{n}.mp3") for n in range(4)]
+    ids = iter(["t0", "t1", "t2", "t3"])
+    celery_client.send_task.side_effect = lambda *a, **k: MagicMock(id=next(ids))
+    response = await client.post("/api/v1/upload/transcode-missing", headers=admin_headers)
+    assert response.json() == {"queued": 4, "already_queued": 0}
+
+    # t0 finished (hls_path set by the worker), t1 failed, t2 running, t3 queued.
+    tracks[0].hls_path = "hls/0"
+    await db_session.flush()
+    await _set_task_result(fake_redis, "t0", "SUCCESS")
+    await _set_task_result(fake_redis, "t1", "FAILURE", {"exc_type": "RuntimeError", "exc_message": ["ffmpeg failed"]})
+    await _set_task_result(fake_redis, "t2", "STARTED")
+
+    response = await client.get("/api/v1/upload/transcode-status", headers=admin_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["hls"] == 1
+    assert data["with_source"] == 4
+    batch = data["batch"]
+    assert (batch["total"], batch["done"], batch["failed"], batch["running"], batch["queued"]) == (4, 1, 1, 1, 1)
+    assert batch["eta_seconds"] is not None
+    assert batch["failed_tracks"][0]["error"] == "RuntimeError: ffmpeg failed"
+    assert batch["failed_tracks"][0]["title"] == "T"
+    assert uuid.UUID(batch["running_tracks"][0]["id"]) == tracks[2].id
+
+
+async def test_transcode_missing_does_not_queue_pending_tracks_twice(client: AsyncClient, db_session, admin_headers, fake_redis):
+    from unittest.mock import MagicMock
+
+    await _track(db_session, file_url="audio/a.mp3")
+    await _track(db_session, file_url="audio/b.mp3")
+    ids = iter(["a1", "b1", "b2"])
+    celery_client.send_task.side_effect = lambda *a, **k: MagicMock(id=next(ids))
+    await client.post("/api/v1/upload/transcode-missing", headers=admin_headers)
+
+    # The first task failed, the second is still waiting: only the failed one is redone.
+    await _set_task_result(fake_redis, "a1", "FAILURE", {"exc_type": "RuntimeError", "exc_message": ["x"]})
+    response = await client.post("/api/v1/upload/transcode-missing", headers=admin_headers)
+    assert response.json() == {"queued": 1, "already_queued": 1}
+    assert celery_client.send_task.call_count == 3
+
+    batch = (await client.get("/api/v1/upload/transcode-status", headers=admin_headers)).json()["batch"]
+    assert (batch["total"], batch["queued"], batch["failed"]) == (2, 2, 0)
+
+
+async def test_transcode_status_without_batch(client: AsyncClient, db_session, admin_headers, auth_headers):
+    await _track(db_session, file_url="audio/a.mp3", hls_path="hls/a")
+    data = (await client.get("/api/v1/upload/transcode-status", headers=admin_headers)).json()
+    assert data == {"hls": 1, "with_source": 1, "queue_length": 0, "batch": None}
+    assert (await client.get("/api/v1/upload/transcode-status", headers=auth_headers)).status_code == 403
