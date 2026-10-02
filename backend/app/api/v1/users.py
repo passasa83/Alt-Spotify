@@ -75,6 +75,10 @@ async def get_stats(
                 "cover_url": t["track"].cover_url,
                 "duration_seconds": t["track"].duration_seconds,
                 "play_count": t["play_count"],
+                # The player refuses tracks without these (nothing to stream).
+                "artist_id": str(t["track"].artist_id),
+                "file_url": t["track"].file_url,
+                "hls_path": t["track"].hls_path,
                 "artist": {
                     "id": str(t["track"].artist.id),
                     "name": t["track"].artist.name,

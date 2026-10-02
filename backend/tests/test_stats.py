@@ -124,6 +124,8 @@ async def test_play_records_listened_duration(client: AsyncClient, auth_headers,
 
     stats = (await client.get("/api/v1/users/me/stats", headers=auth_headers)).json()
     assert stats["total_minutes"] == 2
+    # Clicking a top track plays it: the player needs its audio fields.
+    assert all("file_url" in t and "hls_path" in t for t in stats["top_tracks"])
     history = (await client.get("/api/v1/playlists/user/history", headers=auth_headers)).json()["items"]
     assert sorted(h["duration_listened_seconds"] for h in history) == [0, 125]
     # The player needs the audio fields to play a track again from the history.
