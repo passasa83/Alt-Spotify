@@ -289,30 +289,32 @@ async def get_overview(db: AsyncSession) -> dict:
     }
 
 
-async def purge_unplayable_tracks(db: AsyncSession, dry_run: bool = True) -> dict:
-    """Tracks without audio that nothing points to (search leftovers).
+async def purge_unplayable_tracks(db: AsyncSession, dry_run: bool = True, include_used: bool = False) -> dict:
+    """Tracks without audio (search leftovers).
 
-    Kept: tracks in a playlist, a favorite, someone's history or a jam, so
-    nothing a user saved disappears. ``dry_run`` only counts them.
+    By default only those nothing points to, so nothing a user saved
+    disappears. ``include_used`` also removes the ones sitting in playlists,
+    favorites, history or jams (they cannot be played anyway).
+    ``dry_run`` only counts them.
     """
-    from sqlalchemy import delete, exists
+    from sqlalchemy import exists
 
     from app.models.favorite import Favorite
     from app.models.jam import JamSession
     from app.models.playlist_track import PlaylistTrack
+    from app.utils.track_cleanup import delete_tracks
 
-    unplayable = select(Track.id).where(
-        Track.file_url.is_(None),
-        Track.hls_path.is_(None),
-        ~exists().where(PlaylistTrack.track_id == Track.id),
-        ~exists().where(ListeningHistory.track_id == Track.id),
-        ~exists().where(Favorite.entity_type == "track", Favorite.entity_id == Track.id),
-        ~exists().where(JamSession.current_track_id == Track.id),
-    )
-    ids = list((await db.execute(unplayable)).scalars().all())
+    conditions = [Track.file_url.is_(None), Track.hls_path.is_(None)]
+    if not include_used:
+        conditions += [
+            ~exists().where(PlaylistTrack.track_id == Track.id),
+            ~exists().where(ListeningHistory.track_id == Track.id),
+            ~exists().where(Favorite.entity_type == "track", Favorite.entity_id == Track.id),
+            ~exists().where(JamSession.current_track_id == Track.id),
+        ]
+    ids = list((await db.execute(select(Track.id).where(*conditions))).scalars().all())
     if not dry_run and ids:
-        await db.execute(delete(Track).where(Track.id.in_(ids)))
-        await db.flush()
+        await delete_tracks(db, ids)
     return {"count": len(ids), "deleted": 0 if dry_run else len(ids)}
 
 

@@ -205,8 +205,10 @@ export async function revokeInvite(inviteId: string): Promise<void> {
 }
 
 /** Tracks without audio that nothing uses. `dryRun` only counts them. */
-export async function purgeUnplayableTracks(dryRun: boolean): Promise<{ count: number; deleted: number }> {
-  const response = await client.post('/admin/catalogue/purge-unplayable', null, { params: { dry_run: dryRun } });
+export async function purgeUnplayableTracks(dryRun: boolean, includeUsed = false): Promise<{ count: number; deleted: number }> {
+  const response = await client.post('/admin/catalogue/purge-unplayable', null, {
+    params: { dry_run: dryRun, include_used: includeUsed },
+  });
   return response.data;
 }
 

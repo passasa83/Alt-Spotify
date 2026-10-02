@@ -100,3 +100,33 @@ async def test_smart_playlist_needs_a_rule_and_keeps_playable_tracks(client: Asy
     assert created.status_code == 201
     tracks = (await client.get(f"/api/v1/playlists/{created.json()['id']}/tracks", headers=auth_headers)).json()
     assert len(tracks) == 1
+
+
+async def test_admin_can_delete_a_track_users_saved(client: AsyncClient, admin_headers, auth_headers, db_session, test_user):
+    from app.models.listening_history import ListeningHistory
+
+    t = await _seed(db_session, test_user)
+    db_session.add(ListeningHistory(user_id=test_user.id, track_id=t["in_playlist"].id))
+    await db_session.flush()
+
+    # Used to fail on the foreign keys (playlist entry, favorite, history).
+    for key in ("in_playlist", "favorite"):
+        response = await client.delete(f"/api/v1/tracks/{t[key].id}", headers=admin_headers)
+        assert response.status_code == 204, key
+
+    titles = {x["title"] for x in (await client.get("/api/v1/tracks", headers=auth_headers)).json()["items"]}
+    assert titles == {"Playable", "Orphan"}
+    favorites = (await client.get("/api/v1/favorites?entity_type=track", headers=auth_headers)).json()
+    assert not (favorites.get("items", favorites) if isinstance(favorites, dict) else favorites)
+
+
+async def test_purge_include_used_removes_every_track_without_audio(client: AsyncClient, admin_headers, auth_headers, db_session, test_user):
+    await _seed(db_session, test_user)
+
+    preview = (await client.post("/api/v1/admin/catalogue/purge-unplayable?include_used=true", headers=admin_headers)).json()
+    assert preview == {"count": 3, "deleted": 0}
+    done = (await client.post("/api/v1/admin/catalogue/purge-unplayable?include_used=true&dry_run=false", headers=admin_headers)).json()
+    assert done["deleted"] == 3
+
+    titles = {x["title"] for x in (await client.get("/api/v1/tracks", headers=auth_headers)).json()["items"]}
+    assert titles == {"Playable"}

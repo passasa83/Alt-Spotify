@@ -26,6 +26,8 @@ const AdminCatalogue = () => {
   const [filter, setFilter] = useState<AudioFilter>('all');
   const [purgeable, setPurgeable] = useState<number | null>(null);
   const [purging, setPurging] = useState(false);
+  // Tracks without audio still sitting in playlists / favorites / history.
+  const [usedEmpty, setUsedEmpty] = useState(0);
   const [mergeable, setMergeable] = useState<number | null>(null);
   const [merging, setMerging] = useState(false);
 
@@ -45,7 +47,9 @@ const AdminCatalogue = () => {
 
   const refreshPurgeable = useCallback(async () => {
     try {
-      setPurgeable((await purgeUnplayableTracks(true)).count);
+      const [unused, all] = await Promise.all([purgeUnplayableTracks(true), purgeUnplayableTracks(true, true)]);
+      setPurgeable(unused.count);
+      setUsedEmpty(all.count - unused.count);
     } catch {
       setPurgeable(null);
     }
@@ -82,11 +86,13 @@ const AdminCatalogue = () => {
     }
   };
 
-  const handlePurge = async () => {
-    if (!purgeable || !confirm(t('admin.purge_confirm', { count: purgeable }))) return;
+  const handlePurge = async (includeUsed = false) => {
+    const count = includeUsed ? (purgeable ?? 0) + usedEmpty : purgeable;
+    const question = includeUsed ? t('admin.purge_used_confirm', { count: count ?? 0 }) : t('admin.purge_confirm', { count: count ?? 0 });
+    if (!count || !confirm(question)) return;
     setPurging(true);
     try {
-      const { deleted } = await purgeUnplayableTracks(false);
+      const { deleted } = await purgeUnplayableTracks(false, includeUsed);
       addToast(t('admin.purge_done', { count: deleted }));
       await Promise.all([fetchTracks(page, filter), refreshPurgeable()]);
     } catch {
@@ -119,8 +125,19 @@ const AdminCatalogue = () => {
           <Merge size={16} aria-hidden="true" />
           {merging ? t('admin.merging') : t('admin.merge_button', { count: mergeable ?? 0 })}
         </button>
+        {usedEmpty > 0 && (
+          <button
+            onClick={() => handlePurge(true)}
+            disabled={purging}
+            className="flex items-center gap-2 rounded-full bg-gray-800 px-4 py-2 text-sm text-red-300 hover:bg-gray-700 disabled:opacity-40"
+            title={t('admin.purge_used_hint')}
+          >
+            <Trash2 size={16} aria-hidden="true" />
+            {t('admin.purge_used_button', { count: (purgeable ?? 0) + usedEmpty })}
+          </button>
+        )}
         <button
-          onClick={handlePurge}
+          onClick={() => handlePurge()}
           disabled={!purgeable || purging}
           className="flex items-center gap-2 rounded-full bg-gray-800 px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 disabled:opacity-40"
           title={t('admin.purge_hint')}

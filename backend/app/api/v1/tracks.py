@@ -20,6 +20,7 @@ from app.schemas.common import PaginatedResponse
 from app.schemas.track import TrackCreate, TrackResponse, TrackUpdate
 from app.services.offline import generate_download_url
 from app.utils.deps import get_current_user, get_current_user_stream, require_admin
+from app.utils.track_cleanup import delete_tracks
 from app.utils.track_access import get_track_for_user
 from app.utils.track_serializer import serialize_track
 
@@ -186,7 +187,8 @@ async def delete_track(
     track = result.scalar_one_or_none()
     if not track:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
-    await db.delete(track)
+    # Playlists, favorites, history... point to it: remove those first.
+    await delete_tracks(db, [track.id])
 
 
 class PlayBody(BaseModel):
