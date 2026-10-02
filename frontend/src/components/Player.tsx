@@ -42,6 +42,8 @@ import QueuePanel from './QueuePanel';
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 // Seconds of listening before a play counts (history, stats, recommendations).
 const PLAY_RECORD_THRESHOLD = 10;
+// A rate-limited stream (429) is retried this many times before giving up.
+const MAX_RATE_LIMIT_RETRIES = 2;
 // Unplayable tracks skipped in a row before giving up.
 const MAX_CONSECUTIVE_ERRORS = 3;
 
@@ -56,16 +58,16 @@ const safePlay = (audio: HTMLAudioElement) => {
 };
 
 // <audio> doesn't expose the HTTP status: ask the stream endpoint directly.
-const probeStreamStatus = async (trackId: string): Promise<number> => {
+const probeStreamStatus = async (trackId: string): Promise<{ status: number; retryAfter: number }> => {
   const controller = new AbortController();
   try {
     const response = await fetch(getTrackStreamUrl(trackId), {
       headers: { Range: 'bytes=0-0' },
       signal: controller.signal,
     });
-    return response.status;
+    return { status: response.status, retryAfter: Number(response.headers?.get?.('Retry-After')) || 0 };
   } catch {
-    return 0;
+    return { status: 0, retryAfter: 0 };
   } finally {
     controller.abort();
   }
@@ -114,6 +116,7 @@ const Player = () => {
   const crossfadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const consecutiveErrorsRef = useRef(0);
   const authRetriedTrackIdRef = useRef<string | null>(null);
+  const rateLimitRetriesRef = useRef<{ trackId: string | null; count: number }>({ trackId: null, count: 0 });
   // Seconds really listened to the current track (seeks excluded), sent
   // with the play once the listen ends.
   const listenRef = useRef<{ trackId: string | null; seconds: number; lastTime: number | null }>({
@@ -184,13 +187,30 @@ const Player = () => {
   }, []);
 
   // Tell the user, then move on: a 401 gets one retry after a token refresh,
+  // a 429 waits and retries (the track is fine, the server is busy),
   // anything else skips to the next track (up to MAX_CONSECUTIVE_ERRORS).
   const handlePlaybackError = useCallback(async (audio: HTMLAudioElement) => {
     const track = usePlayerStore.getState().currentTrack;
     if (!track) return;
-    const status = await probeStreamStatus(track.id);
+    const { status, retryAfter } = await probeStreamStatus(track.id);
     const store = usePlayerStore.getState();
     if (audio !== audioRef.current || store.currentTrack?.id !== track.id) return;
+
+    if (status === 429) {
+      const retry = rateLimitRetriesRef.current;
+      const attempts = retry.trackId === track.id ? retry.count : 0;
+      if (attempts < MAX_RATE_LIMIT_RETRIES) {
+        rateLimitRetriesRef.current = { trackId: track.id, count: attempts + 1 };
+        const resumeAt = audio.currentTime;
+        await new Promise((resolve) => setTimeout(resolve, Math.min(Math.max(retryAfter, 2), 30) * 1000));
+        const now = usePlayerStore.getState();
+        if (audio !== audioRef.current || now.currentTrack?.id !== track.id) return;
+        attachSource(audio, track, now.useHls);
+        audio.addEventListener('loadedmetadata', () => { audio.currentTime = resumeAt; }, { once: true });
+        if (now.isPlaying) safePlay(audio);
+        return;
+      }
+    }
 
     if (status === 401 && authRetriedTrackIdRef.current !== track.id) {
       authRetriedTrackIdRef.current = track.id;

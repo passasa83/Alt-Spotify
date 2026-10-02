@@ -221,4 +221,35 @@ describe('Player', () => {
     expect(playTrackMock).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
+  it('waits and retries a rate-limited stream instead of skipping the track', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const next = vi.fn();
+    const state = { ...defaultPlayerState, currentTrack: createTrack('9', 'Busy'), isPlaying: true, useHls: false, next, pause: vi.fn() };
+    vi.mocked(usePlayerStore).mockReturnValue(state as any);
+    (usePlayerStore as any).getState = () => state;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 429, headers: new Headers({ 'Retry-After': '2' }) }));
+    const created: HTMLAudioElement[] = [];
+    const RealAudio = window.Audio;
+    vi.stubGlobal('Audio', class extends RealAudio { constructor() { super(); created.push(this); } });
+
+    render(
+      <MemoryRouter>
+        <Player />
+      </MemoryRouter>
+    );
+    const audio = created[0]!;
+    audio.setAttribute('src', '/api/v1/tracks/9/stream');
+    Object.defineProperty(audio, 'error', { value: { code: 2 } });
+    const toastsBefore = useToastStore.getState().toasts.length;
+    audio.dispatchEvent(new Event('error'));
+
+    await vi.advanceTimersByTimeAsync(2500);
+    expect(next).not.toHaveBeenCalled();
+    expect(useToastStore.getState().toasts.length).toBe(toastsBefore);
+    // The source was re-attached for a new attempt.
+    expect(audio.src).toContain('/api/v1/tracks/9/stream');
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 });

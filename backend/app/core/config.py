@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     OPEN_REGISTRATION: bool = False
 
     RATE_LIMIT_ENABLED: bool = True
-    RATE_LIMIT_DEFAULT: str = "100/minute"
+    RATE_LIMIT_DEFAULT: str = "300/minute"
     RATE_LIMIT_AUTH: str = "10/minute"
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "json"
