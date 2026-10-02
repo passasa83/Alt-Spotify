@@ -1,3 +1,4 @@
+import mimetypes
 import os
 import re
 import uuid
@@ -330,29 +331,61 @@ async def fix_covers(
     return {"total": len(tracks), "fixed": fixed, "cleared": cleared}
 
 
+_COVER_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp")
+
+
+def _music_roots() -> list[str]:
+    roots = {
+        os.environ.get("MUSIC_SCAN_DIR", "/music"),
+        os.environ.get("MUSIC_DOWNLOAD_DIR", "/app/downloads"),
+        "/music",
+        "/app/downloads",
+    }
+    return [os.path.realpath(r) for r in roots if r and os.path.isdir(r)]
+
+
+def _inside(path: str, root: str) -> bool:
+    try:
+        return os.path.commonpath([path, root]) == root
+    except ValueError:  # different drives on Windows
+        return False
+
+
+def resolve_local_cover(cover_path: str) -> str | None:
+    """Real path of an image inside a music folder, or None.
+
+    The path comes from the URL: without this check any logged-in user could
+    read any file the backend can (/proc/self/environ holds SECRET_KEY and
+    the database / MinIO passwords).
+    """
+    roots = _music_roots()
+    raw = cover_path.replace("\\", "/")
+    absolute = raw if re.match(r"^[A-Za-z]:/", raw) else "/" + raw.lstrip("/")
+    candidates = [absolute]
+    # Same file indexed under the other root (the library was scanned twice).
+    for old, new in (("/app/downloads/", "/music/"), ("/music/", "/app/downloads/")):
+        if absolute.startswith(old):
+            candidates.append(new + absolute[len(old):])
+    candidates += [os.path.join(root, raw.lstrip("/")) for root in roots]
+
+    for candidate in candidates:
+        real = os.path.realpath(candidate)
+        if (
+            real.lower().endswith(_COVER_EXTENSIONS)
+            and os.path.isfile(real)
+            and any(_inside(real, root) for root in roots)
+        ):
+            return real
+    return None
+
+
 @router.get("/local/covers/{cover_path:path}")
 async def serve_local_cover(
     cover_path: str,
     _user: User = Depends(get_current_user_from_header_or_query),
 ):
-    candidates = []
-
-    full_path = os.path.normpath(f"/{cover_path}")
-    candidates.append(full_path)
-
-    if full_path.startswith("/app/downloads/"):
-        candidates.append("/music" + full_path[len("/app/downloads"):])
-    elif full_path.startswith("/music/"):
-        candidates.append("/app/downloads" + full_path[len("/music"):])
-
-    if cover_path.startswith("app/downloads/"):
-        candidates.append("/music/" + cover_path[len("app/downloads/"):])
-    elif not cover_path.startswith("/"):
-        candidates.append("/music/" + cover_path)
-
-    for path in candidates:
-        path = os.path.normpath(path)
-        if os.path.isfile(path):
-            return FileResponse(path, media_type="image/jpeg")
-
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover not found")
+    path = resolve_local_cover(cover_path)
+    if path is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover not found")
+    media_type = mimetypes.guess_type(path)[0] or "image/jpeg"
+    return FileResponse(path, media_type=media_type)
