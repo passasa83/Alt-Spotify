@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Shield,
@@ -11,9 +11,11 @@ import {
   Mail,
   Monitor,
   Smartphone,
+  Bug,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import { getBugReports } from '@/api/bugReports';
 import SkipToContent from './SkipToContent';
 
 /**
@@ -24,6 +26,17 @@ const AdminLayout = () => {
   const { user, refreshAuth } = useAuthStore();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const location = useLocation();
+  const [newBugs, setNewBugs] = useState(0);
+  const isAdmin = user?.role === 'ADMIN';
+
+  // Badge on the bug reports link; refreshed when moving between admin pages.
+  useEffect(() => {
+    if (!isAdmin) return;
+    getBugReports('new')
+      .then((d) => setNewBugs(d.counts.new))
+      .catch(() => {});
+  }, [isAdmin, location.pathname]);
 
   useEffect(() => {
     if (!user) {
@@ -53,6 +66,7 @@ const AdminLayout = () => {
     { to: '/admin/invites', label: t('admin.invites'), icon: Mail },
     { to: '/admin/monitoring', label: t('admin.monitoring'), icon: Monitor },
     { to: '/admin/devices', label: t('admin.connected_devices'), icon: Smartphone },
+    { to: '/admin/bug-reports', label: t('admin.bugs.title'), icon: Bug, badge: newBugs },
   ];
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -80,10 +94,15 @@ const AdminLayout = () => {
           className="flex gap-1 overflow-x-auto px-2 pb-2 md:flex-col md:overflow-visible md:pb-0"
           aria-label={t('admin.overview')}
         >
-          {links.map(({ to, label, icon: Icon, end }) => (
+          {links.map(({ to, label, icon: Icon, end, badge }) => (
             <NavLink key={to} to={to} end={end} className={(s) => `${linkClass(s)} flex-shrink-0`}>
               <Icon size={18} aria-hidden="true" />
               {label}
+              {!!badge && (
+                <span className="ml-auto rounded-full bg-red-500 px-1.5 text-xs font-bold text-white" aria-label={t('admin.bugs.new_count', { count: badge })}>
+                  {badge}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

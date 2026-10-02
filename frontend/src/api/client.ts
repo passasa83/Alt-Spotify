@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { recordError, stripQuery } from '@/utils/diagnostics';
 
 const client = axios.create({
   baseURL: '/api/v1',
@@ -59,6 +60,10 @@ client.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    if (originalRequest?.url) {
+      const method = String(originalRequest.method || 'get').toUpperCase();
+      recordError(`HTTP ${error.response?.status ?? 'network error'} ${method} ${stripQuery(originalRequest.url)}`);
+    }
 
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;

@@ -2,6 +2,7 @@ from app.core.database import Base  # noqa: F401
 from app.models.admin_invite import AdminInviteToken  # noqa: E402, F401
 from app.models.album import Album  # noqa: E402, F401
 from app.models.artist import Artist  # noqa: E402, F401
+from app.models.bug_report import BugReport  # noqa: E402, F401
 from app.models.device_session import DeviceSession  # noqa: E402, F401
 from app.models.favorite import Favorite  # noqa: E402, F401
 from app.models.follow import Follow  # noqa: E402, F401

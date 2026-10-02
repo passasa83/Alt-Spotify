@@ -38,6 +38,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { formatTime } from '@/utils/formatTime';
 import { attachSource, detachSource } from '@/utils/audioSource';
 import { useMediaSession } from '@/hooks/useMediaSession';
+import { recordError } from '@/utils/diagnostics';
 import QueuePanel from './QueuePanel';
 
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
@@ -261,6 +262,8 @@ const Player = () => {
       // Clearing the source (src = '') and aborted loads are not failures.
       if (!audio.error || audio.error.code === 1 /* MEDIA_ERR_ABORTED */) return;
       if (!audio.getAttribute('src')) return;
+      const failed = usePlayerStore.getState().currentTrack;
+      recordError(`Audio error ${audio.error.code} on "${failed?.title ?? '?'}" (${failed?.id ?? '?'})`);
       void handlePlaybackError(audio);
     });
 

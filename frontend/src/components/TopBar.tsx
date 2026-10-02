@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, Bell, ChevronDown, Settings, LogOut, Globe } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import NotificationBell from './NotificationBell';
+import BugReportButton from './BugReportButton';
 import { useTranslation } from '@/hooks/useTranslation';
 import type { Locale } from '@/i18n';
 import { usePopover } from '@/hooks/usePopover';
@@ -76,6 +77,8 @@ const TopBar = () => {
             </div>
           )}
         </div>
+
+        <BugReportButton />
 
         <NotificationBell />
 

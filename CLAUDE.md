@@ -22,7 +22,8 @@ Points clés du fonctionnement :
 - **File d'attente** (`stores/playerStore.ts`) : contexte playlist/album, sinon autoplay de titres similaires (`GET /recommendations/autoplay/{id}`).
 - **Auth** : JWT avec `jti` et `iat`. Access 30 min, refresh 7 j avec **rotation** (réutilisation au-delà de 30 s = vol → toutes les sessions révoquées). Révocations stockées dans Redis (`core/sessions.py`, tolérant si Redis est absent). `/auth/logout`, `/auth/logout-all`. Verrouillage après 10 échecs de connexion par compte. Le front ne lance qu'un refresh à la fois (`api/client.ts`).
 - **Sécurité** : fichiers locaux servis **uniquement** dans les dossiers musique (`utils/local_files.py`). `TrustedProxyMiddleware` : `X-Forwarded-For` accepté seulement depuis des IP privées. Limiteur de débit par utilisateur (`core/rate_limit.py` : général 300/min, médias 600/min). CSP stricte dans `frontend/nginx.conf`.
-- **Admin** : espace séparé `/admin` (`components/AdminLayout.tsx`). Page Santé = `GET /admin/overview` (contrôles par domaine). Catalogue : fusion des doublons introuvables, nettoyage des pistes vides (`include_used`), filtre `GET /tracks?playable=`. Bouton de transcodage HLS (`POST /upload/transcode-missing`).
+- **Admin** : espace séparé `/admin` (`components/AdminLayout.tsx`). Page Santé = `GET /admin/overview` (contrôles par domaine). Catalogue : fusion des doublons introuvables, nettoyage des pistes vides (`include_used`), filtre `GET /tracks?playable=`. Bouton de transcodage HLS (`POST /upload/transcode-missing`) avec suivi en direct (`GET /upload/transcode-status`).
+- **Signalements de bugs** : bouton dans la barre du haut (`components/BugReportButton.tsx`, joint page, navigateur, titre en cours et erreurs récentes de `utils/diagnostics.ts`), onglet admin `/admin/bug-reports` (`api/v1/bug_reports.py`, table `bug_reports`).
 
 ## Travailler en local (Windows, sans Docker)
 
@@ -36,7 +37,7 @@ Tests (tous doivent passer avant un commit) :
 cd backend && python -m pytest --ignore=tests/test_jam.py -q
 cd frontend && npx tsc --noEmit -p . && npx vitest run
 ```
-État au 2 octobre 2026 : 315 tests backend, 87 frontend, tous au vert.
+État au 2 octobre 2026 : 320 tests backend, 89 frontend, tous au vert.
 
 ## Pièges connus
 

@@ -6,6 +6,7 @@ from app.api.v1 import (
     albums,
     artists,
     auth,
+    bug_reports,
     devices,
     favorites,
     import_export,
@@ -57,5 +58,6 @@ api_router.include_router(recommendations.router, dependencies=_logged_in)
 api_router.include_router(favorites.router)
 api_router.include_router(admin_invites.router)
 api_router.include_router(devices.router)
+api_router.include_router(bug_reports.router)
 api_router.include_router(music_scanner.router)
 api_router.include_router(tidal.router, dependencies=_logged_in_media)

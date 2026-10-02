@@ -26,6 +26,7 @@ import Recommendations from '@/pages/Recommendations';
 import NotFound from '@/pages/NotFound';
 import AdminInvites from '@/pages/AdminInvites';
 import AdminDevices from '@/pages/AdminDevices';
+import AdminBugReports from '@/pages/AdminBugReports';
 import AdminOverview from '@/pages/AdminOverview';
 import AdminLayout from '@/components/AdminLayout';
 import Browse from '@/pages/Browse';
@@ -116,6 +117,7 @@ const App = () => {
         <Route path="tracks/:id/edit" element={<EditTrack />} />
         <Route path="invites" element={<AdminInvites />} />
         <Route path="devices" element={<AdminDevices />} />
+        <Route path="bug-reports" element={<AdminBugReports />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

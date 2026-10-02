@@ -4,8 +4,10 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
 import { initLocale } from './i18n';
+import { installDiagnostics } from './utils/diagnostics';
 
 initLocale();
+installDiagnostics();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
