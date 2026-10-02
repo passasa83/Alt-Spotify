@@ -1,6 +1,8 @@
 import uuid
 from math import ceil
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +14,7 @@ from app.schemas.album import AlbumResponse
 from app.schemas.artist import ArtistCreate, ArtistResponse, ArtistUpdate
 from app.schemas.common import PaginatedResponse
 from app.utils.deps import require_admin
+from app.utils.playable import album_has_audio, artist_has_audio, artist_plays
 
 router = APIRouter(prefix="/artists", tags=["artists"])
 
@@ -19,6 +22,9 @@ router = APIRouter(prefix="/artists", tags=["artists"])
 @router.get("", response_model=PaginatedResponse[ArtistResponse])
 async def list_artists(
     q: str | None = None,
+    # True: only artists with at least one track that has audio.
+    playable: bool = False,
+    sort: Literal["name", "popular"] = "name",
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -28,10 +34,14 @@ async def list_artists(
     if q:
         query = query.where(Artist.name.ilike(f"%{q}%"))
         count_query = count_query.where(Artist.name.ilike(f"%{q}%"))
+    if playable:
+        query = query.where(artist_has_audio())
+        count_query = count_query.where(artist_has_audio())
 
     total = (await db.execute(count_query)).scalar() or 0
+    order = (artist_plays().desc(), Artist.name) if sort == "popular" else (Artist.name,)
     result = await db.execute(
-        query.offset((page - 1) * page_size).limit(page_size).order_by(Artist.name)
+        query.offset((page - 1) * page_size).limit(page_size).order_by(*order)
     )
     items = result.scalars().all()
     return PaginatedResponse(
@@ -55,15 +65,20 @@ async def get_artist(artist_id: str, db: AsyncSession = Depends(get_db)):
 @router.get("/{artist_id}/albums", response_model=PaginatedResponse[AlbumResponse])
 async def list_artist_albums(
     artist_id: uuid.UUID,
+    # True: hide albums none of whose tracks has audio.
+    playable: bool = False,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    count_query = select(func.count(Album.id)).where(Album.artist_id == artist_id)
+    conditions = [Album.artist_id == artist_id]
+    if playable:
+        conditions.append(album_has_audio())
+    count_query = select(func.count(Album.id)).where(*conditions)
     total = (await db.execute(count_query)).scalar() or 0
     result = await db.execute(
         select(Album)
-        .where(Album.artist_id == artist_id)
+        .where(*conditions)
         .offset((page - 1) * page_size)
         .limit(page_size)
         .order_by(Album.release_date.desc().nullslast(), Album.created_at.desc())

@@ -97,3 +97,42 @@ async def test_delete_artist(client: AsyncClient, admin_headers):
 
     get_resp = await client.get(f"/api/v1/artists/{artist_id}", headers=admin_headers)
     assert get_resp.status_code == 404
+
+
+async def _artist_with_tracks(client, headers, name, plays_per_track):
+    """An artist and an album holding one track per entry (None = no audio)."""
+    artist_id = (await client.post("/api/v1/artists", headers=headers, json={"name": name})).json()["id"]
+    album_id = (await client.post("/api/v1/albums", headers=headers, json={"title": f"{name} LP", "artist_id": artist_id})).json()["id"]
+    for n, plays in enumerate(plays_per_track):
+        track = {"title": f"{name} {n}", "artist_id": artist_id, "album_id": album_id, "duration_seconds": 60}
+        if plays is not None:
+            track["file_url"] = f"audio/{name}-{n}.mp3"
+        track_id = (await client.post("/api/v1/tracks", headers=headers, json=track)).json()["id"]
+        for _ in range(plays or 0):
+            await client.post(f"/api/v1/tracks/{track_id}/play", headers=headers, json={"duration_listened_seconds": 30})
+    return artist_id, album_id
+
+
+async def test_list_artists_playable_by_popularity(client: AsyncClient, admin_headers):
+    await _artist_with_tracks(client, admin_headers, "Aaa Quiet", [0])
+    await _artist_with_tracks(client, admin_headers, "Zzz Loud", [2])
+    await _artist_with_tracks(client, admin_headers, "Bbb Ghost", [None])
+    await client.post("/api/v1/artists", headers=admin_headers, json={"name": "Ccc Nothing"})
+
+    names = [a["name"] for a in (await client.get("/api/v1/artists?page_size=100", headers=admin_headers)).json()["items"]]
+    assert names == ["Aaa Quiet", "Bbb Ghost", "Ccc Nothing", "Zzz Loud"]
+
+    response = await client.get("/api/v1/artists?playable=true&sort=popular", headers=admin_headers)
+    assert [a["name"] for a in response.json()["items"]] == ["Zzz Loud", "Aaa Quiet"]
+    assert response.json()["total"] == 2
+
+
+async def test_artist_albums_playable_hides_empty_albums(client: AsyncClient, admin_headers):
+    artist_id, album_id = await _artist_with_tracks(client, admin_headers, "Band", [0])
+    await client.post("/api/v1/albums", headers=admin_headers, json={"title": "Empty", "artist_id": artist_id})
+
+    every = (await client.get(f"/api/v1/artists/{artist_id}/albums", headers=admin_headers)).json()
+    assert every["total"] == 2
+    playable = (await client.get(f"/api/v1/artists/{artist_id}/albums?playable=true", headers=admin_headers)).json()
+    assert [a["title"] for a in playable["items"]] == ["Band LP"]
+    assert playable["total"] == 1

@@ -23,6 +23,8 @@ interface HistoryItem {
   played_at: string;
   duration_listened_seconds: number;
   artist?: { id: string; name: string; image_url?: string };
+  // Full track (with its audio fields); missing from older servers.
+  track?: Track;
 }
 
 const History = () => {
@@ -65,7 +67,7 @@ const History = () => {
     return formatDate(iso, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
-  const itemToTrack = (item: HistoryItem): Track => ({
+  const itemToTrack = (item: HistoryItem): Track => item.track ?? ({
     id: item.track_id,
     title: item.title,
     artist_id: item.artist_id,

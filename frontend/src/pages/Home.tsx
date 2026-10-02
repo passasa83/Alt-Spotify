@@ -23,7 +23,8 @@ const Home = () => {
       try {
         const [tracksRes, artistsRes, playlistsRes] = await Promise.all([
           getTracks(1, 10, { playable: true }),
-          getArtists(1, 8),
+          // Artists left without audio by searches would only open empty pages.
+          getArtists(1, 8, { playable: true, sort: 'popular' }),
           getPlaylists(1, 8),
         ]);
         setRecentTracks(tracksRes.items);

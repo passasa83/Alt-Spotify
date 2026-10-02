@@ -36,6 +36,7 @@ const fr = {
   'player.equalizer': 'Égaliseur',
   'player.jam_session': 'Session Jam',
   'player.now_playing': 'En cours de lecture',
+  'player.no_audio': 'Ce titre n\'a pas encore de fichier audio',
   'player.more': 'Plus',
   'player.download': 'Télécharger hors ligne',
   'player.remove_download': 'Supprimer le téléchargement',

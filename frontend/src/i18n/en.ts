@@ -36,6 +36,7 @@ const en = {
   'player.equalizer': 'Equalizer',
   'player.jam_session': 'Jam Session',
   'player.now_playing': 'Now Playing',
+  'player.no_audio': 'This track has no audio file yet',
   'player.more': 'More',
   'player.download': 'Download for offline',
   'player.remove_download': 'Remove download',

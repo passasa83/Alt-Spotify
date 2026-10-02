@@ -151,6 +151,7 @@ async def get_user_history(
 
     query = query.order_by(ListeningHistory.played_at.desc())
     query = query.offset((page - 1) * page_size).limit(page_size)
+    query = query.options(selectinload(Track.artist), selectinload(Track.album))
 
     result = await db.execute(query)
     rows = result.all()
@@ -166,6 +167,9 @@ async def get_user_history(
             "duration_seconds": track.duration_seconds,
             "played_at": lh.played_at.isoformat() if lh.played_at else None,
             "duration_listened_seconds": lh.duration_listened_seconds,
+            "artist": {"id": str(track.artist.id), "name": track.artist.name} if track.artist else None,
+            # Full track: the player needs file_url/hls_path to play it again.
+            "track": serialize_track(track),
         })
 
     return {

@@ -126,6 +126,9 @@ async def test_play_records_listened_duration(client: AsyncClient, auth_headers,
     assert stats["total_minutes"] == 2
     history = (await client.get("/api/v1/playlists/user/history", headers=auth_headers)).json()["items"]
     assert sorted(h["duration_listened_seconds"] for h in history) == [0, 125]
+    # The player needs the audio fields to play a track again from the history.
+    assert all("hls_path" in h["track"] and "file_url" in h["track"] for h in history)
+    assert all(h["artist"]["name"] for h in history)
 
 
 async def test_play_rejects_negative_duration(client: AsyncClient, auth_headers, admin_headers):

@@ -23,6 +23,7 @@ from app.services.musicbrainz import search_recordings
 from app.services.tidal import tidal_client
 from app.utils.artist import ensure_artist
 from app.utils.deps import get_current_user, require_admin
+from app.utils.playable import album_has_audio, artist_has_audio
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -203,7 +204,8 @@ async def search(
     if not tidal_only:
         if "artists" in types:
             result = await db.execute(
-                select(Artist).where(Artist.name.ilike(like_pattern)).offset(offset).limit(page_size)
+                # Artists/albums left without audio by searches only lead to empty pages.
+                select(Artist).where(Artist.name.ilike(like_pattern), artist_has_audio()).offset(offset).limit(page_size)
             )
             artists_list = list(result.scalars().all())
             deezer_artists = await search_deezer(q, limit=10)
@@ -240,7 +242,7 @@ async def search(
 
         if "albums" in types:
             result = await db.execute(
-                select(Album).where(Album.title.ilike(like_pattern)).offset(offset).limit(page_size)
+                select(Album).where(Album.title.ilike(like_pattern), album_has_audio()).offset(offset).limit(page_size)
             )
             results["albums"] = [AlbumResponse.model_validate(a) for a in result.scalars().all()]
 

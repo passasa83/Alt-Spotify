@@ -306,3 +306,17 @@ describe('playerStore', () => {
     expect(state.queue.map((t) => t.id)).toEqual(['mine']);
   });
 });
+
+describe('tracks without audio', () => {
+  it('tells the user instead of silently doing nothing', async () => {
+    const { useToastStore } = await import('../toastStore');
+    useToastStore.setState({ toasts: [] });
+    const silent = { ...createTrack('silent'), file_url: undefined, hls_path: undefined } as Track;
+
+    usePlayerStore.getState().setTrack(silent);
+    usePlayerStore.getState().setPlaylistAsQueue([silent], 0);
+
+    expect(usePlayerStore.getState().currentTrack).toBeNull();
+    expect(useToastStore.getState().toasts).toHaveLength(2);
+  });
+});

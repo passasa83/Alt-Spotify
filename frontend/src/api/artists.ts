@@ -1,8 +1,13 @@
 import client from './client';
 import type { Artist, Album, PaginatedResponse } from '@/types';
 
-export const getArtists = async (page = 1, pageSize = 20): Promise<PaginatedResponse<Artist>> => {
-  const response = await client.get('/artists', { params: { page, page_size: pageSize } });
+// `playable`: only artists with at least one track that has audio.
+export const getArtists = async (
+  page = 1,
+  pageSize = 20,
+  opts: { playable?: boolean; sort?: 'name' | 'popular' } = {},
+): Promise<PaginatedResponse<Artist>> => {
+  const response = await client.get('/artists', { params: { page, page_size: pageSize, playable: opts.playable, sort: opts.sort } });
   return response.data;
 };
 
@@ -11,8 +16,14 @@ export const getArtist = async (id: string): Promise<Artist> => {
   return response.data;
 };
 
-export const getArtistAlbums = async (id: string, page = 1, pageSize = 20): Promise<PaginatedResponse<Album>> => {
-  const response = await client.get(`/artists/${id}/albums`, { params: { page, page_size: pageSize } });
+// `playable`: hide albums none of whose tracks has audio.
+export const getArtistAlbums = async (
+  id: string,
+  page = 1,
+  pageSize = 20,
+  opts: { playable?: boolean } = {},
+): Promise<PaginatedResponse<Album>> => {
+  const response = await client.get(`/artists/${id}/albums`, { params: { page, page_size: pageSize, playable: opts.playable } });
   return response.data;
 };
 

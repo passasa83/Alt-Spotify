@@ -25,6 +25,7 @@ async def _seed_data(client, admin_headers):
             "artist_id": str(artist_id),
             "album_id": album_id,
             "duration_seconds": 180,
+            "file_url": "audio/searchable.mp3",
         },
     )
 
@@ -135,3 +136,14 @@ async def test_playable_local_tracks_rank_before_external_results(client: AsyncC
     titles = [t["title"] for t in response.json()["tracks"]]
     assert titles[0] == "Rankme Local"
     assert set(titles[1:]) == {"Rankme External 0", "Rankme External 1", "Rankme External 2"}
+
+
+async def test_search_hides_artists_and_albums_without_audio(client: AsyncClient, admin_headers):
+    await _seed_data(client, admin_headers)
+    # Leftovers of a search: an artist and an album with no playable track.
+    artist_id = (await client.post("/api/v1/artists", headers=admin_headers, json={"name": "Searchable Ghost"})).json()["id"]
+    await client.post("/api/v1/albums", headers=admin_headers, json={"title": "Searchable Ghost Album", "artist_id": artist_id})
+
+    data = (await client.get("/api/v1/search?q=Searchable&type=artists,albums", headers=admin_headers)).json()
+    assert [a["name"] for a in data["artists"]] == ["Searchable Artist"]
+    assert [a["title"] for a in data["albums"]] == ["Searchable Album"]

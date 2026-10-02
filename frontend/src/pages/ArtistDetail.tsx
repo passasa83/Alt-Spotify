@@ -44,7 +44,7 @@ const ArtistDetail = () => {
         // many tracks have no album, and albums can be empty.
         const [artistData, albumsData, tracksData] = await Promise.all([
           getArtist(id),
-          getArtistAlbums(id),
+          getArtistAlbums(id, 1, 50, { playable: true }),
           getTracks(1, MAX_TRACKS, { artistId: id, playable: true, sort: 'play_count', order: 'desc' }),
         ]);
         setArtist(artistData);
@@ -143,14 +143,16 @@ const ArtistDetail = () => {
         )}
       </section>
 
-      <section className="mb-8">
-        <h2 className="mb-4 text-xl font-bold text-white">{t('artist.discography')}</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {albums.map((album) => (
-            <AlbumCard key={album.id} album={album} />
-          ))}
-        </div>
-      </section>
+      {albums.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-4 text-xl font-bold text-white">{t('artist.discography')}</h2>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {albums.map((album) => (
+              <AlbumCard key={album.id} album={{ ...album, artist: album.artist ?? artist }} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 };

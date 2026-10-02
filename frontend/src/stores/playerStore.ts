@@ -3,6 +3,8 @@ import type { Track, LyricsLine } from '@/types';
 import type { Device } from '@/api/devices';
 import { registerDevice, sendHeartbeat, getDevices } from '@/api/devices';
 import { getAutoplayTracks } from '@/api/recommendations';
+import { t } from '@/i18n';
+import { useToastStore } from '@/stores/toastStore';
 
 export type RepeatMode = 'off' | 'one' | 'all';
 
@@ -17,6 +19,9 @@ function generateDeviceId(): string {
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
 const hasAudio = (track: Track) => !!(track.file_url || track.hls_path);
+
+// Clicking a track without audio used to do nothing at all.
+const reportNoAudio = () => useToastStore.getState().addToast(t('player.no_audio'));
 
 // Ids the player queued by itself (rest of the playlist, autoplay), as opposed
 // to tracks the user added: those stay ahead and survive a new selection.
@@ -139,7 +144,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   setTrack: (track) => {
-    if (!hasAudio(track)) return;
+    if (!hasAudio(track)) {
+      reportNoAudio();
+      return;
+    }
     const { currentTrack, history, queue } = get();
     if (currentTrack) {
       set({ history: [currentTrack, ...history].slice(0, 50) });
@@ -224,7 +232,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   setPlaylistAsQueue: (tracks, startIndex = 0) => {
     const playable = tracks.filter(hasAudio);
-    if (playable.length === 0) return;
+    if (playable.length === 0) {
+      reportNoAudio();
+      return;
+    }
     const { currentTrack, history } = get();
     if (currentTrack) {
       set({ history: [currentTrack, ...history].slice(0, 50) });

@@ -6,7 +6,7 @@ from typing import Literal
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import String, cast, func, or_, select, update
+from sqlalchemy import String, cast, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -18,6 +18,7 @@ from app.models.track import Track
 from app.models.user import User
 from app.schemas.common import PaginatedResponse
 from app.schemas.track import TrackCreate, TrackResponse, TrackUpdate
+from app.utils.playable import has_audio
 from app.services.offline import generate_download_url
 from app.utils.deps import get_current_user, get_current_user_stream, require_admin
 from app.utils.track_cleanup import delete_tracks
@@ -119,8 +120,7 @@ async def list_tracks(
         query = query.where(local_filter)
         count_query = count_query.where(local_filter)
     if playable is not None:
-        has_audio = or_(Track.file_url.isnot(None), Track.hls_path.isnot(None))
-        audio_filter = has_audio if playable else ~has_audio
+        audio_filter = has_audio() if playable else ~has_audio()
         query = query.where(audio_filter)
         count_query = count_query.where(audio_filter)
 
