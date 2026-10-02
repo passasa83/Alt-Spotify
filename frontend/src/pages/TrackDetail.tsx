@@ -100,6 +100,7 @@ const TrackDetail = () => {
       <div className="mb-6 flex items-center gap-6">
         <button
           onClick={handlePlay}
+          aria-label={isCurrentTrack && isPlaying ? t('player.pause') : t('player.play')}
           className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-black transition-transform hover:scale-105"
         >
           {isCurrentTrack && isPlaying ? (
@@ -113,6 +114,8 @@ const TrackDetail = () => {
             if (liked) removeFromFavorites(String(track.id));
             else addToFavorites(track);
           }}
+          aria-label={t('nav.liked_songs')}
+          aria-pressed={liked}
           className="text-gray-400 transition-colors hover:text-white"
         >
           <Heart size={24} fill={liked ? 'currentColor' : 'none'} className={liked ? 'text-green-500' : ''} />

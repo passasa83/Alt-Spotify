@@ -89,6 +89,7 @@ const AlbumDetail = () => {
       <div className="mb-6 flex items-center gap-6">
         <button
           onClick={handlePlayAll}
+          aria-label={t('player.play')}
           className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-black transition-transform hover:scale-105"
         >
           <Play size={24} fill="currentColor" />
