@@ -489,6 +489,12 @@ const fr = {
   'artist.popular': 'Populaire',
   'artist.discography': 'Discographie',
   'artist.not_found': 'Artiste introuvable',
+  'artist.track_count': '{count} titres',
+  'artist.show_more': 'Afficher plus',
+  'artist.show_less': 'Afficher moins',
+  'artist.no_tracks': 'Aucun titre jouable pour cet artiste pour l\'instant.',
+  'artist.play': 'Lecture',
+  'artist.shuffle': 'Lecture aléatoire',
 
   // Album
   'album.album': 'Album',

@@ -489,6 +489,12 @@ const en = {
   'artist.popular': 'Popular',
   'artist.discography': 'Discography',
   'artist.not_found': 'Artist not found',
+  'artist.track_count': '{count} tracks',
+  'artist.show_more': 'Show more',
+  'artist.show_less': 'Show less',
+  'artist.no_tracks': 'No playable track for this artist yet.',
+  'artist.play': 'Play',
+  'artist.shuffle': 'Shuffle play',
 
   // Album
   'album.album': 'Album',
