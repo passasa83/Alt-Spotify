@@ -2,6 +2,7 @@ import { usePlayerStore, type RepeatMode } from '@/stores/playerStore';
 import type { Track } from '@/types';
 import { resolveCoverUrl, getTrackStreamUrl, playTrack } from '@/api/tracks';
 import { getMe } from '@/api/users';
+import { refreshMediaToken } from '@/api/mediaToken';
 import { useToastStore } from '@/stores/toastStore';
 import { t as translate } from '@/i18n';
 import { addFavorite, removeFavorite, checkFavorite } from '@/api/favorites';
@@ -216,6 +217,7 @@ const Player = () => {
       authRetriedTrackIdRef.current = track.id;
       try {
         await getMe(); // the API client refreshes the access token on 401
+        await refreshMediaToken(); // the URL's media token may be the expired one
       } catch {
         return; // refresh failed: the client redirects to /login
       }

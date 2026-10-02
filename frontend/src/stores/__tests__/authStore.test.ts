@@ -6,6 +6,12 @@ vi.mock('@/api/auth', () => ({
   register: vi.fn(),
   refreshToken: vi.fn(),
   changePassword: vi.fn(),
+  logout: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/api/mediaToken', () => ({
+  ensureMediaToken: vi.fn().mockResolvedValue(undefined),
+  clearMediaToken: vi.fn(),
 }));
 
 vi.mock('@/api/users', () => ({
@@ -68,6 +74,8 @@ describe('authStore', () => {
     expect(localStorage.getItem('refresh_token')).toBeNull();
     expect(useAuthStore.getState().user).toBeNull();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    // The session is revoked server-side with the refresh token it held.
+    expect(vi.mocked(authApi.logout)).toHaveBeenCalledWith('ref123');
   });
 
   it('refreshAuth updates user', async () => {

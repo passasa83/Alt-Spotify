@@ -23,6 +23,7 @@ from app.core.rate_limit import RateLimitMiddleware
 from app.core.redis import close_redis
 from app.core.request_id import RequestIDMiddleware
 from app.core.security_enhanced import SecurityHeadersMiddleware
+from app.core.trusted_proxy import TrustedProxyMiddleware
 from app.services.meilisearch import ensure_indexes, reindex_all
 
 logger = structlog.get_logger("app")
@@ -129,10 +130,17 @@ app.add_middleware(MetricsMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Auth uses the Authorization header, not cookies: with a "*" origin list,
+    # credentialed cross-site requests stay off.
+    allow_credentials="*" not in settings.cors_origins_list,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Range", "X-Request-ID"],
+    expose_headers=["Content-Range", "Accept-Ranges", "Retry-After", "X-Request-ID"],
 )
+
+# Added last = outermost: everything below sees the real client IP, taken
+# from X-Forwarded-For only when a private-network proxy sent it.
+app.add_middleware(TrustedProxyMiddleware)
 
 # Exception handlers
 app.add_exception_handler(AppException, app_exception_handler)

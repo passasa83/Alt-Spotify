@@ -28,8 +28,14 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 365
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # Sliding: every refresh issues a new refresh token (rotation).
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    # Token put in media URLs (<audio>, <img>): streaming and covers only.
+    MEDIA_TOKEN_EXPIRE_MINUTES: int = 360
+    # Failed logins on one account before it is locked for LOGIN_LOCKOUT_MINUTES.
+    LOGIN_MAX_FAILURES: int = 10
+    LOGIN_LOCKOUT_MINUTES: int = 15
 
     MINIO_ENDPOINT: str = "localhost:9000"
     MINIO_ACCESS_KEY: str = "minioadmin"

@@ -145,7 +145,9 @@ async def test_tidal_requires_login(client: AsyncClient, path):
     assert response.status_code == 401
 
 
-async def test_local_track_streams_with_range(client: AsyncClient, db_session, auth_headers, tmp_path):
+async def test_local_track_streams_with_range(client: AsyncClient, db_session, auth_headers, tmp_path, monkeypatch):
+    # Local files are only served from the music folders.
+    monkeypatch.setenv("MUSIC_SCAN_DIR", str(tmp_path))
     audio = tmp_path / "song.mp3"
     audio.write_bytes(bytes(range(256)) * 4)  # 1024 bytes
     artist = Artist(id=uuid.uuid4(), name="Local")

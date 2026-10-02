@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session, get_db
 from app.core.redis import get_redis
-from app.core.security import verify_token
+from app.core.sessions import user_id_from_token
 from app.models.jam import JamParticipant, JamSession, JamSessionStatus
 from app.models.user import User
 from app.utils.deps import get_current_user
@@ -281,7 +281,7 @@ async def jam_websocket(websocket: WebSocket, session_id: uuid.UUID):
 
     # Authenticate via query param token
     token = websocket.query_params.get("token")
-    user_id = verify_token(token, token_type="access") if token else None
+    user_id = await user_id_from_token(token)
     if not user_id:
         await websocket.close(code=4001, reason="Invalid token")
         return

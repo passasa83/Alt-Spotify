@@ -46,14 +46,15 @@ def _client_key(request: Request) -> str:
     person's activity from eating everyone else's quota — before this, every
     stream on the server shared a single "anon" bucket.
     """
-    from app.core.security import verify_token
+    from app.core.security import decode_token
 
     auth = request.headers.get("authorization", "")
     token = auth[7:] if auth.lower().startswith("bearer ") else request.query_params.get("token")
     if token:
-        user_id = verify_token(token, token_type="access")
-        if user_id:
-            return f"user:{user_id}"
+        # Signature only (no Redis round trip): the route checks revocation.
+        payload = decode_token(token, ("access", "media"))
+        if payload:
+            return f"user:{payload['sub']}"
     return f"ip:{request.client.host if request.client else 'unknown'}"
 
 

@@ -21,9 +21,21 @@ export const refreshToken = async (refreshToken: string): Promise<TokenResponse>
   return response.data;
 };
 
-export const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
-  await client.post('/auth/change-password', {
+// Changing the password signs out every other session; this device gets new tokens.
+export const changePassword = async (currentPassword: string, newPassword: string): Promise<TokenResponse> => {
+  const response = await client.post('/auth/change-password', {
     current_password: currentPassword,
     new_password: newPassword,
   });
+  return response.data;
+};
+
+/** Revoke this session server-side (access token in the header + refresh token). */
+export const logout = async (refreshToken: string | null): Promise<void> => {
+  await client.post('/auth/logout', { refresh_token: refreshToken });
+};
+
+/** Sign out every device, this one included. */
+export const logoutAll = async (): Promise<void> => {
+  await client.post('/auth/logout-all');
 };

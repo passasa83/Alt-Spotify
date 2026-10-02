@@ -86,10 +86,10 @@ services:
       # (BIND_IP), donc joignable via l'IP de la machine. Mettre une IP fixe
       # dans le .env pour restreindre l'exposition.
       - "${BIND_IP:-0.0.0.0}:8000:8000"
-    # --proxy-headers makes uvicorn trust X-Forwarded-For / X-Forwarded-Proto so
-    # that request.client.host is the real client and not the proxy's IP,
-    # which the rate limiter is keyed on. "*" is required because the proxy
-    # container has a dynamic IP on the Docker network.
+    # X-Forwarded-For / -Proto are handled by the app's TrustedProxyMiddleware:
+    # trusted only from private addresses (the reverse proxy on the Docker
+    # network, the host, the LAN). uvicorn's "--forwarded-allow-ips *" trusted
+    # anyone, so a direct client could fake its IP. Extra proxies: TRUSTED_PROXIES.
     command:
       - uvicorn
       - app.main:app
@@ -97,9 +97,6 @@ services:
       - "0.0.0.0"
       - --port
       - "8000"
-      - --proxy-headers
-      - --forwarded-allow-ips
-      - "*"
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-altspotify}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-altspotify}
       REDIS_URL: redis://redis:6379/0
@@ -111,6 +108,10 @@ services:
       ALGORITHM: ${ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      MEDIA_TOKEN_EXPIRE_MINUTES: ${MEDIA_TOKEN_EXPIRE_MINUTES:-360}
+      LOGIN_MAX_FAILURES: ${LOGIN_MAX_FAILURES:-10}
+      LOGIN_LOCKOUT_MINUTES: ${LOGIN_LOCKOUT_MINUTES:-15}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
       # false (défaut) : seul le PREMIER compte est créable librement (il devient

@@ -77,8 +77,8 @@ async def notifications_websocket(websocket: WebSocket):
         await websocket.close(code=4001, reason="Missing token")
         return
 
-    from app.core.security import verify_token
-    user_id = verify_token(token, token_type="access")
+    from app.core.sessions import user_id_from_token
+    user_id = await user_id_from_token(token)
     if not user_id:
         await websocket.close(code=4001, reason="Invalid token")
         return

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { updateProfile } from '@/api/users';
 import { changePassword } from '@/api/auth';
+import { refreshMediaToken } from '@/api/mediaToken';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getLocale, setLocale } from '@/i18n';
 
@@ -55,7 +56,11 @@ const Settings = () => {
     setError('');
     setMessage('');
     try {
-      await changePassword(currentPassword, newPassword);
+      const tokens = await changePassword(currentPassword, newPassword);
+      // Old tokens were revoked with the password change.
+      localStorage.setItem('access_token', tokens.access_token);
+      localStorage.setItem('refresh_token', tokens.refresh_token);
+      await refreshMediaToken().catch(() => {});
       setMessage(t('settings.password_changed'));
       setCurrentPassword('');
       setNewPassword('');

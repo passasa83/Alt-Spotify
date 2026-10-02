@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -5,6 +6,8 @@ from sqlalchemy import desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.security import hash_password
+from app.core.sessions import revoke_all_for_user
 from app.models.album import Album
 from app.models.artist import Artist
 from app.models.device_session import DeviceSession
@@ -205,6 +208,9 @@ async def toggle_user_active(
         raise HTTPException(status_code=404, detail="User not found")
 
     user.is_active = body.get("is_active", True)
+    if not user.is_active:
+        # Disabling must end the sessions already open, not only new logins.
+        await revoke_all_for_user(str(user.id))
     return {"status": "ok"}
 
 
@@ -227,6 +233,12 @@ async def soft_delete_user(
     user.is_active = False
     user.email = f"deleted_{user.id}@alt-spotify.local"
     user.pseudo = f"deleted_{str(user.id)[:8]}"
+    # Personal data goes too, and the password can never match again.
+    user.avatar_url = None
+    user.bio = None
+    user.country = None
+    user.hashed_password = hash_password(secrets.token_urlsafe(32))
+    await revoke_all_for_user(str(user.id))
     return {"status": "ok"}
 
 

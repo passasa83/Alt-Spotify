@@ -1,4 +1,5 @@
 import client from './client';
+import { getMediaToken } from './mediaToken';
 import type { Track, PaginatedResponse } from '@/types';
 
 export interface UploadResult {
@@ -10,9 +11,9 @@ export interface UploadResult {
 export const resolveCoverUrl = (url: string | null | undefined): string => {
   if (!url) return '/placeholder-album.svg';
   if (url.startsWith('local_cover:')) {
-    const token = localStorage.getItem('access_token');
+    const token = getMediaToken() ?? localStorage.getItem('access_token');
     const path = url.substring('local_cover:'.length);
-    return `/api/v1/local/covers${path.startsWith('/') ? path : `/${path}`}${token ? `?token=${token}` : ''}`;
+    return `/api/v1/local/covers${path.startsWith('/') ? path : `/${path}`}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
   }
   return url;
 };
@@ -53,9 +54,10 @@ export const searchTracks = async (query: string): Promise<Track[]> => {
   return response.data.items;
 };
 
-// <audio> can't send an Authorization header: media URLs carry the token.
+// <audio> can't send an Authorization header: media URLs carry a token, the
+// restricted media token when available (URLs land in logs and history).
 export const withToken = (url: string): string => {
-  const token = localStorage.getItem('access_token');
+  const token = getMediaToken() ?? localStorage.getItem('access_token');
   return token ? `${url}?token=${encodeURIComponent(token)}` : url;
 };
 

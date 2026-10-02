@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { User } from '@/types';
 import * as authApi from '@/api/auth';
 import { getMe } from '@/api/users';
+import { clearMediaToken, ensureMediaToken } from '@/api/mediaToken';
 
 interface AuthState {
   user: User | null;
@@ -25,6 +26,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const tokens = await authApi.login(email, password);
       localStorage.setItem('access_token', tokens.access_token);
       localStorage.setItem('refresh_token', tokens.refresh_token);
+      await ensureMediaToken();
       const user = await getMe();
       set({ user, isAuthenticated: true, isLoading: false });
     } catch (error) {
@@ -45,8 +47,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
+    // Revoke the session server-side too (best effort: logging out locally
+    // must work even offline).
+    authApi.logout(localStorage.getItem('refresh_token')).catch(() => {});
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    clearMediaToken();
     set({ user: null, isAuthenticated: false });
   },
 

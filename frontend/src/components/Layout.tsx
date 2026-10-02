@@ -5,6 +5,7 @@ import TopBar from './TopBar';
 import Player from './Player';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useAuthStore } from '@/stores/authStore';
+import { ensureMediaToken } from '@/api/mediaToken';
 import SkipToContent from './SkipToContent';
 import MobileNav from './MobileNav';
 
@@ -24,6 +25,14 @@ const Layout = () => {
   useEffect(() => {
     initDevice();
   }, [initDevice]);
+
+  // Keep a fresh media token for stream / cover URLs.
+  useEffect(() => {
+    if (!user) return;
+    ensureMediaToken();
+    const timer = setInterval(ensureMediaToken, 15 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [user]);
 
   return (
     <div className="flex h-screen flex-col bg-black">
