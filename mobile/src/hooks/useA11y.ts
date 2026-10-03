@@ -15,10 +15,9 @@ export function useA11y() {
     return false;
   }, []);
 
-  const setAccessibilityFocus = useCallback(() => {
-    if (Platform.OS === 'ios') {
-      AccessibilityInfo.setAccessibilityFocus();
-    }
+  // reactTag: findNodeHandle(ref.current) of the element to focus.
+  const setAccessibilityFocus = useCallback((reactTag: number) => {
+    AccessibilityInfo.setAccessibilityFocus(reactTag);
   }, []);
 
   return { announce, isScreenReaderEnabled, setAccessibilityFocus };

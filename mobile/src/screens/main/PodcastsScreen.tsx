@@ -25,7 +25,7 @@ export default function PodcastsScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('PodcastDetail', { id: item.id })}>
-            {item.image_url ? <Image source={{ uri: item.image_url }} style={styles.image} /> : <View style={styles.placeholder}><Ionicons name="headphones" size={24} color={colors.text} /></View>}
+            {item.image_url ? <Image source={{ uri: item.image_url }} style={styles.image} /> : <View style={styles.placeholder}><Ionicons name="headset" size={24} color={colors.text} /></View>}
             <View style={styles.info}>
               <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
               <Text style={styles.author} numberOfLines={1}>{item.author || 'Unknown'}</Text>

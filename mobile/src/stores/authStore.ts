@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from '../api/session';
+import client from '../api/client';
 import type { User } from '../types';
 import * as authApi from '../api/auth';
 import { getMe } from '../api/users';
@@ -23,13 +24,13 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   restoreSession: async () => {
     try {
-      const token = await AsyncStorage.getItem('access_token');
+      const token = await getAccessToken();
       if (token) {
         const user = await getMe();
         set({ user, isAuthenticated: true });
       }
     } catch {
-      await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
+      await clearTokens();
     }
   },
 
@@ -37,8 +38,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const tokens = await authApi.login(email, password);
-      await AsyncStorage.setItem('access_token', tokens.access_token);
-      await AsyncStorage.setItem('refresh_token', tokens.refresh_token);
+      await saveTokens(tokens.access_token, tokens.refresh_token);
       const user = await getMe();
       set({ user, isAuthenticated: true, isLoading: false });
     } catch (error) {
@@ -59,7 +59,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
+    // Revoke the session server-side too (best effort: offline logout still works).
+    const refreshToken = await getRefreshToken();
+    await client.post('/auth/logout', refreshToken ? { refresh_token: refreshToken } : undefined).catch(() => {});
+    await clearTokens();
     set({ user: null, isAuthenticated: false });
   },
 
@@ -68,7 +71,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await getMe();
       set({ user, isAuthenticated: true });
     } catch {
-      await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
+      await clearTokens();
       set({ user: null, isAuthenticated: false });
     }
   },

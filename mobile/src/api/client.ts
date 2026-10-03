@@ -1,9 +1,8 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '@env';
+import { API_BASE_URL, clearTokens, getAccessToken, getRefreshToken, saveTokens } from './session';
 
 const client = axios.create({
-  baseURL: API_BASE_URL || 'http://localhost:8000/api/v1',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -11,7 +10,7 @@ const client = axios.create({
 });
 
 client.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('access_token');
+  const token = await getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -55,10 +54,10 @@ client.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      const refreshToken = await AsyncStorage.getItem('refresh_token');
+      const refreshToken = await getRefreshToken();
       if (!refreshToken) {
         isRefreshing = false;
-        await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
+        await clearTokens();
         return Promise.reject(error);
       }
 
@@ -68,14 +67,14 @@ client.interceptors.response.use(
           { refresh_token: refreshToken }
         );
         const { access_token, refresh_token: newRefresh } = response.data;
-        await AsyncStorage.setItem('access_token', access_token);
-        await AsyncStorage.setItem('refresh_token', newRefresh);
+        // Refresh tokens rotate: the old one is now revoked server-side.
+        await saveTokens(access_token, newRefresh);
         processQueue(null, access_token);
         originalRequest.headers.Authorization = `Bearer ${access_token}`;
         return client(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
+        await clearTokens();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

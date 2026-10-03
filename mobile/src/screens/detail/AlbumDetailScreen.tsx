@@ -10,6 +10,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import type { Album, Track } from '../../types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
+import CoverImage from '../../components/CoverImage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AlbumDetail'>;
 
@@ -69,7 +70,7 @@ export default function AlbumDetailScreen({ route, navigation }: Props) {
         ListHeaderComponent={
           <View style={styles.albumHeader}>
             {album.cover_url ? (
-              <Image source={{ uri: album.cover_url }} style={styles.cover} />
+              <CoverImage uri={album.cover_url} style={styles.cover} />
             ) : (
               <View style={[styles.cover, styles.coverPlaceholder]}>
                 <Ionicons name="disc" size={60} color={colors.textMuted} />

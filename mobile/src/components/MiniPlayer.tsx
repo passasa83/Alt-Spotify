@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Progress from 'react-native-progress';
 import { colors, spacing, fontSize, borderRadius } from '../utils/theme';
 import { formatTime } from '../utils/formatTime';
 import { usePlayerStore } from '../stores/playerStore';
+import CoverImage from './CoverImage';
 
 interface MiniPlayerProps {
   onPress: () => void;
@@ -20,19 +20,13 @@ export default function MiniPlayer({ onPress }: MiniPlayerProps) {
   return (
     <Pressable style={styles.container} onPress={onPress}>
       <View style={styles.progressBar}>
-        <Progress.Bar
-          progress={progressValue}
-          width={null}
-          height={2}
-          color={colors.primary}
-          unfilledColor={colors.border}
-          borderWidth={0}
-          style={styles.progress}
-        />
+        <View style={[styles.progress, { height: 2, backgroundColor: colors.border }]}>
+          <View style={{ height: 2, width: `${Math.min(100, progressValue * 100)}%`, backgroundColor: colors.primary }} />
+        </View>
       </View>
       <View style={styles.content}>
         {currentTrack.cover_url ? (
-          <Image source={{ uri: currentTrack.cover_url }} style={styles.cover} />
+          <CoverImage uri={currentTrack.cover_url} style={styles.cover} />
         ) : (
           <View style={[styles.cover, styles.coverPlaceholder]}>
             <Ionicons name="musical-note" size={16} color={colors.textMuted} />

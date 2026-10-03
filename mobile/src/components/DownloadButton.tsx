@@ -3,6 +3,7 @@ import { TouchableOpacity, ActivityIndicator, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { downloadTrack, removeDownload, isTrackDownloaded } from '../services/offlineStorage';
 import { getTrackStreamUrl } from '../api/tracks';
+import { withMediaToken } from '../api/mediaToken';
 
 interface Props {
   trackId: string;
@@ -27,10 +28,8 @@ export default function DownloadButton({ trackId, color = '#9ca3af', size = 20 }
 
     setIsDownloading(true);
     try {
-      const streamUrl = getTrackStreamUrl(trackId);
-      const userId = 'current-user-id';
-      const deviceId = 'mobile-device-id';
-      await downloadTrack(trackId, streamUrl, userId, deviceId);
+      // The original file (not HLS), with the media token: no header on downloads.
+      await downloadTrack(trackId, await withMediaToken(getTrackStreamUrl(trackId)));
       setIsDownloaded(true);
     } catch (error) {
       console.error('Download failed:', error);

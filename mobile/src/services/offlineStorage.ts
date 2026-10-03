@@ -1,5 +1,4 @@
 import * as FileSystem from 'expo-file-system';
-import * as Crypto from 'expo-crypto';
 
 interface DownloadedTrack {
   trackId: string;
@@ -31,45 +30,43 @@ async function saveIndex(index: Record<string, DownloadedTrack>) {
   await FileSystem.writeAsStringAsync(INDEX_FILE, JSON.stringify(index, null, 2));
 }
 
-export async function downloadTrack(
-  trackId: string,
-  streamUrl: string,
-  userId: string,
-  deviceId: string
-): Promise<DownloadedTrack> {
+// Audio players pick the decoder from the extension.
+const EXTENSIONS: Record<string, string> = {
+  'audio/flac': 'flac',
+  'audio/x-flac': 'flac',
+  'audio/mpeg': 'mp3',
+  'audio/mp4': 'm4a',
+  'audio/aac': 'aac',
+  'audio/ogg': 'ogg',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+};
+
+/**
+ * Save a track for offline listening, streamed straight to the app's private
+ * storage (a 50 MB FLAC must never go through a JS string).
+ */
+export async function downloadTrack(trackId: string, streamUrl: string): Promise<DownloadedTrack> {
   const index = await loadIndex();
   if (index[trackId]) return index[trackId];
+  await ensureDir();
 
-  const response = await fetch(streamUrl);
-  const blob = await response.blob();
-
-  const key = await Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    `${userId}:${deviceId}`
-  );
-
-  const localUri = `${OFFLINE_DIR}${trackId}.enc`;
-  const arrayBuffer = await blob.arrayBuffer();
-  const uint8 = new Uint8Array(arrayBuffer);
-
-  const encrypted = new Uint8Array(uint8.length + 16);
-  for (let i = 0; i < 16; i++) {
-    encrypted[i] = parseInt(key.slice(i * 2, i * 2 + 2), 16);
+  const partial = `${OFFLINE_DIR}${trackId}.part`;
+  const result = await FileSystem.downloadAsync(streamUrl, partial);
+  if (result.status !== 200) {
+    await FileSystem.deleteAsync(partial, { idempotent: true });
+    throw new Error(`Download failed (HTTP ${result.status})`);
   }
-  encrypted.set(uint8, 16);
-
-  await FileSystem.writeAsStringAsync(
-    localUri,
-    String.fromCharCode(...encrypted),
-    { encoding: FileSystem.EncodingType.Base64 }
-  );
+  const type = (result.headers['Content-Type'] || result.headers['content-type'] || '').split(';')[0]!.trim();
+  const localUri = `${OFFLINE_DIR}${trackId}.${EXTENSIONS[type] ?? 'audio'}`;
+  await FileSystem.moveAsync({ from: partial, to: localUri });
 
   const fileInfo = await FileSystem.getInfoAsync(localUri);
   const track: DownloadedTrack = {
     trackId,
     localUri,
     downloadedAt: Date.now(),
-    size: fileInfo.size || 0,
+    size: fileInfo.exists ? fileInfo.size : 0,
   };
 
   index[trackId] = track;

@@ -6,10 +6,10 @@ export const configureBackgroundAudio = async () => {
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
       staysActiveInBackground: true,
-      interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
+      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
       playsInSilentModeIOS: true,
       shouldDuckAndroid: true,
-      interruptionModeAndroid: InterruptionModeAndroid.MixWithOthers,
+      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
       playThroughEarpieceAndroid: false,
     });
   } catch (error) {
@@ -21,11 +21,11 @@ export const setAudioInterruptionMode = async () => {
   try {
     if (Platform.OS === 'ios') {
       await Audio.setAudioModeAsync({
-        interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
+        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
       });
     } else {
       await Audio.setAudioModeAsync({
-        interruptionModeAndroid: InterruptionModeAndroid.MixWithOthers,
+        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
       });
     }
   } catch (error) {

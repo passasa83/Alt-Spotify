@@ -11,6 +11,7 @@ import SynchronizedLyrics from '../../components/SynchronizedLyrics';
 import type { Track, LyricsLine } from '../../types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
+import CoverImage from '../../components/CoverImage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TrackDetail'>;
 
@@ -65,7 +66,7 @@ export default function TrackDetailScreen({ route, navigation }: Props) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {track.cover_url ? (
-          <Image source={{ uri: track.cover_url }} style={styles.cover} />
+          <CoverImage uri={track.cover_url} style={styles.cover} />
         ) : (
           <View style={[styles.cover, styles.coverPlaceholder]}>
             <Ionicons name="musical-note" size={60} color={colors.textMuted} />

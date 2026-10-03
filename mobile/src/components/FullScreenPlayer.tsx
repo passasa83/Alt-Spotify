@@ -5,6 +5,7 @@ import Slider from '@react-native-community/slider';
 import { colors, spacing, fontSize, borderRadius } from '../utils/theme';
 import { formatTime } from '../utils/formatTime';
 import { usePlayerStore } from '../stores/playerStore';
+import CoverImage from './CoverImage';
 
 interface FullScreenPlayerProps {
   onClose: () => void;
@@ -52,7 +53,7 @@ export default function FullScreenPlayer({ onClose, onSeek }: FullScreenPlayerPr
 
       <View style={styles.coverContainer}>
         {currentTrack.cover_url ? (
-          <Image source={{ uri: currentTrack.cover_url }} style={styles.cover} />
+          <CoverImage uri={currentTrack.cover_url} style={styles.cover} />
         ) : (
           <View style={[styles.cover, styles.coverPlaceholder]}>
             <Ionicons name="musical-note" size={60} color={colors.textMuted} />

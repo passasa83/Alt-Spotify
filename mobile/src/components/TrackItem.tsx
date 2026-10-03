@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../utils/theme';
 import { formatTime } from '../utils/formatTime';
 import type { Track } from '../types';
+import CoverImage from './CoverImage';
 
 interface TrackItemProps {
   track: Track;
@@ -21,7 +22,7 @@ export default function TrackItem({ track, index, onPress, onPlayPress, showInde
         {showIndex && index !== undefined ? (
           <Text style={[styles.index, isActive && styles.activeText]}>{index + 1}</Text>
         ) : track.cover_url ? (
-          <Image source={{ uri: track.cover_url }} style={styles.cover} />
+          <CoverImage uri={track.cover_url} style={styles.cover} />
         ) : (
           <View style={[styles.cover, styles.coverPlaceholder]}>
             <Ionicons name="musical-note" size={20} color={colors.textMuted} />

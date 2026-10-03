@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from './src/stores/authStore';
@@ -11,20 +11,46 @@ import FullScreenPlayer from './src/components/FullScreenPlayer';
 import MiniPlayer from './src/components/MiniPlayer';
 import LoadingSpinner from './src/components/LoadingSpinner';
 import { configureBackgroundAudio } from './src/services/backgroundAudio';
+import { useAudioPlayer } from './src/hooks/useAudioPlayer';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
 import { setNavigationRef } from './src/services/notificationHandler';
 import type { RootStackParamList } from './src/navigation/types';
-import { View, StyleSheet } from 'react-native';
+import { Modal, View, StyleSheet } from 'react-native';
 import { colors } from './src/utils/theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+// Height of the bottom tab bar (MainNavigator): the mini player sits on top of it.
+const TAB_BAR_HEIGHT = 85;
+
+/** Plays the audio and shows the mini player / full-screen player over the app. */
+function PlayerHost() {
+  const { seekTo } = useAudioPlayer();
+  const currentTrack = usePlayerStore((s) => s.currentTrack);
+  const [fullScreen, setFullScreen] = useState(false);
+
+  if (!currentTrack) return null;
+  return (
+    <>
+      <View style={styles.miniPlayerDock} pointerEvents="box-none">
+        <MiniPlayer onPress={() => setFullScreen(true)} />
+      </View>
+      <Modal
+        visible={fullScreen}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setFullScreen(false)}
+      >
+        <FullScreenPlayer onClose={() => setFullScreen(false)} onSeek={seekTo} />
+      </Modal>
+    </>
+  );
+}
+
 function MainApp() {
   const { isAuthenticated, isLoading, restoreSession } = useAuthStore();
-  const { currentTrack } = usePlayerStore();
-  const [showFullScreen, setShowFullScreen] = useState(false);
   const [ready, setReady] = useState(false);
-  const navigationRef = useRef(null);
+  const navigationRef = useNavigationContainerRef<RootStackParamList>();
   usePushNotifications();
 
   useEffect(() => {
@@ -47,7 +73,7 @@ function MainApp() {
   return (
     <>
       <StatusBar style="light" />
-      <NavigationContainer ref={navigationRef} onReady={() => setNavigationRef(navigationRef.current)}>
+      <NavigationContainer ref={navigationRef} onReady={() => setNavigationRef(navigationRef)}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {!isAuthenticated ? (
             <Stack.Screen name="Auth" component={AuthNavigator} />
@@ -97,6 +123,7 @@ function MainApp() {
             </>
           )}
         </Stack.Navigator>
+        {isAuthenticated && <PlayerHost />}
       </NavigationContainer>
     </>
   );
@@ -111,6 +138,12 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  miniPlayerDock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: TAB_BAR_HEIGHT + 4,
+  },
   loadingContainer: {
     flex: 1,
     backgroundColor: colors.bg,

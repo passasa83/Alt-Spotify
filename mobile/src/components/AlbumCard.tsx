@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../utils/theme';
 import type { Album } from '../types';
+import CoverImage from './CoverImage';
 
 interface AlbumCardProps {
   album: Album;
@@ -16,7 +17,7 @@ export default function AlbumCard({ album, onPress, size = 'medium' }: AlbumCard
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
       {album.cover_url ? (
-        <Image source={{ uri: album.cover_url }} style={[styles.cover, { width: dimensions, height: dimensions }]} />
+        <CoverImage uri={album.cover_url} style={[styles.cover, { width: dimensions, height: dimensions }]} />
       ) : (
         <View style={[styles.cover, styles.placeholder, { width: dimensions, height: dimensions }]}>
           <Ionicons name="disc" size={40} color={colors.textMuted} />
