@@ -40,7 +40,7 @@ const SearchFiltersPanel = ({ filters, onChange }: Props) => {
     <div className="mb-4">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-full border border-gray-600 px-4 py-2 text-sm text-gray-300 transition-colors hover:border-white hover:text-white"
+        className="flex items-center gap-2 rounded-full border border-gray-600 px-4 py-2 text-sm text-gray-300 pointer-coarse:min-h-11 transition-colors hover:border-white hover:text-white"
       >
         <SlidersHorizontal size={16} />
         Filters
@@ -56,7 +56,7 @@ const SearchFiltersPanel = ({ filters, onChange }: Props) => {
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white">Advanced Filters</h3>
             {activeCount > 0 && (
-              <button onClick={clear} className="flex items-center gap-1 text-xs text-gray-400 hover:text-white">
+              <button onClick={clear} className="flex items-center gap-1 text-xs pointer-coarse:min-h-11 text-gray-400 hover:text-white">
                 <X size={12} /> Clear all
               </button>
             )}

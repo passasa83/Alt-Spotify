@@ -33,7 +33,7 @@ const NotificationBell = () => {
       <button
         ref={buttonRef}
         onClick={togglePanel}
-        className="relative rounded-full p-2 text-gray-400 hover:text-white transition-colors"
+        className="relative flex h-11 w-11 items-center justify-center rounded-full text-gray-400 hover:text-white transition-colors"
         aria-label={t('notifications.title')}
         aria-expanded={isOpen}
       >

@@ -57,12 +57,12 @@ const Browse = () => {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-white">{t('browse.title')}</h1>
 
-      <div className="flex gap-2">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:px-0">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => { setTab(t.key); setSelectedGenre(null); }}
-            className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+            className={`flex flex-shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors pointer-coarse:min-h-11 ${
               tab === t.key ? 'bg-white text-black' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
             }`}
           >
@@ -109,7 +109,7 @@ const Browse = () => {
               </span>
               <button
                 onClick={() => playOrToggle(track.id, () => setTrack(track))}
-                className="hidden h-8 w-8 items-center justify-center rounded-full bg-green-500 text-black group-hover:flex [@media(hover:none)]:flex"
+                className="hidden h-8 w-8 items-center justify-center rounded-full bg-green-500 text-black group-hover:flex pointer-coarse:flex pointer-coarse:h-11 pointer-coarse:w-11"
                 aria-label={isPlayingTrack(track.id) ? t('player.pause') : t('player.play')}
               >
                 {isPlayingTrack(track.id) ? <Pause size={14} fill="black" /> : <Play size={14} fill="black" />}

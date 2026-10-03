@@ -24,13 +24,13 @@ const ArtistCard = ({ artist }: ArtistCardProps) => {
             <span className="text-4xl font-bold text-white/80">{artist.name.charAt(0).toUpperCase()}</span>
           </div>
         )}
-        <button
-          className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-black shadow-xl transition-all ${
-            'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
-          }`}
+        {/* Decorative: the whole card is the link to the artist. */}
+        <span
+          aria-hidden="true"
+          className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-black opacity-0 shadow-xl transition-all translate-y-2 group-hover:opacity-100 group-hover:translate-y-0"
         >
           <Play size={18} fill="currentColor" />
-        </button>
+        </span>
       </div>
       <p className="block truncate text-center text-sm font-semibold text-white">{artist.name}</p>
       <p className="block truncate text-center text-xs text-gray-400">Artist</p>

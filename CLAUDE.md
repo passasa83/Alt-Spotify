@@ -37,7 +37,7 @@ Tests (tous doivent passer avant un commit) :
 cd backend && python -m pytest --ignore=tests/test_jam.py -q
 cd frontend && npx tsc --noEmit -p . && npx vitest run
 ```
-État au 2 octobre 2026 : 321 tests backend, 94 frontend, tous au vert.
+État au 2 octobre 2026 : 321 tests backend, 97 frontend, tous au vert.
 
 ## Pièges connus
 
@@ -72,8 +72,8 @@ Après ce déploiement, supprimer les **5 pistes sans audio** restantes (Admin �
 
 **Prochain chantier : le front sur téléphone**, puis une app mobile. Plan validé à l'audit mobile :
 1. ~~Écran « En lecture » plein écran et mini-lecteur épuré~~ : fait (`components/NowPlayingSheet.tsx`).
-2. Cibles tactiles de 44 px dans les listes (les boutons Lecture font 14 px, le menu ⋯ 24 px), ligne entière cliquable.
-3. Onglets de Parcourir qui débordent (+17 px), case à cocher de 16 px dans Paramètres, filtres et sélecteur de langue à 28 px de haut.
+2. ~~Cibles tactiles de 44 px, ligne entière cliquable~~ : fait (`utils/rowTap.ts`, variantes `pointer-coarse:`).
+3. ~~Débordements et petites cibles (Parcourir, Paramètres, filtres, langue)~~ : fait.
 4. PWA installable (manifest, icônes, plein écran).
 Ensuite : évaluer `mobile/` (Expo) avant de construire l'app native.
 

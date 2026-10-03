@@ -65,14 +65,14 @@ const SearchPage = () => {
   return (
     <div className="pb-24">
       <div className="mb-8 max-w-xl">
-        <SearchBar value={query} onChange={handleSearch} placeholder="What do you want to listen to?" />
+        <SearchBar value={query} onChange={handleSearch} />
       </div>
 
       {query && (
         <div className="mb-4 flex gap-2">
           <button
             onClick={() => setSource('local')}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition ${
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition pointer-coarse:min-h-11 pointer-coarse:px-4 ${
               source === 'local' ? 'bg-white text-black' : 'bg-zinc-800 text-white hover:bg-zinc-700'
             }`}
           >
@@ -81,7 +81,7 @@ const SearchPage = () => {
           </button>
           <button
             onClick={() => setSource('all')}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition ${
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition pointer-coarse:min-h-11 pointer-coarse:px-4 ${
               source === 'all' ? 'bg-white text-black' : 'bg-zinc-800 text-white hover:bg-zinc-700'
             }`}
           >
@@ -90,7 +90,7 @@ const SearchPage = () => {
           </button>
           <button
             onClick={() => setSource('tidal')}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition ${
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition pointer-coarse:min-h-11 pointer-coarse:px-4 ${
               source === 'tidal' ? 'bg-white text-black' : 'bg-zinc-800 text-white hover:bg-zinc-700'
             }`}
           >

@@ -95,7 +95,7 @@ const Settings = () => {
                 <span className="text-2xl font-bold">{pseudo.charAt(0).toUpperCase()}</span>
               )}
             </div>
-            <button type="button" className="rounded-full border border-gray-600 px-4 py-2 text-sm font-medium text-white hover:border-white focus-visible:outline-2 focus-visible:outline-green-500">
+            <button type="button" className="rounded-full border border-gray-600 px-4 py-2 text-sm pointer-coarse:min-h-11 font-medium text-white hover:border-white focus-visible:outline-2 focus-visible:outline-green-500">
               {t('settings.change_photo')}
             </button>
           </div>
@@ -150,13 +150,13 @@ const Settings = () => {
             />
           </div>
 
-          <div className="flex items-center gap-2 py-2">
+          <div className="flex min-h-11 items-center gap-3 py-2">
             <input
               id="settings-child"
               type="checkbox"
               checked={isChildAccount}
               onChange={(e) => setIsChildAccount(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500 focus:ring-offset-gray-900"
+              className="h-6 w-6 flex-shrink-0 rounded accent-green-500 border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500 focus:ring-offset-gray-900"
             />
             <div>
               <label htmlFor="settings-child" className="block text-sm font-medium text-white">{t('settings.child_account')}</label>
@@ -207,7 +207,7 @@ const Settings = () => {
               setLocale(e.target.value as 'fr' | 'en');
               window.location.reload();
             }}
-            className="w-full rounded-md border border-gray-600 bg-gray-700 px-4 py-2 text-white outline-none focus:border-green-500"
+            className="w-full rounded-md border border-gray-600 bg-gray-700 px-4 py-2 text-white pointer-coarse:min-h-11 outline-none focus:border-green-500"
           >
             <option value="fr">Français</option>
             <option value="en">English</option>

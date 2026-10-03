@@ -41,7 +41,8 @@ const AlbumCard = ({ album }: AlbumCardProps) => {
         />
         <button
           onClick={handlePlay}
-          className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-black shadow-xl transition-all ${
+          aria-label={`${t('player.play')} ${album.title}`}
+          className={`absolute bottom-2 right-2 flex h-10 w-10 items-center pointer-coarse:h-11 pointer-coarse:w-11 justify-center rounded-full bg-green-500 text-black shadow-xl transition-all ${
             isPlaying
               ? 'opacity-100 translate-y-0'
               : 'opacity-0 [@media(hover:none)]:opacity-100 translate-y-2 [@media(hover:none)]:translate-y-0 group-hover:opacity-100 group-hover:translate-y-0'

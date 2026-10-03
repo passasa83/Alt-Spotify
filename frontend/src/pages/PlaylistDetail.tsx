@@ -5,6 +5,7 @@ import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useAuthStore } from '@/stores/authStore';
+import { rowTapHandler } from '@/utils/rowTap';
 import TrackContextMenu from '@/components/TrackContextMenu';
 import AddToPlaylistModal from '@/components/AddToPlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
@@ -204,7 +205,7 @@ const PlaylistDetail = () => {
         )}
       </div>
 
-      <div className="mb-2 grid grid-cols-[16px_4fr_3fr_minmax(80px,1fr)_32px] gap-4 border-b border-gray-700 px-4 py-2 text-xs uppercase tracking-wider text-gray-400 md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]">
+      <div className="mb-2 grid grid-cols-[24px_minmax(0,1fr)_auto_44px] gap-3 border-b border-gray-700 px-4 py-2 text-xs uppercase tracking-wider text-gray-400 md:gap-4 md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]">
         <span className="text-right">#</span>
         <span>Title</span>
         <span className="hidden md:block">Album</span>
@@ -220,7 +221,7 @@ const PlaylistDetail = () => {
           pt.track && (
             <div
               key={pt.track_id}
-              className="group grid cursor-pointer items-center gap-4 rounded-md px-4 py-2 transition-colors hover:bg-gray-800 md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]"
+              className="group grid cursor-pointer grid-cols-[24px_minmax(0,1fr)_auto_44px] items-center gap-3 rounded-md px-4 py-2 transition-colors hover:bg-gray-800 md:gap-4 md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]"
               onDoubleClick={() => {
                 if (pt.track) {
                   const allTracks = tracks.filter(p => p.track).map(p => p.track!);
@@ -228,9 +229,14 @@ const PlaylistDetail = () => {
                   setPlaylistAsQueue(allTracks, trackIndex >= 0 ? trackIndex : 0);
                 }
               }}
+              onClick={rowTapHandler(() => {
+                const allTracks = tracks.filter(p => p.track).map(p => p.track!);
+                const trackIndex = allTracks.findIndex(t => t.id === pt.track!.id);
+                playOrToggle(pt.track!.id, () => setPlaylistAsQueue(allTracks, trackIndex >= 0 ? trackIndex : 0));
+              })}
             >
               <div className="flex items-center justify-end">
-                <span className={`text-sm group-hover:hidden [@media(hover:none)]:hidden ${isCurrent(pt.track.id) ? 'text-green-500' : 'text-gray-400'}`}>
+                <span className={`text-sm pointer-fine:group-hover:hidden ${isCurrent(pt.track.id) ? 'text-green-500' : 'text-gray-400'}`}>
                   {isPlayingTrack(pt.track.id) ? '♪' : index + 1}
                 </span>
                 <button
@@ -243,21 +249,21 @@ const PlaylistDetail = () => {
                       });
                     }
                   }}
-                  className="hidden text-white group-hover:block [@media(hover:none)]:block"
-                  aria-label={`${isPlayingTrack(pt.track.id) ? 'Pause' : 'Play'} ${pt.track.title}`}
+                  className="sr-only text-white focus-visible:not-sr-only pointer-fine:group-hover:not-sr-only"
+                  aria-label={`${isPlayingTrack(pt.track.id) ? t('player.pause') : t('player.play')} ${pt.track.title}`}
                 >
                   {isPlayingTrack(pt.track.id) ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                 </button>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <img
                   src={resolveCoverUrl(pt.track.cover_url || pt.track.album?.cover_url)}
                   alt={pt.track.title}
-                  className="h-10 w-10 rounded object-cover"
+                  className="h-10 w-10 flex-shrink-0 rounded object-cover"
                 />
                 <div className="min-w-0">
                   <p className={`truncate text-sm ${isCurrent(pt.track.id) ? 'font-bold text-green-500' : 'font-medium text-white'}`}>{pt.track.title}</p>
-                  <Link to={`/artist/${pt.track.artist?.id || pt.track.artist_id}`} className="truncate text-xs text-gray-400 hover:underline">{pt.track.artist?.name || 'Unknown Artist'}</Link>
+                  <Link to={`/artist/${pt.track.artist?.id || pt.track.artist_id}`} className="block truncate text-xs text-gray-400 hover:underline pointer-coarse:pointer-events-none">{pt.track.artist?.name || t('player.unknown_artist')}</Link>
                 </div>
               </div>
               <span className="hidden truncate text-sm text-gray-400 md:block">{pt.track.album?.title || 'Unknown Album'}</span>
@@ -266,16 +272,14 @@ const PlaylistDetail = () => {
                 {Math.floor(pt.track.duration_seconds / 60)}:{(pt.track.duration_seconds % 60).toString().padStart(2, '0')}
               </span>
               <div className="flex justify-end">
-                {isOwner && (
-                  <div className="opacity-0 transition-all group-hover:opacity-100">
-                    <TrackContextMenu
-                      track={pt.track}
-                      menuDirection="left"
-                      onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
-                      onRemoveFromPlaylist={(t) => handleRemoveTrack(String(t.id))}
-                    />
-                  </div>
-                )}
+                <div className="opacity-0 transition-all focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+                  <TrackContextMenu
+                    track={pt.track}
+                    menuDirection="left"
+                    onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
+                    onRemoveFromPlaylist={isOwner ? (t) => handleRemoveTrack(String(t.id)) : undefined}
+                  />
+                </div>
               </div>
             </div>
           )

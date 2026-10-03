@@ -12,6 +12,7 @@ import { useTrackPlayback } from '@/hooks/useTrackPlayback';
 import client from '@/api/client';
 import { resolveCoverUrl } from '@/api/tracks';
 import { usePlaylistModals } from '@/hooks/usePlaylistModals';
+import { rowTapHandler } from '@/utils/rowTap';
 
 interface HistoryItem {
   id: string;
@@ -125,11 +126,12 @@ const History = () => {
             return (
               <div
                 key={item.id}
-                className={`group flex items-center gap-4 rounded-lg px-4 py-3 transition-colors ${
+                className={`group flex cursor-pointer items-center gap-4 rounded-lg px-4 py-3 transition-colors ${
                   isCurrentTrack && isPlaying
                     ? 'bg-green-500/10 text-green-400'
                     : 'hover:bg-gray-800 text-gray-300'
                 }`}
+                onClick={rowTapHandler(() => playOrToggle(item.track_id, () => setTrack(itemToTrack(item))))}
               >
                 <div className="relative h-10 w-10">
                   <img
@@ -154,14 +156,14 @@ const History = () => {
                 <div className="min-w-0 flex-1">
                   <p className={`truncate text-sm ${isCurrentTrack ? 'font-bold text-green-500' : 'font-medium'}`}>{item.title}</p>
                   <p className="truncate text-xs text-gray-500">
-                    {item.artist?.name ? <Link to={`/artist/${item.artist.id}`} className="hover:underline">{item.artist.name}</Link> : ''}
+                    {item.artist?.name ? <Link to={`/artist/${item.artist.id}`} className="hover:underline pointer-coarse:pointer-events-none">{item.artist.name}</Link> : ''}
                     {item.duration_listened_seconds > 0
                       ? ` • ${formatTime(item.duration_listened_seconds)} / ${formatTime(item.duration_seconds)}`
                       : ` • ${formatTime(item.duration_seconds)}`}
                   </p>
                 </div>
                 <span className="text-xs text-gray-500">{formatHistoryDate(item.played_at)}</span>
-                <div className="opacity-0 group-hover:opacity-100">
+                <div className="opacity-0 focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
                   <TrackContextMenu
                     track={itemToTrack(item)}
                     onAddToPlaylist={(t) => openAddToPlaylist(t)}

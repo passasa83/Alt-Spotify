@@ -12,6 +12,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { deleteTrack, resolveCoverUrl } from '@/api/tracks';
 import { formatTime } from '@/utils/formatTime';
 import { usePlaylistModals } from '@/hooks/usePlaylistModals';
+import { rowTapHandler } from '@/utils/rowTap';
 
 interface TrackListProps {
   tracks: Track[];
@@ -85,22 +86,23 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
                 isCurrentTrack ? 'bg-gray-800' : ''
               } ${showIndex ? 'grid-cols-[16px_minmax(0,1fr)_auto] md:grid-cols-[16px_minmax(0,4fr)_minmax(0,2fr)_minmax(0,3fr)_minmax(80px,1fr)_72px]' : 'grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,4fr)_minmax(0,2fr)_minmax(0,3fr)_minmax(80px,1fr)_72px]'}`}
               onDoubleClick={() => handlePlayTrack(track)}
+              onClick={rowTapHandler(() => playOrToggle(track.id, () => handlePlayTrack(track)))}
             >
               {showIndex && (
                 <div className="flex items-center justify-end">
-                  <span className={`text-sm [@media(hover:none)]:hidden ${isCurrentTrack ? 'text-green-500' : 'text-gray-400 group-hover:hidden'}`}>
+                  <span className={`text-sm ${isCurrentTrack ? 'text-green-500' : 'text-gray-400 pointer-fine:group-hover:hidden'}`}>
                     {isCurrentTrack && isPlaying ? '♪' : index + 1}
                   </span>
                   {(track.file_url || track.hls_path) ? (
                     <button
                       onClick={() => playOrToggle(track.id, () => handlePlayTrack(track))}
-                      className="hidden text-white group-hover:block [@media(hover:none)]:block"
+                      className="sr-only text-white focus-visible:not-sr-only pointer-fine:group-hover:not-sr-only"
                       aria-label={`${isPlayingTrack(track.id) ? t('player.pause') : t('player.play')} ${track.title}`}
                     >
                       {isPlayingTrack(track.id) ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                     </button>
                   ) : (
-                    <span className="hidden text-gray-600 group-hover:block [@media(hover:none)]:block">—</span>
+                    <span className="hidden text-gray-600 pointer-fine:group-hover:block">—</span>
                   )}
                 </div>
               )}
@@ -110,13 +112,13 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
                   (track.file_url || track.hls_path) ? (
                     <button
                       onClick={() => playOrToggle(track.id, () => handlePlayTrack(track))}
-                      className="hidden flex-shrink-0 text-white group-hover:block [@media(hover:none)]:block"
+                      className="sr-only flex-shrink-0 text-white focus-visible:not-sr-only pointer-fine:group-hover:not-sr-only"
                       aria-label={`${isPlayingTrack(track.id) ? t('player.pause') : t('player.play')} ${track.title}`}
                     >
                       {isPlayingTrack(track.id) ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                     </button>
                   ) : (
-                    <span className="hidden text-gray-600 group-hover:block [@media(hover:none)]:block">—</span>
+                    <span className="hidden text-gray-600 pointer-fine:group-hover:block">—</span>
                   )
                 )}
                 <img
@@ -127,7 +129,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
                 <div className="min-w-0">
                   <Link
                     to={`/track/${track.id}`}
-                    className={`block truncate text-sm hover:underline ${
+                    className={`block truncate text-sm hover:underline pointer-coarse:pointer-events-none ${
                       isCurrentTrack ? 'font-bold text-green-500' : 'font-medium text-white'
                     }`}
                   >
@@ -135,7 +137,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
                   </Link>
                   <Link
                     to={`/artist/${track.artist?.id || track.artist_id}`}
-                    className="block truncate text-xs text-gray-400 hover:underline"
+                    className="block truncate text-xs text-gray-400 hover:underline pointer-coarse:pointer-events-none"
                   >
                     {track.artist?.name || t('player.unknown_artist')}
                   </Link>
@@ -157,7 +159,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
               <div className="flex items-center justify-end gap-2">
                 <span className="text-sm text-gray-400 md:hidden">{formatTime(track.duration_seconds)}</span>
                 {/* Everything else (admin actions included) lives in this menu. */}
-                <div className="opacity-0 focus-within:opacity-100 [@media(hover:none)]:opacity-100 group-hover:opacity-100">
+                <div className="opacity-0 focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
                   <TrackContextMenu
                     track={track}
                     onAddToPlaylist={(t) => openAddToPlaylist(t)}

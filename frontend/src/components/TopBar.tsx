@@ -53,7 +53,7 @@ const TopBar = () => {
             onClick={langMenu.toggle}
             aria-label={t('settings.language')}
             aria-expanded={isLangOpen}
-            className="flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-gray-400 hover:text-white"
+            className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full px-3 py-1.5 text-sm text-gray-400 hover:text-white"
           >
             <Globe size={16} />
             <span className="hidden sm:inline">{locale.toUpperCase()}</span>
@@ -87,7 +87,7 @@ const TopBar = () => {
             onClick={userMenu.toggle}
             aria-expanded={isDropdownOpen}
             aria-label={user?.pseudo || 'User'}
-            className="flex items-center gap-2 rounded-full bg-gray-800 py-1 pl-1 pr-3 hover:bg-gray-700"
+            className="flex min-h-11 items-center gap-2 rounded-full bg-gray-800 py-1 pl-1 pr-3 hover:bg-gray-700 pointer-coarse:pl-2"
           >
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-600">
               {user?.avatar_url ? (

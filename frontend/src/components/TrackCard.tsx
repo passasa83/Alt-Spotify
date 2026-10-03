@@ -70,7 +70,7 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
           <button
             onClick={hasAudio ? handlePlay : handleDownload}
             disabled={downloading}
-            className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full shadow-xl transition-all ${
+            className={`absolute bottom-2 right-2 flex h-10 w-10 items-center pointer-coarse:h-11 pointer-coarse:w-11 justify-center rounded-full shadow-xl transition-all ${
               hasAudio
                 ? 'bg-green-500 text-black'
                 : 'bg-blue-500 text-white'
@@ -98,12 +98,13 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
                 addToFavorites(track);
               }
             }}
-            className={`absolute top-2 right-11 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 transition-all ${
+            className={`absolute top-2 right-11 flex h-8 w-8 items-center pointer-coarse:right-14 pointer-coarse:h-11 pointer-coarse:w-11 justify-center rounded-full bg-black/60 transition-all ${
               liked
                 ? 'text-green-500 opacity-100'
                 : 'text-gray-400 opacity-0 [@media(hover:none)]:opacity-100 group-hover:opacity-100 hover:text-white'
             }`}
-            aria-label={liked ? 'Remove from liked' : 'Add to liked'}
+            aria-label={liked ? t('player.unlike') : t('player.like')}
+            aria-pressed={liked}
           >
             <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
           </button>

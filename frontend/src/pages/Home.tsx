@@ -61,7 +61,7 @@ const Home = () => {
       <section>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white">{t('stats.top_tracks')}</h2>
-          <button onClick={() => navigate('/search')} className="text-sm font-semibold text-gray-400 hover:underline focus-visible:outline-2 focus-visible:outline-green-500">{t('action.show_all')}</button>
+          <button onClick={() => navigate('/search')} className="text-sm font-semibold text-gray-400 hover:underline focus-visible:outline-2 pointer-coarse:min-h-11 pointer-coarse:px-2 focus-visible:outline-green-500">{t('action.show_all')}</button>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {recentTracks.map((track) => (
@@ -73,7 +73,7 @@ const Home = () => {
       <section>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white">{t('stats.top_artists')}</h2>
-          <button onClick={() => navigate('/search')} className="text-sm font-semibold text-gray-400 hover:underline focus-visible:outline-2 focus-visible:outline-green-500">{t('action.show_all')}</button>
+          <button onClick={() => navigate('/search')} className="text-sm font-semibold text-gray-400 hover:underline focus-visible:outline-2 pointer-coarse:min-h-11 pointer-coarse:px-2 focus-visible:outline-green-500">{t('action.show_all')}</button>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {topArtists.map((artist) => (
@@ -85,7 +85,7 @@ const Home = () => {
       <section>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white">{t('nav.playlists')}</h2>
-          <button onClick={() => navigate('/library')} className="text-sm font-semibold text-gray-400 hover:underline focus-visible:outline-2 focus-visible:outline-green-500">{t('action.show_all')}</button>
+          <button onClick={() => navigate('/library')} className="text-sm font-semibold text-gray-400 hover:underline focus-visible:outline-2 pointer-coarse:min-h-11 pointer-coarse:px-2 focus-visible:outline-green-500">{t('action.show_all')}</button>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {featuredPlaylists.map((playlist) => (

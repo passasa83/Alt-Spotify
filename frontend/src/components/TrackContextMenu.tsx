@@ -1,9 +1,11 @@
 import { useRef, useId, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePopover } from '@/hooks/usePopover';
-import { MoreHorizontal, ListPlus, ListMusic, Heart, HeartOff, Trash2, Edit } from 'lucide-react';
+import { MoreHorizontal, ListPlus, ListMusic, Heart, HeartOff, Trash2, Edit, Disc3, User, Music } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useToastStore } from '@/stores/toastStore';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { Track } from '@/types';
 
 interface Props {
@@ -16,16 +18,22 @@ interface Props {
   onDelete?: (track: Track) => void;
 }
 
-const MENU_HEIGHT = 220;
+const MENU_HEIGHT = 340;
 const MENU_WIDTH = 224; // w-56
 
+// 44 px rows on touch screens, compact ones with a mouse.
+const itemClass = 'flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-gray-800 pointer-coarse:min-h-11';
+
 const TrackContextMenu = ({ track, onAddToPlaylist, onRemoveFromPlaylist, menuDirection = 'left', onEdit, onDelete }: Props) => {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen, toggle, close } = usePopover(`track-menu-${useId()}`, [menuRef]);
   const { addToQueue } = usePlayerStore();
   const { addToFavorites, removeFromFavorites, isFavorite } = useLibraryStore();
   const addToast = useToastStore((s) => s.addToast);
   const liked = isFavorite(String(track.id));
+  const artistId = track.artist?.id || track.artist_id;
 
   const handleAction = (action: () => void) => {
     action();
@@ -46,7 +54,7 @@ const TrackContextMenu = ({ track, onAddToPlaylist, onRemoveFromPlaylist, menuDi
     }
     toggle();
   };
-  const positionClass = `${alignRight ? 'right-0' : 'left-0'} ${openUp ? 'bottom-8' : 'top-8'}`;
+  const positionClass = `${alignRight ? 'right-0' : 'left-0'} ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`;
 
   return (
     <div className="relative" ref={menuRef}>
@@ -55,61 +63,74 @@ const TrackContextMenu = ({ track, onAddToPlaylist, onRemoveFromPlaylist, menuDi
           e.stopPropagation();
           handleToggle();
         }}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-all hover:text-white"
-        aria-label={`Actions ${track.title}`}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-all hover:text-white pointer-coarse:h-11 pointer-coarse:w-11"
+        aria-label={t('menu.more_options', { title: track.title })}
         aria-haspopup="menu"
         aria-expanded={isOpen}
       >
-        <MoreHorizontal size={16} />
+        <MoreHorizontal size={18} />
       </button>
 
       {isOpen && (
-        <div className={`absolute ${positionClass} z-50 w-56 max-w-[calc(100vw-1.5rem)] rounded-md bg-gray-900 py-1 shadow-xl ring-1 ring-white/10`}>
-          <button
-            onClick={() => handleAction(() => { addToQueue(track); addToast('Added to queue'); })}
-            className="flex w-full items-center gap-3 px-3 py-2 text-sm text-gray-200 hover:bg-gray-800"
-          >
+        <div
+          role="menu"
+          className={`absolute ${positionClass} z-50 w-56 max-w-[calc(100vw-1.5rem)] rounded-md bg-gray-900 py-1 text-gray-200 shadow-xl ring-1 ring-white/10`}
+        >
+          <button role="menuitem" onClick={() => handleAction(() => { addToQueue(track); addToast(t('menu.added_to_queue')); })} className={itemClass}>
             <ListPlus size={16} />
-            Add to queue
+            {t('menu.add_to_queue')}
           </button>
 
-          <button
-            onClick={() => handleAction(() => onAddToPlaylist?.(track))}
-            className="flex w-full items-center gap-3 px-3 py-2 text-sm text-gray-200 hover:bg-gray-800"
-          >
+          <button role="menuitem" onClick={() => handleAction(() => onAddToPlaylist?.(track))} className={itemClass}>
             <ListMusic size={16} />
-            Add to playlist
+            {t('menu.add_to_playlist')}
           </button>
-
-          <div className="my-1 border-t border-gray-700" />
 
           {liked ? (
             <button
-              onClick={() => handleAction(() => { removeFromFavorites(String(track.id)); addToast('Removed from liked songs'); })}
-              className="flex w-full items-center gap-3 px-3 py-2 text-sm text-gray-200 hover:bg-gray-800"
+              role="menuitem"
+              onClick={() => handleAction(() => { removeFromFavorites(String(track.id)); addToast(t('menu.removed_from_liked')); })}
+              className={itemClass}
             >
               <HeartOff size={16} />
-              Remove from liked songs
+              {t('player.unlike')}
             </button>
           ) : (
             <button
-              onClick={() => handleAction(() => { addToFavorites(track); addToast('Saved to liked songs'); })}
-              className="flex w-full items-center gap-3 px-3 py-2 text-sm text-gray-200 hover:bg-gray-800"
+              role="menuitem"
+              onClick={() => handleAction(() => { addToFavorites(track); addToast(t('menu.saved_to_liked')); })}
+              className={itemClass}
             >
               <Heart size={16} />
-              Save to liked songs
+              {t('player.like')}
             </button>
           )}
+
+          {/* On touch screens the title and artist are not links (the row plays): go there from here. */}
+          <div className="my-1 border-t border-gray-700" />
+          {artistId && (
+            <button role="menuitem" onClick={() => handleAction(() => navigate(`/artist/${artistId}`))} className={itemClass}>
+              <User size={16} />
+              {t('menu.go_to_artist')}
+            </button>
+          )}
+          {track.album_id && (
+            <button role="menuitem" onClick={() => handleAction(() => navigate(`/album/${track.album_id}`))} className={itemClass}>
+              <Disc3 size={16} />
+              {t('menu.go_to_album')}
+            </button>
+          )}
+          <button role="menuitem" onClick={() => handleAction(() => navigate(`/track/${track.id}`))} className={itemClass}>
+            <Music size={16} />
+            {t('menu.go_to_track')}
+          </button>
 
           {onRemoveFromPlaylist && (
             <>
               <div className="my-1 border-t border-gray-700" />
-              <button
-                onClick={() => handleAction(() => onRemoveFromPlaylist(track))}
-                className="flex w-full items-center gap-3 px-3 py-2 text-sm text-red-400 hover:bg-gray-800"
-              >
+              <button role="menuitem" onClick={() => handleAction(() => onRemoveFromPlaylist(track))} className={`${itemClass} text-red-400`}>
                 <Trash2 size={16} />
-                Remove from this playlist
+                {t('menu.remove_from_playlist')}
               </button>
             </>
           )}
@@ -118,21 +139,15 @@ const TrackContextMenu = ({ track, onAddToPlaylist, onRemoveFromPlaylist, menuDi
             <>
               <div className="my-1 border-t border-gray-700" />
               {onEdit && (
-                <button
-                  onClick={() => handleAction(() => onEdit(track))}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-sm text-gray-200 hover:bg-gray-800"
-                >
+                <button role="menuitem" onClick={() => handleAction(() => onEdit(track))} className={itemClass}>
                   <Edit size={16} />
-                  Edit track
+                  {t('menu.edit_track')}
                 </button>
               )}
               {onDelete && (
-                <button
-                  onClick={() => handleAction(() => onDelete(track))}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-sm text-red-400 hover:bg-gray-800"
-                >
+                <button role="menuitem" onClick={() => handleAction(() => onDelete(track))} className={`${itemClass} text-red-400`}>
                   <Trash2 size={16} />
-                  Delete track
+                  {t('menu.delete_track')}
                 </button>
               )}
             </>
