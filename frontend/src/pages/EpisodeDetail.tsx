@@ -6,8 +6,10 @@ import { ArrowLeft, Play, Pause, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatDurationHm, formatDate } from '@/utils/formatTime';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const EpisodeDetail = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [podcast, setPodcast] = useState<(Podcast & { episodes: Episode[] }) | null>(null);
   const [episode, setEpisode] = useState<Episode | null>(null);
@@ -87,7 +89,7 @@ const EpisodeDetail = () => {
           className="h-48 w-48 flex-shrink-0 rounded-lg object-cover shadow-lg md:h-56 md:w-56"
         />
         <div className="flex flex-col justify-end">
-          <p className="text-sm font-medium text-green-500">Podcast Episode</p>
+          <p className="text-sm font-medium text-green-500">{t('podcast.episode')}</p>
           <h1 className="mt-1 text-3xl font-bold text-white">{episode.title}</h1>
           <p className="mt-2 text-gray-400">{podcast.title}</p>
           <div className="mt-3 flex items-center gap-4 text-sm text-gray-500">
@@ -107,19 +109,19 @@ const EpisodeDetail = () => {
           {isPlaying ? (
             <>
               <Pause size={18} fill="currentColor" />
-              Pause
+              {t('episode.pause')}
             </>
           ) : (
             <>
               <Play size={18} fill="currentColor" />
-              Play
+              {t('episode.play')}
             </>
           )}
         </button>
         {episode.is_played && (
           <span className="flex items-center gap-1 text-sm text-green-500">
             <Check size={16} />
-            Played
+            {t('episode.played')}
           </span>
         )}
       </div>
@@ -137,7 +139,7 @@ const EpisodeDetail = () => {
 
       {episode.description && (
         <div className="rounded-lg bg-gray-800 p-6">
-          <h2 className="mb-3 text-lg font-semibold text-white">About this episode</h2>
+          <h2 className="mb-3 text-lg font-semibold text-white">{t('podcast.about_episode')}</h2>
           <p className="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap">
             {episode.description}
           </p>

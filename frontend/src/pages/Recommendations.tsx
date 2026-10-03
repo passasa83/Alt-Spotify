@@ -4,6 +4,7 @@ import TrackList from '@/components/TrackList';
 import { Sparkles, Music } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 import type { Track } from '@/types';
+import { mixTitle } from '@/utils/systemNames';
 
 interface DailyMix {
   mix_id: string;
@@ -52,7 +53,7 @@ const Recommendations = () => {
 
       {discoverTracks.length > 0 && (
         <section className="space-y-4">
-          <h2 className="text-2xl font-bold text-white">Discover Weekly</h2>
+          <h2 className="text-2xl font-bold text-white">{t('discover.weekly')}</h2>
           <div className="rounded-lg bg-gray-900 p-4">
             <TrackList tracks={discoverTracks} showIndex={true} />
           </div>
@@ -61,7 +62,7 @@ const Recommendations = () => {
 
       {dailyMixes.length > 0 && (
         <section className="space-y-4">
-          <h2 className="text-2xl font-bold text-white">Daily Mixes</h2>
+          <h2 className="text-2xl font-bold text-white">{t('discover.daily_mixes')}</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {dailyMixes.map((mix) => (
               <div
@@ -73,7 +74,7 @@ const Recommendations = () => {
                     <Music size={24} className="text-green-500" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-white">{mix.title}</h3>
+                    <h3 className="font-bold text-white">{mixTitle(mix.title, t)}</h3>
                     <p className="text-sm text-gray-400">{mix.description}</p>
                   </div>
                 </div>

@@ -105,7 +105,7 @@ const QueuePanel = ({ onClose }: QueuePanelProps) => {
     >
       <div className="mb-2 flex items-center justify-between px-2">
         <h3 className="text-sm font-semibold text-white">{t('player.queue')}</h3>
-        <button onClick={onClose} className="p-1 text-gray-400 hover:text-white" aria-label="Close">
+        <button onClick={onClose} className="p-1 text-gray-400 hover:text-white" aria-label={t('action.close')}>
           <X size={16} />
         </button>
       </div>

@@ -14,6 +14,7 @@ import { useTrackPlayback } from '@/hooks/useTrackPlayback';
 import type { Playlist, PlaylistTrack, Track } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
 import { resolveCoverUrl } from '@/api/tracks';
+import { playlistDescription, playlistTitle } from '@/utils/systemNames';
 
 const PlaylistDetail = () => {
   const { t } = useTranslation();
@@ -79,7 +80,7 @@ const PlaylistDetail = () => {
         await removeTrackFromPlaylist(id, trackId);
       }
       setTracks((prev) => prev.filter((pt) => pt.track_id !== trackId));
-      addToast('Track removed from playlist');
+      addToast(t('playlist.removed_track'));
     } catch {
       console.error('Failed to remove track');
     }
@@ -90,7 +91,7 @@ const PlaylistDetail = () => {
     try {
       await deletePlaylist(id);
       loadPlaylists();
-      addToast('Playlist deleted');
+      addToast(t('playlist.deleted'));
       navigate('/library');
     } catch {
       console.error('Failed to delete playlist');
@@ -107,7 +108,7 @@ const PlaylistDetail = () => {
       setPlaylist(updated);
       loadPlaylists();
       setShowEditModal(false);
-      addToast('Playlist updated');
+      addToast(t('playlist.updated'));
     } catch {
       console.error('Failed to update playlist');
     }
@@ -160,12 +161,12 @@ const PlaylistDetail = () => {
         )}
         <div>
           <p className="text-sm font-medium uppercase text-white">{t('playlist.playlist')}</p>
-          <h1 className="mt-2 text-4xl font-bold text-white md:text-6xl">{playlist.title}</h1>
+          <h1 className="mt-2 text-4xl font-bold text-white md:text-6xl">{playlistTitle(playlist.title, t)}</h1>
           {playlist.description && (
-            <p className="mt-2 text-sm text-gray-400">{playlist.description}</p>
+            <p className="mt-2 text-sm text-gray-400">{playlistDescription(playlist.description, t)}</p>
           )}
           <p className="mt-2 text-sm text-gray-400">
-            {playlist.owner_name || 'Unknown'} • {tracks.length} {t('playlist.songs')}
+            {playlist.owner_name || t('playlist.owner')} • {tracks.length} {t('playlist.songs')}
             {hours > 0 && `, ${hours} hr`}
             {minutes > 0 && ` ${minutes} min`}
           </p>
@@ -190,14 +191,16 @@ const PlaylistDetail = () => {
             <button
               onClick={openEditModal}
               className="text-gray-400 transition-colors hover:text-white"
-              title="Edit playlist"
+              title={t('playlist.edit')}
+              aria-label={t('playlist.edit')}
             >
               <Pencil size={20} />
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="text-gray-400 transition-colors hover:text-red-500"
-              title="Delete playlist"
+              title={t('playlist.delete')}
+              aria-label={t('playlist.delete')}
             >
               <Trash2 size={20} />
             </button>
@@ -207,9 +210,9 @@ const PlaylistDetail = () => {
 
       <div className="mb-2 grid grid-cols-[24px_minmax(0,1fr)_auto_44px] gap-3 border-b border-gray-700 px-4 py-2 text-xs uppercase tracking-wider text-gray-400 md:gap-4 md:grid-cols-[16px_4fr_2fr_3fr_minmax(80px,1fr)_32px]">
         <span className="text-right">#</span>
-        <span>Title</span>
-        <span className="hidden md:block">Album</span>
-        <span className="hidden md:block">Date Added</span>
+        <span>{t('common.title')}</span>
+        <span className="hidden md:block">{t('album.album')}</span>
+        <span className="hidden md:block">{t('playlist.track_added')}</span>
         <span className="flex justify-end">
           <Clock size={16} />
         </span>
@@ -266,8 +269,8 @@ const PlaylistDetail = () => {
                   <Link to={`/artist/${pt.track.artist?.id || pt.track.artist_id}`} className="block truncate text-xs text-gray-400 hover:underline pointer-coarse:pointer-events-none">{pt.track.artist?.name || t('player.unknown_artist')}</Link>
                 </div>
               </div>
-              <span className="hidden truncate text-sm text-gray-400 md:block">{pt.track.album?.title || 'Unknown Album'}</span>
-              <span className="hidden text-sm text-gray-400 md:block">{pt.added_at ? new Date(pt.added_at).toLocaleDateString() : 'Recently'}</span>
+              <span className="hidden truncate text-sm text-gray-400 md:block">{pt.track.album?.title || t('player.unknown_album')}</span>
+              <span className="hidden text-sm text-gray-400 md:block">{pt.added_at ? new Date(pt.added_at).toLocaleDateString() : t('playlist.recently')}</span>
               <span className="text-right text-sm text-gray-400">
                 {Math.floor(pt.track.duration_seconds / 60)}:{(pt.track.duration_seconds % 60).toString().padStart(2, '0')}
               </span>
@@ -285,27 +288,27 @@ const PlaylistDetail = () => {
           )
         ))}
         {tracks.length === 0 && (
-          <p className="py-8 text-center text-sm text-gray-500">No tracks in this playlist</p>
+          <p className="py-8 text-center text-sm text-gray-500">{t('playlist.empty')}</p>
         )}
       </div>
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setShowDeleteConfirm(false)}>
           <div className="w-full max-w-sm rounded-lg bg-gray-900 p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-white">Delete playlist?</h2>
-            <p className="mt-2 text-sm text-gray-400">This action cannot be undone. "{playlist.title}" will be permanently deleted.</p>
+            <h2 className="text-lg font-bold text-white">{t('playlist.delete_confirm')}</h2>
+            <p className="mt-2 text-sm text-gray-400">{t('playlist.delete_warning', { title: playlist.title })}</p>
             <div className="mt-4 flex justify-end gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
                 className="rounded-md px-4 py-2 text-sm text-gray-400 hover:text-white"
               >
-                Cancel
+                {t('action.cancel')}
               </button>
               <button
                 onClick={handleDeletePlaylist}
                 className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500"
               >
-                Delete
+                {t('action.delete')}
               </button>
             </div>
           </div>
@@ -315,13 +318,13 @@ const PlaylistDetail = () => {
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setShowEditModal(false)}>
           <div className="w-full max-w-sm rounded-lg bg-gray-900 p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-white">Edit playlist</h2>
+            <h2 className="text-lg font-bold text-white">{t('playlist.edit')}</h2>
             <input
               type="text"
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
               className="mt-3 w-full rounded-md bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Playlist title"
+              placeholder={t('playlist.title_placeholder')}
               autoFocus
               onKeyDown={(e) => { if (e.key === 'Enter') handleEditPlaylist(); if (e.key === 'Escape') setShowEditModal(false); }}
             />
@@ -329,7 +332,7 @@ const PlaylistDetail = () => {
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
               className="mt-2 w-full resize-none rounded-md bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Description (optional)"
+              placeholder={t('playlist.description_placeholder')}
               rows={2}
             />
             <div className="mt-4 flex justify-end gap-3">
@@ -337,14 +340,14 @@ const PlaylistDetail = () => {
                 onClick={() => setShowEditModal(false)}
                 className="rounded-md px-4 py-2 text-sm text-gray-400 hover:text-white"
               >
-                Cancel
+                {t('action.cancel')}
               </button>
               <button
                 onClick={handleEditPlaylist}
                 disabled={!editTitle.trim()}
                 className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50"
               >
-                Save
+                {t('action.save')}
               </button>
             </div>
           </div>

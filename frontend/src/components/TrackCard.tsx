@@ -43,10 +43,10 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
       const result = await fetchFromYoutube(track.id);
       downloadedTrackUrls.set(String(track.id), result.file_url);
       forceRender((n) => n + 1);
-      addToast(`Téléchargé: ${result.youtube_title || track.title}`);
+      addToast(t('track.downloaded', { title: result.youtube_title || track.title }));
       onDownloaded?.(track.id, result.file_url);
     } catch (err: any) {
-      addToast(err?.response?.data?.detail || 'Échec du téléchargement');
+      addToast(err?.response?.data?.detail || t('track.download_failed'));
     } finally {
       setDownloading(false);
     }
@@ -78,8 +78,8 @@ const TrackCard = ({ track, onDownloaded }: TrackCardProps) => {
               ? 'opacity-0 [@media(hover:none)]:opacity-100 translate-y-2 [@media(hover:none)]:translate-y-0 group-hover:opacity-100 group-hover:translate-y-0'
               : 'opacity-0 [@media(hover:none)]:opacity-100 translate-y-2 [@media(hover:none)]:translate-y-0 group-hover:opacity-100 group-hover:translate-y-0'
             } ${downloading ? '!opacity-100 !translate-y-0' : ''} ${hasAudio && isCurrentTrack && isPlaying ? '!opacity-100 !translate-y-0' : ''}`}
-            title={hasAudio ? (playingThis ? t('player.pause') : t('player.play')) : 'Télécharger depuis YouTube'}
-            aria-label={hasAudio ? `${playingThis ? t('player.pause') : t('player.play')} ${track.title}` : 'Télécharger depuis YouTube'}
+            title={hasAudio ? (playingThis ? t('player.pause') : t('player.play')) : t('track.download_youtube')}
+            aria-label={hasAudio ? `${playingThis ? t('player.pause') : t('player.play')} ${track.title}` : t('track.download_youtube')}
           >
             {downloading ? (
               <Loader2 size={18} className="animate-spin" />

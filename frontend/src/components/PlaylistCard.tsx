@@ -3,6 +3,7 @@ import type { Playlist } from '@/types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
 import { resolveCoverUrl } from '@/api/tracks';
+import { playlistTitle } from '@/utils/systemNames';
 
 interface PlaylistCardProps {
   playlist: Playlist;
@@ -45,7 +46,7 @@ const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
           </div>
         )}
       </div>
-      <p className="block truncate text-sm font-semibold text-white">{playlist.title}</p>
+      <p className="block truncate text-sm font-semibold text-white">{playlistTitle(playlist.title, t)}</p>
       <p className="block truncate text-xs text-gray-400">
         {playlist.owner_name && <>{playlist.owner_name} • </>}
         {playlist.track_count !== undefined ? `${playlist.track_count} ${t('playlist.songs')}` : t('playlist.playlist')}

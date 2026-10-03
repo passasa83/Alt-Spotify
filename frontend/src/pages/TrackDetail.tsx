@@ -55,7 +55,7 @@ const TrackDetail = () => {
   if (!track) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-gray-400">Track not found</p>
+        <p className="text-gray-400">{t('track.not_found')}</p>
       </div>
     );
   }
@@ -79,7 +79,7 @@ const TrackDetail = () => {
           className="h-48 w-48 rounded-md object-cover shadow-2xl md:h-56 md:w-56"
         />
         <div>
-          <p className="text-sm font-medium uppercase text-white">Song</p>
+          <p className="text-sm font-medium uppercase text-white">{t('track.song')}</p>
           <h1 className="mt-2 text-4xl font-bold text-white md:text-6xl">{track.title}</h1>
           <div className="mt-2 flex items-center gap-1 text-sm text-gray-400">
             <Link to={`/artist/${track.artist?.id || track.artist_id}`} className="font-medium text-white hover:underline">
@@ -154,7 +154,7 @@ const TrackDetail = () => {
       </div>
 
       <div className="mt-8 rounded-lg bg-gray-900 p-6">
-        <h2 className="mb-4 text-xl font-bold text-white">About the artist</h2>
+        <h2 className="mb-4 text-xl font-bold text-white">{t('track.about_artist')}</h2>
         <Link to={`/artist/${track.artist?.id || track.artist_id}`} className="text-green-500 hover:underline">
           {track.artist?.name || t('player.unknown_artist')}
         </Link>

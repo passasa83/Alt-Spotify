@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { SlidersHorizontal, X } from 'lucide-react';
 import type { SearchFilters } from '@/types';
 import { GENRES } from '@/constants/genres';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const MUSICAL_KEYS = [
   'C', 'Cm', 'C#', 'C#m',
@@ -25,6 +26,7 @@ interface Props {
 }
 
 const SearchFiltersPanel = ({ filters, onChange }: Props) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const activeCount = Object.values(filters).filter(Boolean).length;
 
@@ -54,23 +56,23 @@ const SearchFiltersPanel = ({ filters, onChange }: Props) => {
       {isOpen && (
         <div className="mt-3 rounded-lg border border-gray-700 bg-gray-900 p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white">Advanced Filters</h3>
+            <h3 className="text-sm font-semibold text-white">{t('search.advanced_filters')}</h3>
             {activeCount > 0 && (
               <button onClick={clear} className="flex items-center gap-1 text-xs pointer-coarse:min-h-11 text-gray-400 hover:text-white">
-                <X size={12} /> Clear all
+                <X size={12} /> {t('search.clear_all')}
               </button>
             )}
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-400">Genre</label>
+              <label className="mb-1 block text-xs font-medium text-gray-400">{t('search.genre')}</label>
               <select
                 value={filters.genre || ''}
                 onChange={(e) => update({ genre: e.target.value || undefined })}
                 className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-1.5 text-sm text-white focus:border-green-500 focus:outline-none"
               >
-                <option value="">All genres</option>
+                <option value="">{t('search.all_genres')}</option>
                 {GENRES.map((g) => (
                   <option key={g} value={g}>{g}</option>
                 ))}
@@ -78,7 +80,7 @@ const SearchFiltersPanel = ({ filters, onChange }: Props) => {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-400">BPM Range</label>
+              <label className="mb-1 block text-xs font-medium text-gray-400">{t('search.bpm_range')}</label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -103,13 +105,13 @@ const SearchFiltersPanel = ({ filters, onChange }: Props) => {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-400">Key</label>
+              <label className="mb-1 block text-xs font-medium text-gray-400">{t('search.key')}</label>
               <select
                 value={filters.key || ''}
                 onChange={(e) => update({ key: e.target.value || undefined })}
                 className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-1.5 text-sm text-white focus:border-green-500 focus:outline-none"
               >
-                <option value="">All keys</option>
+                <option value="">{t('search.all_keys')}</option>
                 {MUSICAL_KEYS.map((k) => (
                   <option key={k} value={k}>{k}</option>
                 ))}
@@ -117,13 +119,13 @@ const SearchFiltersPanel = ({ filters, onChange }: Props) => {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-400">Mood</label>
+              <label className="mb-1 block text-xs font-medium text-gray-400">{t('search.mood')}</label>
               <select
                 value={filters.mood || ''}
                 onChange={(e) => update({ mood: e.target.value || undefined })}
                 className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-1.5 text-sm text-white focus:border-green-500 focus:outline-none"
               >
-                <option value="">All moods</option>
+                <option value="">{t('search.all_moods')}</option>
                 {MOODS.map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
@@ -154,7 +156,7 @@ const SearchFiltersPanel = ({ filters, onChange }: Props) => {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-400">Year</label>
+              <label className="mb-1 block text-xs font-medium text-gray-400">{t('search.year')}</label>
               <input
                 type="number"
                 min={1900}
@@ -167,7 +169,7 @@ const SearchFiltersPanel = ({ filters, onChange }: Props) => {
             </div>
 
             <div className="sm:col-span-2 lg:col-span-3">
-              <label className="mb-1 block text-xs font-medium text-gray-400">Search in lyrics</label>
+              <label className="mb-1 block text-xs font-medium text-gray-400">{t('search.lyrics_search')}</label>
               <input
                 type="text"
                 placeholder="e.g. tonight, forever, heart..."

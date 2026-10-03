@@ -10,8 +10,10 @@ import PlaylistCard from '@/components/PlaylistCard';
 import { Globe, HardDrive } from 'lucide-react';
 import type { SearchFilters } from '@/types';
 import { GENRES } from '@/constants/genres';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const SearchPage = () => {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { query, setQuery, filters, setFilters, source, setSource, results, isLoading } = useSearch();
   const hasResults =
@@ -77,7 +79,7 @@ const SearchPage = () => {
             }`}
           >
             <HardDrive className="h-3.5 w-3.5" />
-            Local
+            {t('search.source_local')}
           </button>
           <button
             onClick={() => setSource('all')}
@@ -86,7 +88,7 @@ const SearchPage = () => {
             }`}
           >
             <Globe className="h-3.5 w-3.5" />
-            All
+            {t('common.all')}
           </button>
           <button
             onClick={() => setSource('tidal')}
@@ -112,7 +114,7 @@ const SearchPage = () => {
 
       {!query && !isLoading && (
         <div>
-          <h2 className="mb-6 text-2xl font-bold text-white">Browse all</h2>
+          <h2 className="mb-6 text-2xl font-bold text-white">{t('search.browse_all')}</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {GENRES.map((genre) => (
               <div
@@ -131,7 +133,7 @@ const SearchPage = () => {
         <div className="space-y-8">
           {results.tracks.length > 0 && (
             <section>
-              <h2 className="mb-4 text-2xl font-bold text-white">Songs</h2>
+              <h2 className="mb-4 text-2xl font-bold text-white">{t('search.songs')}</h2>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {results.tracks.slice(0, 12).map((track) => (
                   <TrackCard key={track.id} track={track} />
@@ -142,7 +144,7 @@ const SearchPage = () => {
 
           {results.artists.length > 0 && (
             <section>
-              <h2 className="mb-4 text-2xl font-bold text-white">Artists</h2>
+              <h2 className="mb-4 text-2xl font-bold text-white">{t('search.artists')}</h2>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {results.artists.slice(0, 6).map((artist) => (
                   <ArtistCard key={artist.id} artist={artist} />
@@ -153,7 +155,7 @@ const SearchPage = () => {
 
           {results.albums.length > 0 && (
             <section>
-              <h2 className="mb-4 text-2xl font-bold text-white">Albums</h2>
+              <h2 className="mb-4 text-2xl font-bold text-white">{t('search.albums')}</h2>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {results.albums.slice(0, 6).map((album) => (
                   <AlbumCard key={album.id} album={album} />
@@ -164,7 +166,7 @@ const SearchPage = () => {
 
           {results.playlists.length > 0 && (
             <section>
-              <h2 className="mb-4 text-2xl font-bold text-white">Playlists</h2>
+              <h2 className="mb-4 text-2xl font-bold text-white">{t('search.playlists')}</h2>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {results.playlists.slice(0, 6).map((playlist) => (
                   <PlaylistCard key={playlist.id} playlist={playlist} />
@@ -178,7 +180,7 @@ const SearchPage = () => {
       {query && !isLoading && !hasResults && (
         <div className="flex flex-col items-center justify-center py-16">
           <p className="text-xl font-bold text-white">No results found for "{query}"</p>
-          <p className="mt-2 text-gray-400">Check your spelling or try different keywords.</p>
+          <p className="mt-2 text-gray-400">{t('search.try_different')}</p>
         </div>
       )}
     </div>

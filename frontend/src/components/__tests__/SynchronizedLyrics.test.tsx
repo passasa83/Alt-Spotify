@@ -16,7 +16,7 @@ beforeEach(() => {
 describe('SynchronizedLyrics', () => {
   it('renders no lyrics message', () => {
     render(<SynchronizedLyrics lyrics={[]} currentTime={0} />);
-    expect(screen.getByText('No lyrics available')).toBeInTheDocument();
+    expect(screen.getByText('Lyrics not available for this track.')).toBeInTheDocument();
   });
 
   it('renders lyrics lines', () => {

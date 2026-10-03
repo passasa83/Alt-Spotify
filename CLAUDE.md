@@ -79,7 +79,7 @@ App Expo (`mobile/`) remise en état (démarrage, paquets, lecture avec jeton m�
 
 Autres pistes (`RAPPORT-AUDIT.md`, `AMELIORATIONS.md`) :
 - ~~cache des pochettes indexé par l'artiste~~ : corrigé ; réparer les données avec Admin › Catalogue › « Corriger N pochettes partagées » (1 732 titres concernés en prod au 3 octobre) ;
-- traductions françaises incomplètes ;
+- ~~traductions françaises incomplètes~~ : faites (textes en dur remplacés ; noms générés par le serveur traduits à l'affichage, `utils/systemNames.ts`) ;
 - fonctions de l'API sans interface (partage, import/export CSV, abonnements, radio, transfert d'appareil, file de la Jam) ;
 - podcasts hors du lecteur principal ;
 - téléchargement hors ligne non persistant.

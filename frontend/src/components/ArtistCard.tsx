@@ -1,12 +1,14 @@
 import { Play } from 'lucide-react';
 import type { Artist } from '@/types';
 import { Link } from 'react-router-dom';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface ArtistCardProps {
   artist: Artist;
 }
 
 const ArtistCard = ({ artist }: ArtistCardProps) => {
+  const { t } = useTranslation();
   return (
     <Link
       to={`/artist/${artist.id}`}
@@ -33,7 +35,7 @@ const ArtistCard = ({ artist }: ArtistCardProps) => {
         </span>
       </div>
       <p className="block truncate text-center text-sm font-semibold text-white">{artist.name}</p>
-      <p className="block truncate text-center text-xs text-gray-400">Artist</p>
+      <p className="block truncate text-center text-xs text-gray-400">{t('artist.artist')}</p>
     </Link>
   );
 };

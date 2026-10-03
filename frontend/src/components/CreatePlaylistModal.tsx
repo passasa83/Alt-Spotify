@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Music } from 'lucide-react';
 import { useLibraryStore } from '@/stores/libraryStore';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface Props {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 const CreatePlaylistModal = ({ isOpen, onClose }: Props) => {
+  const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -53,7 +55,7 @@ const CreatePlaylistModal = ({ isOpen, onClose }: Props) => {
         onKeyDown={handleKeyDown}
       >
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Create playlist</h2>
+          <h2 className="text-xl font-bold text-white">{t('library.create_playlist')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X size={20} />
           </button>
@@ -68,7 +70,7 @@ const CreatePlaylistModal = ({ isOpen, onClose }: Props) => {
         <div className="space-y-4">
           <div>
             <label htmlFor="playlist-title" className="mb-1 block text-sm font-medium text-gray-300">
-              Name
+              {t('playlist.name')}
             </label>
             <input
               ref={inputRef}
@@ -76,20 +78,20 @@ const CreatePlaylistModal = ({ isOpen, onClose }: Props) => {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="My playlist"
+              placeholder={t('playlist.name_placeholder')}
               maxLength={100}
               className="w-full rounded-md border border-gray-600 bg-gray-800 px-4 py-3 text-white placeholder-gray-400 outline-none transition-colors focus:border-green-500"
             />
           </div>
           <div>
             <label htmlFor="playlist-desc" className="mb-1 block text-sm font-medium text-gray-300">
-              Description <span className="text-gray-500">(optional)</span>
+              {t('playlist.description')} <span className="text-gray-500">{t('playlist.optional')}</span>
             </label>
             <textarea
               id="playlist-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add an optional description"
+              placeholder={t('playlist.description_hint')}
               rows={2}
               maxLength={300}
               className="w-full resize-none rounded-md border border-gray-600 bg-gray-800 px-4 py-3 text-white placeholder-gray-400 outline-none transition-colors focus:border-green-500"
@@ -102,14 +104,14 @@ const CreatePlaylistModal = ({ isOpen, onClose }: Props) => {
             onClick={onClose}
             className="rounded-full px-6 py-2.5 text-sm font-bold text-white hover:bg-gray-800 transition-colors"
           >
-            Cancel
+            {t('action.cancel')}
           </button>
           <button
             onClick={handleCreate}
             disabled={!title.trim() || isCreating}
             className="rounded-full bg-white px-8 py-2.5 text-sm font-bold text-black transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
           >
-            {isCreating ? 'Creating...' : 'Create'}
+            {isCreating ? t('playlist.creating') : t('action.create')}
           </button>
         </div>
       </div>

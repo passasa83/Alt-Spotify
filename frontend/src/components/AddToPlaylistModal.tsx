@@ -5,6 +5,8 @@ import { useToastStore } from '@/stores/toastStore';
 import { addTrackToPlaylist } from '@/api/playlists';
 import { addFavorite } from '@/api/favorites';
 import type { Track } from '@/types';
+import { useTranslation } from '@/hooks/useTranslation';
+import { playlistTitle } from '@/utils/systemNames';
 
 interface Props {
   isOpen: boolean;
@@ -14,6 +16,7 @@ interface Props {
 }
 
 const AddToPlaylistModal = ({ isOpen, onClose, track, onCreateNew }: Props) => {
+  const { t } = useTranslation();
   const { playlists, loadPlaylists } = useLibraryStore();
   const addToast = useToastStore((s) => s.addToast);
 
@@ -30,13 +33,13 @@ const AddToPlaylistModal = ({ isOpen, onClose, track, onCreateNew }: Props) => {
       } else {
         await addTrackToPlaylist(playlistId, String(track.id));
       }
-      addToast(`Added to ${title}`);
+      addToast(t('playlist.added_to', { title }));
       onClose();
     } catch (err: any) {
       if (err?.response?.status === 409) {
-        addToast('Track already in this playlist');
+        addToast(t('playlist.already_in'));
       } else {
-        addToast('Failed to add track');
+        addToast(t('playlist.add_failed'));
       }
     }
   };
@@ -48,14 +51,14 @@ const AddToPlaylistModal = ({ isOpen, onClose, track, onCreateNew }: Props) => {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">Add to playlist</h2>
+          <h2 className="text-lg font-bold text-white">{t('menu.add_to_playlist')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X size={20} />
           </button>
         </div>
 
         <p className="mb-3 text-sm text-gray-400 truncate">
-          Adding: <span className="text-white">{track.title}</span>
+          {t('playlist.adding')} <span className="text-white">{track.title}</span>
         </p>
 
         <button
@@ -68,7 +71,7 @@ const AddToPlaylistModal = ({ isOpen, onClose, track, onCreateNew }: Props) => {
           <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-700">
             <Plus size={16} />
           </div>
-          New playlist
+          {t('playlist.new')}
         </button>
 
         <div className="max-h-60 overflow-y-auto">
@@ -83,12 +86,12 @@ const AddToPlaylistModal = ({ isOpen, onClose, track, onCreateNew }: Props) => {
                 <div className={`flex h-8 w-8 items-center justify-center rounded ${isLiked ? 'bg-gradient-to-br from-purple-700 to-blue-300' : 'bg-gradient-to-br from-purple-700 to-blue-300'}`}>
                   {isLiked ? <Heart size={14} className="text-white" fill="white" /> : <Music size={14} className="text-white" />}
                 </div>
-                <span className="truncate">{playlist.title}</span>
+                <span className="truncate">{playlistTitle(playlist.title, t)}</span>
               </button>
             );
           })}
           {playlists.length === 0 && (
-            <p className="py-4 text-center text-sm text-gray-500">No playlists yet</p>
+            <p className="py-4 text-center text-sm text-gray-500">{t('playlist.none_yet')}</p>
           )}
         </div>
       </div>

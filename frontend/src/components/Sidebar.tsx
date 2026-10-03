@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useEffect, useState } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
+import { playlistTitle } from '@/utils/systemNames';
 
 const Sidebar = () => {
   const { playlists, loadPlaylists, loadFavorites } = useLibraryStore();
@@ -26,13 +27,13 @@ const Sidebar = () => {
     <>
     <aside className="hidden w-64 flex-shrink-0 flex-col overflow-y-auto bg-black p-2 md:flex lg:w-72" role="navigation" aria-label={t('nav.library')}>
       <div className="mb-2 rounded-lg bg-gray-900 p-4">
-        <NavLink to="/" className="mb-4 flex items-center gap-2 text-white" aria-label="Alt Spotify Home">
+        <NavLink to="/" className="mb-4 flex items-center gap-2 text-white" aria-label={`Alt Spotify – ${t('nav.home')}`}>
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500">
             <span className="text-sm font-bold text-black">S</span>
           </div>
           <span className="text-xl font-bold">Alt Spotify</span>
         </NavLink>
-        <nav className="space-y-1" aria-label="Main navigation">
+        <nav className="space-y-1" aria-label={t('nav.main')}>
           <NavLink to="/" className={navLinkClass} aria-label={t('nav.home')}>
             <Home size={24} aria-hidden="true" />
             {t('nav.home')}
@@ -57,9 +58,9 @@ const Sidebar = () => {
             <BarChart3 size={24} aria-hidden="true" />
             {t('nav.stats')}
           </NavLink>
-          <NavLink to="/discover" className={navLinkClass} aria-label="Discover">
+          <NavLink to="/discover" className={navLinkClass} aria-label={t('nav.discover')}>
             <Sparkles size={24} aria-hidden="true" />
-            Discover
+            {t('nav.discover')}
           </NavLink>
           <NavLink to="/podcasts" className={navLinkClass} aria-label={t('nav.podcasts')}>
             <Headphones size={24} aria-hidden="true" />
@@ -98,7 +99,7 @@ const Sidebar = () => {
           </button>
         </div>
 
-        <div className="space-y-1" role="list" aria-label="Your playlists">
+        <div className="space-y-1" role="list" aria-label={t('nav.your_playlists')}>
           {[...playlists].sort((a, b) => {
             if (a.title === 'Liked Songs') return -1;
             if (b.title === 'Liked Songs') return 1;
@@ -113,7 +114,7 @@ const Sidebar = () => {
                 }`
               }
             >
-              {playlist.title}
+              {playlistTitle(playlist.title, t)}
             </NavLink>
           ))}
         </div>

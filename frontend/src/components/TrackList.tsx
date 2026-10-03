@@ -41,7 +41,7 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
 
   const navigate = useNavigate();
   const handleDelete = async (trackId: string) => {
-    if (confirm("Are you sure you want to delete this track?")) {
+    if (confirm(t('menu.delete_confirm'))) {
       try {
         await deleteTrack(trackId);
         if (onRefresh) onRefresh();
@@ -63,10 +63,10 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
       {showIndex && (
         <div className="mb-2 grid grid-cols-[16px_minmax(0,1fr)_auto] gap-3 border-b border-gray-700 px-3 py-2 text-xs uppercase tracking-wider text-gray-400 md:gap-4 md:px-4 md:grid-cols-[16px_minmax(0,4fr)_minmax(0,2fr)_minmax(0,3fr)_minmax(80px,1fr)_72px]">
           <span className="text-right">#</span>
-          <span>{t('player.next').includes('Next') ? 'Title' : 'Titre'}</span>
+          <span>{t('common.title')}</span>
           {showAlbum ? <span className="hidden md:block">{t('nav.albums')}</span> : <span className="hidden md:block" />}
           <span className="hidden md:block">{t('playlist.track_added')}</span>
-          <span className="hidden text-right md:block">{t('player.now_playing').includes('Now') ? 'Duration' : 'Durée'}</span>
+          <span className="hidden text-right md:block">{t('common.duration')}</span>
           <span className="hidden md:block" />
           <span className="md:hidden" />
         </div>

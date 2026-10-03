@@ -19,7 +19,7 @@ const Library = () => {
   return (
     <div className="pb-24">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">Your Library</h1>
+        <h1 className="text-3xl font-bold text-white">{t('library.title')}</h1>
         <div className="flex gap-2">
           <button
             onClick={() => setShowImportModal(true)}
@@ -53,8 +53,8 @@ const Library = () => {
         </div>
       ) : playlists.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16">
-          <p className="text-xl font-bold text-white">Create your first playlist</p>
-          <p className="mt-2 text-gray-400">It's easy, we'll help you</p>
+          <p className="text-xl font-bold text-white">{t('library.create_first')}</p>
+          <p className="mt-2 text-gray-400">{t('library.create_help')}</p>
           <button
             onClick={() => setShowCreateModal(true)}
             className="mt-4 rounded-full bg-white px-6 py-3 font-bold text-black hover:scale-105"

@@ -290,12 +290,12 @@ const AdminUpload = () => {
         <h2 className="mb-4 text-xl font-bold text-white">Upload Lyrics (.lrc)</h2>
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-400">Search track</label>
+            <label className="mb-1 block text-sm font-medium text-gray-400">{t('upload.search_track')}</label>
             <input
               value={trackSearchQuery}
               onChange={(e) => handleSearchTracks(e.target.value)}
               className="w-full rounded-lg bg-gray-800 px-4 py-3 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Type track title..."
+              placeholder={t('upload.search_track_placeholder')}
             />
           </div>
           {trackSearchResults.length > 0 && (
@@ -313,7 +313,7 @@ const AdminUpload = () => {
                   <img src={resolveCoverUrl(t.cover_url)} className="h-8 w-8 rounded object-cover" />
                   <div>
                     <p className="font-medium text-white">{t.title}</p>
-                    <p className="text-xs text-gray-400">{t.artist?.name || 'Unknown'}</p>
+                    <p className="text-xs text-gray-400">{t.artist?.name || '?'}</p>
                   </div>
                 </button>
               ))}
@@ -342,7 +342,7 @@ const AdminUpload = () => {
           {lyricsSuccess && (
             <div className="flex items-center gap-2 rounded-lg bg-green-500/10 p-4 text-green-400">
               <CheckCircle size={20} />
-              Lyrics uploaded successfully!
+              {t('upload.lyrics_uploaded')}
             </div>
           )}
         </div>

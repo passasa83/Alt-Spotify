@@ -20,7 +20,7 @@ const MobileNav = () => {
   return (
     <nav
       className="flex flex-shrink-0 justify-around border-t border-gray-800 bg-black pb-[env(safe-area-inset-bottom)] md:hidden"
-      aria-label="Main navigation"
+      aria-label={t('nav.main')}
     >
       {items.map(({ to, label, icon: Icon, end }) => (
         <NavLink

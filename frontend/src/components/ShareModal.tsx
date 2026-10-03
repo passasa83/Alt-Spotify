@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Copy, Check } from 'lucide-react';
 import type { ShareLink } from '@/types';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface ShareModalProps {
 }
 
 const ShareModal = ({ isOpen, onClose, shareLink, title }: ShareModalProps) => {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -94,18 +96,18 @@ const ShareModal = ({ isOpen, onClose, shareLink, title }: ShareModalProps) => {
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 id="share-modal-title" className="text-lg font-semibold text-white">{title || 'Share'}</h3>
-          <button onClick={handleClose} className="text-gray-400 hover:text-white" aria-label="Close">
+          <button onClick={handleClose} className="text-gray-400 hover:text-white" aria-label={t('action.close')}>
             <X size={20} />
           </button>
         </div>
 
         <div className="mb-4 rounded-lg bg-gray-900 p-4">
-          <p className="mb-2 text-xs text-gray-400">Share Link</p>
+          <p className="mb-2 text-xs text-gray-400">{t('share.share_link')}</p>
           <div className="flex items-center gap-2">
             <input
               readOnly
               value={shareLink.url}
-              aria-label="Share link URL"
+              aria-label={t('share.link_url')}
               className="flex-1 rounded bg-gray-800 px-3 py-2 text-sm text-white outline-none"
             />
             <button
@@ -125,7 +127,7 @@ const ShareModal = ({ isOpen, onClose, shareLink, title }: ShareModalProps) => {
         </div>
 
         <div className="mb-4 rounded-lg bg-gray-900 p-4 text-center">
-          <p className="mb-2 text-xs text-gray-400">QR Code</p>
+          <p className="mb-2 text-xs text-gray-400">{t('share.qr_code')}</p>
           <div className="mx-auto flex h-32 w-32 items-center justify-center rounded bg-white p-2">
             <pre className="text-[6px] leading-tight text-black">{qrText}</pre>
           </div>
@@ -152,7 +154,7 @@ const ShareModal = ({ isOpen, onClose, shareLink, title }: ShareModalProps) => {
             href={`mailto:?subject=Check this out&body=${encodeURIComponent(shareLink.url)}`}
             className="flex-1 rounded-lg bg-gray-700 py-2 text-center text-sm font-medium text-white hover:bg-gray-600 focus-visible:outline-2 focus-visible:outline-green-500"
           >
-            Email
+            {t('share.email')}
           </a>
         </div>
       </div>

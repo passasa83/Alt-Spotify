@@ -113,7 +113,7 @@ const ArtistDetail = () => {
           <Shuffle size={24} />
         </button>
         <button className="rounded-full border border-gray-400 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:border-white">
-          Follow
+          {t('action.follow')}
         </button>
       </div>
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { LyricsLine } from '@/types';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface SynchronizedLyricsProps {
   lyrics: LyricsLine[];
@@ -8,6 +9,7 @@ interface SynchronizedLyricsProps {
 }
 
 const SynchronizedLyrics = ({ lyrics, currentTime, onSeek }: SynchronizedLyricsProps) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +35,7 @@ const SynchronizedLyrics = ({ lyrics, currentTime, onSeek }: SynchronizedLyricsP
   if (!lyrics || lyrics.length === 0) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-gray-500">No lyrics available</p>
+        <p className="text-gray-500">{t('track.lyrics_not_available')}</p>
       </div>
     );
   }

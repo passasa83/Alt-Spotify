@@ -48,7 +48,7 @@ const AdminLayout = () => {
   // API has confirmed who this is, and only admins get past.
   if (!user) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-950" role="status" aria-label="Loading">
+      <div className="flex h-screen items-center justify-center bg-gray-950" role="status" aria-label={t('common.loading')}>
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-green-500 border-t-transparent" />
       </div>
     );

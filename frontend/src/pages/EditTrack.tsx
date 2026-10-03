@@ -67,7 +67,7 @@ const EditTrack = () => {
       
       <form onSubmit={handleSubmit} className="space-y-6 rounded-lg bg-gray-900 p-6">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-300">Title</label>
+          <label className="mb-1 block text-sm font-medium text-gray-300">{t('common.title')}</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}

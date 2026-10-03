@@ -66,7 +66,7 @@ const Stats = () => {
       addToast(`"${result.title}" playlist created with ${result.track_count} tracks`);
       navigate(`/playlist/${result.playlist_id}`);
     } catch {
-      addToast('Failed to generate top playlist');
+      addToast(t('stats.generate_failed'));
     } finally {
       setGeneratingPlaylist(false);
     }
@@ -219,23 +219,23 @@ const Stats = () => {
 
       <div className="rounded-lg bg-gray-800 p-6">
         <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
-          <ListMusic size={20} /> Generate Top Playlist
+          <ListMusic size={20} /> {t('stats.generate_title')}
         </h3>
-        <p className="mb-4 text-sm text-gray-400">Create an automatic playlist of your most played tracks.</p>
+        <p className="mb-4 text-sm text-gray-400">{t('stats.generate_desc')}</p>
         <div className="flex gap-3">
           <button
             onClick={() => handleGenerateTop('month')}
             disabled={generatingPlaylist}
             className="rounded-full bg-green-500 px-6 py-2 text-sm font-bold text-black transition-transform hover:scale-105 disabled:opacity-50"
           >
-            {generatingPlaylist ? 'Generating...' : 'Top Songs This Month'}
+            {generatingPlaylist ? t('stats.generating') : t('stats.top_month')}
           </button>
           <button
             onClick={() => handleGenerateTop('year')}
             disabled={generatingPlaylist}
             className="rounded-full border border-gray-400 px-6 py-2 text-sm font-bold text-white transition-colors hover:border-white disabled:opacity-50"
           >
-            {generatingPlaylist ? 'Generating...' : 'Top Songs This Year'}
+            {generatingPlaylist ? t('stats.generating') : t('stats.top_year')}
           </button>
         </div>
       </div>
