@@ -197,3 +197,30 @@ async def test_download_requires_auth(client: AsyncClient, db_session):
     track = await _create_track(db_session, artist.id, file_url="files/track.mp3")
     response = await client.get(f"/api/v1/stream/{track.id}/download")
     assert response.status_code == 401
+
+
+async def test_hls_playlists_pass_the_query_token_on(client: AsyncClient, db_session, auth_headers):
+    # Native players (iOS/Android/Safari) fetch variants and segments without
+    # our header: the token must travel inside the playlists.
+    artist = await _create_artist(db_session)
+    track = await _create_track(db_session, artist.id, hls_path="hls/test-track")
+    token = auth_headers["Authorization"].removeprefix("Bearer ")
+    master = b"#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=140800\n128k/playlist.m3u8\n"
+    variant = b"#EXTM3U\n#EXTINF:6.0,\nsegment_000.ts\n#EXT-X-ENDLIST\n"
+    with patch("app.api.v1.stream.get_minio_client") as mock_minio:
+        mock_response = MagicMock()
+        mock_minio.return_value.get_object.return_value = mock_response
+
+        mock_response.read.return_value = master
+        body = (await client.get(f"/api/v1/stream/{track.id}/master.m3u8?token={token}")).text
+        assert f"128k/playlist.m3u8?token={token}" in body
+        assert "#EXT-X-STREAM-INF:BANDWIDTH=140800\n" in body
+
+        mock_response.read.return_value = variant
+        body = (await client.get(f"/api/v1/stream/{track.id}/128k/playlist.m3u8?token={token}")).text
+        assert f"segment_000.ts?token={token}" in body
+        assert "#EXT-X-ENDLIST" in body
+
+        # Header-authenticated clients (HLS.js) get the playlist untouched.
+        body = (await client.get(f"/api/v1/stream/{track.id}/128k/playlist.m3u8", headers=auth_headers)).text
+        assert "token=" not in body

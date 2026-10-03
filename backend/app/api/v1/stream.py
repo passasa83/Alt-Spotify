@@ -1,6 +1,8 @@
+import asyncio
 import os
 import re
 import uuid
+from urllib.parse import quote
 from collections.abc import Callable, Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -175,30 +177,56 @@ def _read_object(object_name: str, not_found_detail: str) -> bytes:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail)
 
 
+def _pass_token_on(content: bytes, token: str | None) -> bytes:
+    """Append the playlist's ``?token=`` to every URI it lists.
+
+    Native HLS players (iOS, Android, Safari) fetch the variant playlists and
+    segments themselves, without our Authorization header: the token the
+    playlist was requested with has to travel with them.
+    """
+    if not token:
+        return content
+    param = "token=" + quote(token, safe="")
+    lines = []
+    for line in content.decode("utf-8").splitlines():
+        if line.strip() and not line.startswith("#"):
+            line = f"{line}{'&' if '?' in line else '?'}{param}"
+        lines.append(line)
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+async def _playlist_response(object_name: str, not_found: str, request: Request) -> Response:
+    # Off the event loop: the MinIO client is blocking.
+    content = await asyncio.to_thread(_read_object, object_name, not_found)
+    content = _pass_token_on(content, request.query_params.get("token"))
+    return Response(content=content, media_type=_PLAYLIST_MEDIA_TYPE, headers={"Cache-Control": "private, no-cache"})
+
+
 # HLS requests are authenticated like the direct stream (header or ``?token=``).
-# HLS.js sends the Authorization header on every playlist/segment request.
+# HLS.js sends the Authorization header on every playlist/segment request;
+# native players get the token passed on in the playlists instead.
 @router.get("/{track_id}/master.m3u8")
 async def get_master_playlist(
     track_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_stream),
 ):
     track = await _get_hls_track(track_id, current_user, db)
-    content = _read_object(f"{track.hls_path}/master.m3u8", "Master playlist not found")
-    return Response(content=content, media_type=_PLAYLIST_MEDIA_TYPE, headers={"Cache-Control": "private, no-cache"})
+    return await _playlist_response(f"{track.hls_path}/master.m3u8", "Master playlist not found", request)
 
 
 @router.get("/{track_id}/{quality}/playlist.m3u8")
 async def get_variant_playlist(
     track_id: uuid.UUID,
     quality: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_stream),
 ):
     _check_quality(quality)
     track = await _get_hls_track(track_id, current_user, db)
-    content = _read_object(f"{track.hls_path}/{quality}/playlist.m3u8", "Variant playlist not found")
-    return Response(content=content, media_type=_PLAYLIST_MEDIA_TYPE, headers={"Cache-Control": "private, no-cache"})
+    return await _playlist_response(f"{track.hls_path}/{quality}/playlist.m3u8", "Variant playlist not found", request)
 
 
 @router.get("/{track_id}/{quality}/{segment}")
@@ -213,7 +241,7 @@ async def get_hls_segment(
     if not _SEGMENT_RE.fullmatch(segment):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid segment file")
     track = await _get_hls_track(track_id, current_user, db)
-    content = _read_object(f"{track.hls_path}/{quality}/{segment}", "Segment not found")
+    content = await asyncio.to_thread(_read_object, f"{track.hls_path}/{quality}/{segment}", "Segment not found")
     # Segments never change once written (a re-transcode rewrites the playlists).
     return Response(content=content, media_type="video/mp2t", headers={"Cache-Control": "private, max-age=86400"})
 
