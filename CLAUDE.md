@@ -74,7 +74,7 @@ Après ce déploiement, supprimer les **5 pistes sans audio** restantes (Admin �
 1. ~~Écran « En lecture » plein écran et mini-lecteur épuré~~ : fait (`components/NowPlayingSheet.tsx`).
 2. ~~Cibles tactiles de 44 px, ligne entière cliquable~~ : fait (`utils/rowTap.ts`, variantes `pointer-coarse:`).
 3. ~~Débordements et petites cibles (Parcourir, Paramètres, filtres, langue)~~ : fait.
-4. PWA installable (manifest, icônes, plein écran).
+4. ~~PWA installable~~ : fait (`public/manifest.webmanifest`, icônes générées, sans service worker pour l'instant).
 Ensuite : évaluer `mobile/` (Expo) avant de construire l'app native.
 
 Autres pistes (`RAPPORT-AUDIT.md`, `AMELIORATIONS.md`) :
