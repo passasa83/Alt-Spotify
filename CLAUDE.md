@@ -12,7 +12,7 @@ Dépôt : `github.com/passasa83/Alt-Spotify`. Production : https://app.musicgrat
 | `backend/` | FastAPI (async SQLAlchemy, PostgreSQL), API sous `/api/v1`. Routes : `app/api/v1/*.py`, logique : `app/services/`, utilitaires : `app/utils/`, cœur : `app/core/` |
 | `frontend/` | React 18 + Vite + TypeScript + Tailwind v4 + Zustand. Servi par nginx (`frontend/nginx.conf`, qui proxifie `/api` vers le backend) |
 | `worker/` | Celery (Redis) : transcodage HLS avec ffmpeg, upload des segments dans MinIO |
-| `mobile/` | App Expo 52 / React Native 0.76 (non testée, non auditée) |
+| `mobile/` | App Expo 52 / React Native 0.76 : démarre et se compile (CI : typecheck + bundle Android), jamais testée sur un vrai téléphone |
 | `docker-compose.yml` | Stack prod : postgres, redis, minio, meilisearch, backend, worker, frontend. Images `ghcr.io/passasa83/alt-spotify-*:main` |
 
 Points clés du fonctionnement :
@@ -37,7 +37,7 @@ Tests (tous doivent passer avant un commit) :
 cd backend && python -m pytest --ignore=tests/test_jam.py -q
 cd frontend && npx tsc --noEmit -p . && npx vitest run
 ```
-État au 2 octobre 2026 : 321 tests backend, 97 frontend, tous au vert.
+État au 2 octobre 2026 : 322 tests backend, 97 frontend, tous au vert.
 
 ## Pièges connus
 
@@ -75,7 +75,7 @@ Après ce déploiement, supprimer les **5 pistes sans audio** restantes (Admin �
 2. ~~Cibles tactiles de 44 px, ligne entière cliquable~~ : fait (`utils/rowTap.ts`, variantes `pointer-coarse:`).
 3. ~~Débordements et petites cibles (Parcourir, Paramètres, filtres, langue)~~ : fait.
 4. ~~PWA installable~~ : fait (`public/manifest.webmanifest`, icônes générées, sans service worker pour l'instant).
-Ensuite : évaluer `mobile/` (Expo) avant de construire l'app native.
+App Expo (`mobile/`) remise en état (démarrage, paquets, lecture avec jeton média, SecureStore, hors ligne). Lancer : `cd mobile && npx expo start`, puis Expo Go sur le téléphone (vise la prod par défaut, `EXPO_PUBLIC_API_URL` sinon). Reste : test sur téléphone, remplacer `expo-av` (non maintenu, pas de contrôles écran verrouillé) par `react-native-track-player` (nécessite un build de développement).
 
 Autres pistes (`RAPPORT-AUDIT.md`, `AMELIORATIONS.md`) :
 - cache des pochettes indexé seulement par l'artiste, donc de mauvaises pochettes conservées 30 jours (`services/cover_service.py`) ;
