@@ -40,6 +40,8 @@ import { attachSource, detachSource } from '@/utils/audioSource';
 import { useMediaSession } from '@/hooks/useMediaSession';
 import { recordError } from '@/utils/diagnostics';
 import QueuePanel from './QueuePanel';
+import NowPlayingSheet, { type SheetAction } from './NowPlayingSheet';
+import { getParsedLyrics } from '@/api/lyrics';
 
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 // Seconds of listening before a play counts (history, stats, recommendations).
@@ -102,6 +104,7 @@ const Player = () => {
     toggleShuffle,
     toggleRepeat,
     toggleLyrics,
+    setLyrics,
     setCrossfadeDuration,
     toggleReplayGain,
     setPlaybackRate,
@@ -138,6 +141,41 @@ const Player = () => {
   const equalizerPanel = usePopover('player-equalizer');
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const download = useTrackDownload(currentTrack?.id ?? '');
+  // Phones: full-screen "Now playing" opened from the mini player.
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  // The phone's back button closes the sheet instead of leaving the page.
+  const openSheet = () => {
+    setSheetOpen(true);
+    window.history.pushState({ ...window.history.state, nowPlaying: true }, '');
+  };
+  const closeSheet = useCallback(() => {
+    if (window.history.state?.nowPlaying) window.history.back();
+    else setSheetOpen(false);
+  }, []);
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const onPop = () => setSheetOpen(false);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [sheetOpen]);
+
+  // Lyrics of the current track, for the lyrics panel (only tracks that have some).
+  const currentId = currentTrack?.id;
+  const hasLyrics = !!currentTrack?.lyrics_lrc;
+  useEffect(() => {
+    setLyrics([]);
+    if (!currentId || !hasLyrics) return;
+    let cancelled = false;
+    getParsedLyrics(currentId)
+      .then((parsed) => {
+        if (!cancelled) setLyrics(parsed);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [currentId, hasLyrics, setLyrics]);
 
   const getNextTrack = useCallback(() => {
     const { queue, shuffle: sh } = usePlayerStore.getState();
@@ -460,6 +498,21 @@ const Player = () => {
 
   useMediaSession(audioRef);
 
+  const toggleLike = async () => {
+    if (!currentTrack) return;
+    try {
+      if (isLiked) {
+        await removeFavorite('track', String(currentTrack.id));
+        setIsLiked(false);
+      } else {
+        await addFavorite('track', String(currentTrack.id));
+        setIsLiked(true);
+      }
+    } catch {
+      // silently fail
+    }
+  };
+
   const RepeatIcon = repeat === 'one' ? Repeat1 : Repeat;
   const progressPercent = duration > 0 ? Math.min(100, (progress / duration) * 100) : 0;
 
@@ -502,6 +555,20 @@ const Player = () => {
         ]),
   ];
 
+  const sheetActions: SheetAction[] = [
+    {
+      key: 'download',
+      label: download.downloaded ? t('player.remove_download') : t('player.download'),
+      icon: download.downloaded ? Check : Download,
+      onClick: download.toggle,
+      active: download.downloaded,
+      disabled: download.isDownloading,
+    },
+    { key: 'equalizer', label: t('player.equalizer'), icon: Sliders, onClick: () => { closeSheet(); equalizerPanel.open(); } },
+    { key: 'settings', label: t('player.audio_settings'), icon: Settings2, onClick: () => { closeSheet(); settingsPanel.toggle(); } },
+    { key: 'jam', label: t('player.jam_session'), icon: Radio, onClick: () => { setSheetOpen(false); navigate('/jam'); } },
+  ];
+
   if (!currentTrack) {
     return (
       <div className="hidden h-20 flex-shrink-0 items-center justify-center bg-gray-900 border-t border-gray-800 md:flex">
@@ -518,56 +585,60 @@ const Player = () => {
         </div>
       )}
       <div className="relative flex h-16 items-center justify-between gap-2 bg-gray-900 px-3 border-t border-gray-800 md:h-20 md:px-4">
-      {/* Mobile: thin seek bar along the top edge */}
-      <input
-        type="range"
-        min={0}
-        max={duration || 0}
-        value={progress}
-        onChange={handleSeek}
-        aria-label={t('player.now_playing')}
-        className="absolute inset-x-0 -top-1 h-2 w-full cursor-pointer appearance-none bg-transparent accent-green-500 md:hidden"
-        style={{ background: `linear-gradient(to right, rgb(34 197 94) ${progressPercent}%, rgb(55 65 81) ${progressPercent}%) center / 100% 2px no-repeat` }}
-      />
+      {/* Mobile: thin progress line along the top edge (seeking is in the full-screen view) */}
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-gray-700 md:hidden" aria-hidden="true">
+        <div className="h-full bg-green-500" style={{ width: `${progressPercent}%` }} />
+      </div>
       <div className="flex min-w-0 flex-1 items-center gap-3 md:w-1/4 md:flex-none lg:w-1/4">
-        <Link to={`/track/${currentTrack.id}`}>
-          <img
-            src={resolveCoverUrl(currentTrack.cover_url || currentTrack.album?.cover_url)}
-            alt={currentTrack.title}
-            className="h-11 w-11 rounded object-cover md:h-14 md:w-14"
-          />
-        </Link>
-        <div className="min-w-0">
-          <Link
-            to={`/track/${currentTrack.id}`}
-            className="block truncate text-sm font-bold text-white hover:underline"
+        {isDesktop ? (
+          <>
+            <Link to={`/track/${currentTrack.id}`}>
+              <img
+                src={resolveCoverUrl(currentTrack.cover_url || currentTrack.album?.cover_url)}
+                alt={currentTrack.title}
+                className="h-14 w-14 rounded object-cover"
+              />
+            </Link>
+            <div className="min-w-0">
+              <Link
+                to={`/track/${currentTrack.id}`}
+                className="block truncate text-sm font-bold text-white hover:underline"
+              >
+                {currentTrack.title}
+              </Link>
+              <Link
+                to={`/artist/${currentTrack.artist?.id || currentTrack.artist_id}`}
+                className="block truncate text-xs text-gray-400 hover:underline"
+              >
+                {currentTrack.artist?.name || t('player.unknown_artist')}
+              </Link>
+            </div>
+          </>
+        ) : (
+          <button
+            onClick={openSheet}
+            className="flex min-h-11 min-w-0 flex-1 items-center gap-3 text-left"
+            aria-label={t('player.open_now_playing', { title: currentTrack.title })}
+            aria-haspopup="dialog"
           >
-            {currentTrack.title}
-          </Link>
-          <Link
-            to={`/artist/${currentTrack.artist?.id || currentTrack.artist_id}`}
-            className="block truncate text-xs text-gray-400 hover:underline"
-          >
-            {currentTrack.artist?.name || t('player.unknown_artist')}
-          </Link>
-        </div>
+            <img
+              src={resolveCoverUrl(currentTrack.cover_url || currentTrack.album?.cover_url)}
+              alt=""
+              className="h-11 w-11 flex-shrink-0 rounded object-cover"
+            />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-bold text-white">{currentTrack.title}</span>
+              <span className="block truncate text-xs text-gray-400">
+                {currentTrack.artist?.name || t('player.unknown_artist')}
+              </span>
+            </span>
+          </button>
+        )}
         <button
-          onClick={async () => {
-            if (!currentTrack) return;
-            try {
-              if (isLiked) {
-                await removeFavorite('track', String(currentTrack.id));
-                setIsLiked(false);
-              } else {
-                await addFavorite('track', String(currentTrack.id));
-                setIsLiked(true);
-              }
-            } catch {
-              // silently fail
-            }
-          }}
-          className={`ml-2 ${isLiked ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
-          aria-label={isLiked ? 'Remove from liked' : 'Add to liked'}
+          onClick={toggleLike}
+          className={`flex h-11 w-11 flex-shrink-0 items-center justify-center md:ml-2 md:h-auto md:w-auto ${isLiked ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
+          aria-label={isLiked ? t('player.unlike') : t('player.like')}
+          aria-pressed={isLiked}
         >
           <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
         </button>
@@ -583,17 +654,17 @@ const Player = () => {
           >
             <Shuffle size={16} />
           </button>
-          <button onClick={prev} className="p-1 text-gray-400 hover:text-white" aria-label={t('player.previous')}>
+          <button onClick={prev} className="hidden p-1 text-gray-400 hover:text-white md:block" aria-label={t('player.previous')}>
             <SkipBack size={20} fill="currentColor" />
           </button>
           <button
             onClick={togglePlay}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black hover:scale-105"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-black hover:scale-105 md:h-8 md:w-8"
             aria-label={isPlaying ? t('player.pause') : t('player.play')}
           >
-            {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+            {isPlaying ? <Pause size={isDesktop ? 16 : 20} fill="currentColor" /> : <Play size={isDesktop ? 16 : 20} fill="currentColor" />}
           </button>
-          <button onClick={() => next()} className="p-1 text-gray-400 hover:text-white" aria-label={t('player.next')}>
+          <button onClick={() => next()} className="hidden p-1 text-gray-400 hover:text-white md:block" aria-label={t('player.next')}>
             <SkipForward size={20} fill="currentColor" />
           </button>
           <button
@@ -625,7 +696,7 @@ const Player = () => {
         </div>
       </div>
 
-      <OverflowToolbar
+      {isDesktop && <OverflowToolbar
         items={toolbarItems}
         moreLabel={t('player.more')}
         placement="top"
@@ -653,7 +724,7 @@ const Player = () => {
             </>
           ) : undefined
         }
-      />
+      />}
       </div>
 
       {queuePanel.isOpen && (
@@ -728,6 +799,22 @@ const Player = () => {
       )}
 
       <Equalizer isOpen={equalizerPanel.isOpen} onClose={equalizerPanel.close} audioRef={audioRef} />
+
+      {sheetOpen && !isDesktop && (
+        <NowPlayingSheet
+          onClose={closeSheet}
+          onNavigate={() => setSheetOpen(false)}
+          progress={progress}
+          duration={duration}
+          onSeek={(time) => {
+            if (audioRef.current) audioRef.current.currentTime = time;
+            seek(time);
+          }}
+          isLiked={isLiked}
+          onToggleLike={toggleLike}
+          actions={sheetActions}
+        />
+      )}
     </div>
   );
 };

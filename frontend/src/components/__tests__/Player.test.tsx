@@ -60,6 +60,7 @@ const defaultPlayerState = {
   toggleShuffle: vi.fn(),
   toggleRepeat: vi.fn(),
   toggleLyrics: vi.fn(),
+  setLyrics: vi.fn(),
   setCrossfadeDuration: vi.fn(),
   toggleReplayGain: vi.fn(),
   setPlaybackRate: vi.fn(),

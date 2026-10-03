@@ -128,3 +128,13 @@
     outline-offset: 2px;
   }
 }
+
+/* Mobile "Now playing" screen sliding up from the mini player. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
