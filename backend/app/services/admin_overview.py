@@ -289,20 +289,23 @@ async def get_overview(db: AsyncSession) -> dict:
     }
 
 
-async def purge_unplayable_tracks(db: AsyncSession, dry_run: bool = True, include_used: bool = False) -> dict:
+async def purge_unplayable_tracks(
+    db: AsyncSession, dry_run: bool = True, include_used: bool = False, include_orphans: bool = False
+) -> dict:
     """Tracks without audio (search leftovers).
 
     By default only those nothing points to, so nothing a user saved
     disappears. ``include_used`` also removes the ones sitting in playlists,
     favorites, history or jams (they cannot be played anyway).
-    ``dry_run`` only counts them.
+    ``include_orphans`` then removes the albums and artists left without
+    any track. ``dry_run`` only counts them.
     """
     from sqlalchemy import exists
 
     from app.models.favorite import Favorite
     from app.models.jam import JamSession
     from app.models.playlist_track import PlaylistTrack
-    from app.utils.track_cleanup import delete_tracks
+    from app.utils.track_cleanup import delete_orphan_catalogue, delete_tracks, orphan_catalogue
 
     conditions = [Track.file_url.is_(None), Track.hls_path.is_(None)]
     if not include_used:
@@ -313,9 +316,17 @@ async def purge_unplayable_tracks(db: AsyncSession, dry_run: bool = True, includ
             ~exists().where(JamSession.current_track_id == Track.id),
         ]
     ids = list((await db.execute(select(Track.id).where(*conditions))).scalars().all())
+    result = {"count": len(ids), "deleted": 0 if dry_run else len(ids)}
     if not dry_run and ids:
         await delete_tracks(db, ids)
-    return {"count": len(ids), "deleted": 0 if dry_run else len(ids)}
+    if include_orphans:
+        # Albums/artists left without any track would only open empty pages.
+        if dry_run:
+            albums, artists = (len(x) for x in await orphan_catalogue(db, ignoring_tracks=ids))
+        else:
+            albums, artists = await delete_orphan_catalogue(db)
+        result.update(orphan_albums=albums, orphan_artists=artists)
+    return result
 
 
 _KNOWN_ROOTS = ("/music", "/app/downloads")

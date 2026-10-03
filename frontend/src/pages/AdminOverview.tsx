@@ -27,6 +27,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import type { TranslationKey } from '@/i18n/en';
 import { formatRelative } from '@/utils/formatTime';
 import TranscodeProgress from '@/components/TranscodeProgress';
+import PurgeEmptyTracksButton from '@/components/PurgeEmptyTracksButton';
 
 const STATUS: Record<CheckStatus, { icon: typeof Info; text: string; badge: string; ring: string }> = {
   ok: { icon: CheckCircle2, text: 'text-green-400', badge: 'bg-green-500/15 text-green-300', ring: 'ring-gray-800' },
@@ -140,11 +141,9 @@ const AdminOverview = () => {
               {t('admin.merge_button', { count: c.mergeable })} →
             </Link>
           )}
-          {!!c.purgeable && (
-            <Link to="/admin/catalogue" className="mt-3 inline-block text-sm text-green-400 hover:underline">
-              {t('admin.purge_button', { count: c.purgeable })} →
-            </Link>
-          )}
+          <div className="mt-3">
+            <PurgeEmptyTracksButton onDone={load} />
+          </div>
           {c.missing_examples.length > 0 && (
             <details className="mt-3 text-xs">
               <summary className="cursor-pointer text-gray-400 hover:text-white">{t('admin.catalogue_missing_examples')}</summary>

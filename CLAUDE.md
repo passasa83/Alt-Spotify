@@ -37,7 +37,7 @@ Tests (tous doivent passer avant un commit) :
 cd backend && python -m pytest --ignore=tests/test_jam.py -q
 cd frontend && npx tsc --noEmit -p . && npx vitest run
 ```
-État au 2 octobre 2026 : 320 tests backend, 89 frontend, tous au vert.
+État au 2 octobre 2026 : 321 tests backend, 91 frontend, tous au vert.
 
 ## Pièges connus
 

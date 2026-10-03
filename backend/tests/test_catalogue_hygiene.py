@@ -130,3 +130,33 @@ async def test_purge_include_used_removes_every_track_without_audio(client: Asyn
 
     titles = {x["title"] for x in (await client.get("/api/v1/tracks", headers=auth_headers)).json()["items"]}
     assert titles == {"Playable"}
+
+
+async def test_purge_also_removes_albums_and_artists_left_empty(client: AsyncClient, admin_headers, auth_headers, db_session, test_user):
+    from app.models.album import Album
+    from app.models.follow import Follow, FollowType
+
+    await _seed(db_session, test_user)
+    # A search leftover: artist + album whose only track has no audio, liked and followed.
+    ghost = Artist(name="Ghost Artist")
+    db_session.add(ghost)
+    await db_session.flush()
+    ghost_album = Album(title="Ghost Album", artist_id=ghost.id)
+    db_session.add(ghost_album)
+    await db_session.flush()
+    db_session.add(Track(title="Ghost Song", artist_id=ghost.id, album_id=ghost_album.id, duration_seconds=60))
+    db_session.add(Favorite(user_id=test_user.id, entity_id=ghost_album.id, entity_type="album"))
+    db_session.add(Follow(follower_id=test_user.id, followed_id=ghost.id, follow_type=FollowType.ARTIST))
+    # An album with a playable track must stay, even though its artist has empty tracks too.
+    await db_session.flush()
+
+    url = "/api/v1/admin/catalogue/purge-unplayable?include_used=true&include_orphans=true"
+    preview = (await client.post(url, headers=admin_headers)).json()
+    assert preview == {"count": 4, "deleted": 0, "orphan_albums": 1, "orphan_artists": 1}
+
+    done = (await client.post(url + "&dry_run=false", headers=admin_headers)).json()
+    assert done == {"count": 4, "deleted": 4, "orphan_albums": 1, "orphan_artists": 1}
+
+    names = [a["name"] for a in (await client.get("/api/v1/artists", headers=auth_headers)).json()["items"]]
+    assert names == ["Hygiene Artist"]  # still has its playable track
+    assert (await client.get(f"/api/v1/albums/{ghost_album.id}", headers=auth_headers)).status_code == 404

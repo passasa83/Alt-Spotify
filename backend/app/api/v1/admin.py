@@ -140,11 +140,14 @@ async def _users_activity(db: AsyncSession, user_ids: list) -> dict:
 async def purge_unplayable(
     dry_run: bool = Query(True, description="Only count what would be deleted"),
     include_used: bool = Query(False, description="Also remove those in playlists, favorites or history"),
+    include_orphans: bool = Query(False, description="Then remove albums and artists left without any track"),
     _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete tracks without audio (by default only those nothing uses)."""
-    return await purge_unplayable_tracks(db, dry_run=dry_run, include_used=include_used)
+    return await purge_unplayable_tracks(
+        db, dry_run=dry_run, include_used=include_used, include_orphans=include_orphans
+    )
 
 
 @router.post("/catalogue/merge-missing-duplicates")

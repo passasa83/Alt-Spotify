@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Trash2, Merge } from 'lucide-react';
+import { Merge } from 'lucide-react';
 import { getTracks } from '@/api/tracks';
-import { purgeUnplayableTracks, mergeMissingDuplicates } from '@/api/admin';
+import { mergeMissingDuplicates } from '@/api/admin';
+import PurgeEmptyTracksButton from '@/components/PurgeEmptyTracksButton';
 import type { PaginatedResponse, Track } from '@/types';
 import TrackList from '@/components/TrackList';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -24,12 +25,10 @@ const AdminCatalogue = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<AudioFilter>('all');
-  const [purgeable, setPurgeable] = useState<number | null>(null);
-  const [purging, setPurging] = useState(false);
-  // Tracks without audio still sitting in playlists / favorites / history.
-  const [usedEmpty, setUsedEmpty] = useState(0);
   const [mergeable, setMergeable] = useState<number | null>(null);
   const [merging, setMerging] = useState(false);
+  // Remounts the purge button so it counts again after a merge.
+  const [purgeKey, setPurgeKey] = useState(0);
 
   const fetchTracks = useCallback(async (p: number, f: AudioFilter) => {
     setLoading(true);
@@ -42,16 +41,6 @@ const AdminCatalogue = () => {
       console.error('Failed to load tracks');
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  const refreshPurgeable = useCallback(async () => {
-    try {
-      const [unused, all] = await Promise.all([purgeUnplayableTracks(true), purgeUnplayableTracks(true, true)]);
-      setPurgeable(unused.count);
-      setUsedEmpty(all.count - unused.count);
-    } catch {
-      setPurgeable(null);
     }
   }, []);
 
@@ -68,9 +57,8 @@ const AdminCatalogue = () => {
   }, []);
 
   useEffect(() => {
-    refreshPurgeable();
     refreshMergeable();
-  }, [refreshPurgeable, refreshMergeable]);
+  }, [refreshMergeable]);
 
   const handleMerge = async () => {
     if (!mergeable || !confirm(t('admin.merge_confirm', { count: mergeable }))) return;
@@ -78,27 +66,12 @@ const AdminCatalogue = () => {
     try {
       const { merged } = await mergeMissingDuplicates(false);
       addToast(t('admin.merge_done', { count: merged }));
-      await Promise.all([fetchTracks(page, filter), refreshMergeable(), refreshPurgeable()]);
+      await Promise.all([fetchTracks(page, filter), refreshMergeable()]);
+      setPurgeKey((k) => k + 1);
     } catch {
       addToast(t('admin.merge_error'));
     } finally {
       setMerging(false);
-    }
-  };
-
-  const handlePurge = async (includeUsed = false) => {
-    const count = includeUsed ? (purgeable ?? 0) + usedEmpty : purgeable;
-    const question = includeUsed ? t('admin.purge_used_confirm', { count: count ?? 0 }) : t('admin.purge_confirm', { count: count ?? 0 });
-    if (!count || !confirm(question)) return;
-    setPurging(true);
-    try {
-      const { deleted } = await purgeUnplayableTracks(false, includeUsed);
-      addToast(t('admin.purge_done', { count: deleted }));
-      await Promise.all([fetchTracks(page, filter), refreshPurgeable()]);
-    } catch {
-      addToast(t('admin.purge_error'));
-    } finally {
-      setPurging(false);
     }
   };
 
@@ -125,26 +98,7 @@ const AdminCatalogue = () => {
           <Merge size={16} aria-hidden="true" />
           {merging ? t('admin.merging') : t('admin.merge_button', { count: mergeable ?? 0 })}
         </button>
-        {usedEmpty > 0 && (
-          <button
-            onClick={() => handlePurge(true)}
-            disabled={purging}
-            className="flex items-center gap-2 rounded-full bg-gray-800 px-4 py-2 text-sm text-red-300 hover:bg-gray-700 disabled:opacity-40"
-            title={t('admin.purge_used_hint')}
-          >
-            <Trash2 size={16} aria-hidden="true" />
-            {t('admin.purge_used_button', { count: (purgeable ?? 0) + usedEmpty })}
-          </button>
-        )}
-        <button
-          onClick={() => handlePurge()}
-          disabled={!purgeable || purging}
-          className="flex items-center gap-2 rounded-full bg-gray-800 px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 disabled:opacity-40"
-          title={t('admin.purge_hint')}
-        >
-          <Trash2 size={16} aria-hidden="true" />
-          {purging ? t('admin.purging') : t('admin.purge_button', { count: purgeable ?? 0 })}
-        </button>
+        <PurgeEmptyTracksButton key={purgeKey} onDone={() => fetchTracks(page, filter)} />
         </div>
       </div>
 

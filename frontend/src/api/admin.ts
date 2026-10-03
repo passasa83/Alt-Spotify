@@ -204,10 +204,22 @@ export async function revokeInvite(inviteId: string): Promise<void> {
   await client.delete(`/admin/invites/${inviteId}`);
 }
 
-/** Tracks without audio that nothing uses. `dryRun` only counts them. */
-export async function purgeUnplayableTracks(dryRun: boolean, includeUsed = false): Promise<{ count: number; deleted: number }> {
+export interface PurgeResult {
+  count: number;
+  deleted: number;
+  // Only with `includeOrphans`: albums / artists left without any track.
+  orphan_albums?: number;
+  orphan_artists?: number;
+}
+
+/**
+ * Tracks without audio. By default only those nothing uses; `includeUsed`
+ * also those in playlists, likes or history; `includeOrphans` then the albums
+ * and artists left empty. `dryRun` only counts them.
+ */
+export async function purgeUnplayableTracks(dryRun: boolean, includeUsed = false, includeOrphans = false): Promise<PurgeResult> {
   const response = await client.post('/admin/catalogue/purge-unplayable', null, {
-    params: { dry_run: dryRun, include_used: includeUsed },
+    params: { dry_run: dryRun, include_used: includeUsed, include_orphans: includeOrphans },
   });
   return response.data;
 }
