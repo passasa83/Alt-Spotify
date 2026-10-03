@@ -37,7 +37,7 @@ Tests (tous doivent passer avant un commit) :
 cd backend && python -m pytest --ignore=tests/test_jam.py -q
 cd frontend && npx tsc --noEmit -p . && npx vitest run
 ```
-État au 2 octobre 2026 : 322 tests backend, 97 frontend, tous au vert.
+État au 2 octobre 2026 : 328 tests backend, 97 frontend, tous au vert.
 
 ## Pièges connus
 
@@ -78,7 +78,7 @@ Après ce déploiement, supprimer les **5 pistes sans audio** restantes (Admin �
 App Expo (`mobile/`) remise en état (démarrage, paquets, lecture avec jeton média, SecureStore, hors ligne). Lancer : `cd mobile && npx expo start`, puis Expo Go sur le téléphone (vise la prod par défaut, `EXPO_PUBLIC_API_URL` sinon). Reste : test sur téléphone, remplacer `expo-av` (non maintenu, pas de contrôles écran verrouillé) par `react-native-track-player` (nécessite un build de développement).
 
 Autres pistes (`RAPPORT-AUDIT.md`, `AMELIORATIONS.md`) :
-- cache des pochettes indexé seulement par l'artiste, donc de mauvaises pochettes conservées 30 jours (`services/cover_service.py`) ;
+- ~~cache des pochettes indexé par l'artiste~~ : corrigé ; réparer les données avec Admin › Catalogue › « Corriger N pochettes partagées » (1 732 titres concernés en prod au 3 octobre) ;
 - traductions françaises incomplètes ;
 - fonctions de l'API sans interface (partage, import/export CSV, abonnements, radio, transfert d'appareil, file de la Jam) ;
 - podcasts hors du lecteur principal ;

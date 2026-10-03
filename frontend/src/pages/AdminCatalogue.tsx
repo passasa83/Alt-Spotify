@@ -3,6 +3,7 @@ import { Merge } from 'lucide-react';
 import { getTracks } from '@/api/tracks';
 import { mergeMissingDuplicates } from '@/api/admin';
 import PurgeEmptyTracksButton from '@/components/PurgeEmptyTracksButton';
+import RecheckCoversButton from '@/components/RecheckCoversButton';
 import type { PaginatedResponse, Track } from '@/types';
 import TrackList from '@/components/TrackList';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -98,6 +99,7 @@ const AdminCatalogue = () => {
           <Merge size={16} aria-hidden="true" />
           {merging ? t('admin.merging') : t('admin.merge_button', { count: mergeable ?? 0 })}
         </button>
+        <RecheckCoversButton />
         <PurgeEmptyTracksButton key={purgeKey} onDone={() => fetchTracks(page, filter)} />
         </div>
       </div>

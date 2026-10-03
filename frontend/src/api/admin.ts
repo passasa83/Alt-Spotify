@@ -275,3 +275,9 @@ export async function getTranscodeStatus(): Promise<TranscodeStatus> {
   const response = await client.get('/upload/transcode-status');
   return response.data;
 }
+
+/** Covers wrongly shared between tracks of one artist; `dryRun` only counts. Runs in the background. */
+export async function recheckCovers(dryRun: boolean): Promise<{ count: number; queued: number; running: boolean }> {
+  const response = await client.post('/recheck-covers', null, { params: { dry_run: dryRun } });
+  return response.data;
+}

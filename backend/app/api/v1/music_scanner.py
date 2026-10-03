@@ -5,7 +5,7 @@ import uuid
 from pathlib import Path
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from mutagen import File as MutagenFile
 from sqlalchemy import select
@@ -164,7 +164,7 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
             lrc_content = find_lrc_for_audio(file_path)
 
             from app.services.cover_service import fetch_cover
-            api_cover = await fetch_cover(title.strip(), (artist_name or "").strip())
+            api_cover = await fetch_cover(title.strip(), (artist_name or "").strip(), album_name)
 
             track = Track(
                 id=uuid.uuid4(),
@@ -330,6 +330,29 @@ async def fix_covers(
 
     await db.commit()
     return {"total": len(tracks), "fixed": fixed, "cleared": cleared}
+
+
+@router.post("/recheck-covers")
+async def recheck_shared_covers(
+    background_tasks: BackgroundTasks,
+    dry_run: bool = Query(True, description="Only count the tracks to re-check"),
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Re-fetch covers wrongly shared between tracks of one artist.
+
+    Runs in the background (a few minutes: the cover APIs are rate limited).
+    """
+    from app.core.database import async_session
+    from app.services import cover_repair
+
+    track_ids = await cover_repair.suspect_track_ids(db)
+    if dry_run or not track_ids:
+        return {"count": len(track_ids), "queued": 0, "running": cover_repair.is_running()}
+    if cover_repair.is_running():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A cover re-check is already running")
+    background_tasks.add_task(cover_repair.recheck_covers, track_ids, async_session)
+    return {"count": len(track_ids), "queued": len(track_ids), "running": True}
 
 
 _COVER_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp")
