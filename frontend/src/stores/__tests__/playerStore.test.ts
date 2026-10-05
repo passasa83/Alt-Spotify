@@ -243,12 +243,27 @@ describe('playerStore', () => {
 
     const state = usePlayerStore.getState();
     expect(state.currentTrack?.id).toBe('3');
-    expect(state.queue.map((t) => t.id)).toEqual(['1']);
+    // The playlist ends there: nothing is queued until the loop is turned on.
+    expect(state.queue).toEqual([]);
   });
 
-  it('refills the queue from the playlist once it runs out', () => {
+  it('repeat off stops at the end of the playlist', async () => {
+    const tracks = ['1', '2'].map((id) => createTrack(id));
+    usePlayerStore.getState().setPlaylistAsQueue(tracks, 1);
+
+    usePlayerStore.getState().next();
+    await flush();
+
+    const state = usePlayerStore.getState();
+    expect(state.currentTrack?.id).toBe('2');
+    expect(state.queue).toEqual([]);
+    expect(state.isPlaying).toBe(false);
+  });
+
+  it('repeat all replays the playlist from the top', () => {
     const tracks = ['1', '2', '3'].map((id) => createTrack(id));
     usePlayerStore.getState().setPlaylistAsQueue(tracks, 1);
+    usePlayerStore.getState().repeat = 'all';
 
     usePlayerStore.getState().next(); // -> 3, end of the playlist
 
@@ -256,6 +271,22 @@ describe('playerStore', () => {
     expect(state.currentTrack?.id).toBe('3');
     expect(state.queue.map((t) => t.id)).toEqual(['1', '2']);
     expect(mockAutoplay).not.toHaveBeenCalled();
+  });
+
+  it('repeat all replays the queue from the top', async () => {
+    mockAutoplay.mockResolvedValue([createTrack('s1'), createTrack('s2')]);
+
+    usePlayerStore.getState().setTrack(createTrack('1'));
+    await flush();
+    usePlayerStore.getState().repeat = 'all';
+
+    usePlayerStore.getState().next(); // -> s1
+    usePlayerStore.getState().next(); // -> s2, queue empty
+    usePlayerStore.getState().next(); // -> back to the start of the queue
+
+    const state = usePlayerStore.getState();
+    expect(state.currentTrack?.id).toBe('1');
+    expect(state.queue.map((t) => t.id)).toEqual(['s1']);
   });
 
   it('queues similar tracks after a track played outside a playlist', async () => {

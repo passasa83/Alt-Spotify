@@ -274,7 +274,9 @@ const Player = () => {
       addToast(translate('player.error_stopped'));
       return;
     }
-    if (store.queue.length > 0 || store.repeat === 'off') {
+    // Skip when there is something left to play; a lone track looping on its
+    // own would just fail again, so it stops instead.
+    if (store.queue.length > 0 || store.repeat === 'off' || store.queuePlayed.length > 0) {
       store.next();
     } else {
       store.pause();
