@@ -357,10 +357,11 @@ _VERSION_WORD = re.compile(
     r"\b(?:live|remix|mix|edit|acoustic|acoustique|instrumental|unplugged|demo|version|cover|a ?cappella|extended|session|orchestral)\b"
 )
 _TITLE_NOISE_WORDS = re.compile(r"\b(?:official (?:music )?video|official audio|clip officiel|lyrics? video)\b")
-# One recording in two files differs by a few seconds (silence, encoder, the
-# YouTube copy); a radio edit or another recording differs by more.
-_DURATION_TOLERANCE = 10
-# Titles many different songs share: only exact twins are merged.
+# Durations are not a criterion: the same song lasts 3:56 on the album and
+# 4:19 as a YouTube clip with an intro, and listeners see both as duplicates.
+# Other versions are told apart by their title ("Live", "Remix"...).
+# Except titles many different songs share (one "Intro" per album): those
+# are only merged when practically the same length.
 _GENERIC_TITLES = {"intro", "outro", "interlude", "skit", "prelude", "prologue", "epilogue", "bonus", "untitled", "instrumental"}
 _GENERIC_TOLERANCE = 1
 
@@ -391,7 +392,7 @@ def normalize_title(title: str, artist_name: str = "") -> str:
     return text
 
 
-def _same_duration_clusters(tracks: list[Track], tolerance: int = _DURATION_TOLERANCE) -> list[list[Track]]:
+def _same_duration_clusters(tracks: list[Track], tolerance: int = _GENERIC_TOLERANCE) -> list[list[Track]]:
     """Split one title's tracks into groups of compatible durations (each
     within ``tolerance`` seconds of the shortest of its group)."""
     known = sorted((t for t in tracks if t.duration_seconds), key=lambda t: t.duration_seconds)
@@ -439,10 +440,10 @@ def _find_duplicate_pairs(
 
     Two kinds of duplicates:
     1. the same file scanned from two roots, where one copy's file is gone;
-    2. the same song stored twice with both files still there: same artist,
-       same title once normalized, durations within a few seconds (only when
-       ``include_alive`` is set). Typically a song both on an album and as a
-       single, or in the music folder and downloaded again from YouTube.
+    2. the same song stored twice with both files still there: same artist
+       and same title once normalized (only when ``include_alive`` is set).
+       Typically a song on an album, a deluxe edition and as a single, or in
+       the music folder and downloaded again from YouTube as a longer clip.
     """
     artist_names = artist_names or {}
     pairs: list[tuple[Track, Track]] = []
@@ -475,8 +476,8 @@ def _find_duplicate_pairs(
         for (_artist, title), group in groups.items():
             if len(group) < 2:
                 continue
-            tolerance = _GENERIC_TOLERANCE if title in _GENERIC_TITLES else _DURATION_TOLERANCE
-            for cluster in _same_duration_clusters(group, tolerance):
+            clusters = _same_duration_clusters(group) if title in _GENERIC_TITLES else [group]
+            for cluster in clusters:
                 if len(cluster) < 2:
                     continue
                 survivor = min(cluster, key=lambda t: _keep_rank(t, exists, paths))
