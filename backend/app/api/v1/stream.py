@@ -34,6 +34,7 @@ _AUDIO_CONTENT_TYPES = {
     "m4a": "audio/mp4",
     "aac": "audio/aac",
     "opus": "audio/ogg",
+    "webm": "audio/webm",
 }
 
 

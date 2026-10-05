@@ -46,20 +46,26 @@ def _search_youtube(query: str) -> dict | None:
     return None
 
 
-def _download_audio(url: str, output_path: str) -> bool:
+# Extensions yt-dlp may save the audio stream with.
+_AUDIO_EXTENSIONS = (".m4a", ".webm", ".opus", ".mp3", ".ogg", ".aac", ".flac", ".wav")
+
+
+def _download_audio(url: str, base_path: str) -> str | None:
+    """Save the audio stream as YouTube serves it; return the file path.
+
+    No conversion: YouTube audio is lossy (~130 kbps AAC/Opus), so turning it
+    into FLAC only made files 6 times bigger for the same sound. M4A (AAC) is
+    preferred because every browser plays it (old Safari lacks Opus).
+    """
     try:
         import yt_dlp
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        os.makedirs(os.path.dirname(base_path), exist_ok=True)
 
         ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': output_path.replace('.flac', '.%(ext)s'),
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'flac',
-                'preferredquality': '0',
-            }],
+            'format': 'bestaudio[ext=m4a]/bestaudio',
+            'outtmpl': base_path + '.%(ext)s',
             'quiet': True,
+            'noprogress': True,
             'no_warnings': True,
             'noplaylist': True,
             'socket_timeout': 30,
@@ -68,20 +74,13 @@ def _download_audio(url: str, output_path: str) -> bool:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        if os.path.isfile(output_path):
-            return True
-
-        for ext in ['.flac', '.opus', '.mp3', '.m4a', '.ogg', '.wav']:
-            candidate = output_path.replace('.flac', ext)
-            if os.path.isfile(candidate):
-                if ext != '.flac':
-                    os.rename(candidate, output_path)
-                return True
-
-        return False
+        for ext in _AUDIO_EXTENSIONS:
+            if os.path.isfile(base_path + ext):
+                return base_path + ext
+        return None
     except Exception as e:
         logger.error("yt_dlp_download_error", url=url, error=str(e))
-        return False
+        return None
 
 
 def _get_track_metadata(file_path: str) -> dict:
@@ -119,12 +118,12 @@ async def search_and_download(
     filename = _sanitize_filename(f"{artist} - {title}" if artist else title)
     if not filename:
         filename = str(uuid.uuid4())[:8]
-    output_path = os.path.join(DOWNLOAD_DIR, f"{filename}.flac")
-
     loop = asyncio.get_event_loop()
-    success = await loop.run_in_executor(_executor, _download_audio, youtube_url, output_path)
+    output_path = await loop.run_in_executor(
+        _executor, _download_audio, youtube_url, os.path.join(DOWNLOAD_DIR, filename)
+    )
 
-    if not success:
+    if not output_path:
         return {"success": False, "error": "Download failed"}
 
     metadata = _get_track_metadata(output_path)
@@ -149,11 +148,11 @@ async def download_from_url(youtube_url: str) -> dict:
     filename = _sanitize_filename(f"{artist} - {title}")
     if not filename:
         filename = str(uuid.uuid4())[:8]
-    output_path = os.path.join(DOWNLOAD_DIR, f"{filename}.flac")
+    output_path = await loop.run_in_executor(
+        _executor, _download_audio, youtube_url, os.path.join(DOWNLOAD_DIR, filename)
+    )
 
-    success = await loop.run_in_executor(_executor, _download_audio, youtube_url, output_path)
-
-    if not success:
+    if not output_path:
         return {"success": False, "error": "Download failed"}
 
     metadata = _get_track_metadata(output_path)
