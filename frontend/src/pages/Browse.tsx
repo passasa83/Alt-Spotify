@@ -9,7 +9,7 @@ import TrackContextMenu from '@/components/TrackContextMenu';
 import AddToPlaylistModal from '@/components/AddToPlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import type { Track } from '@/types';
-import { GENRES } from '@/constants/genres';
+import { genreLabel, useGenres } from '@/constants/genres';
 import { usePlaylistModals } from '@/hooks/usePlaylistModals';
 
 type Tab = 'new' | 'trending' | 'genres';
@@ -20,6 +20,7 @@ const Browse = () => {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
+  const genres = useGenres();
   const { setTrack } = usePlayerStore();
   const { isCurrent, isPlayingTrack, playOrToggle } = useTrackPlayback();
   const { playlistModalTrack, showCreateModal, openAddToPlaylist, openCreatePlaylist, closeAddToPlaylist, closeCreatePlaylist } = usePlaylistModals();
@@ -74,15 +75,16 @@ const Browse = () => {
 
       {tab === 'genres' && (
         <div className="flex flex-wrap gap-2">
-          {GENRES.map((genre) => (
+          {genres && genres.length === 0 && <p className="text-sm text-gray-400">{t('search.no_genres')}</p>}
+          {(genres ?? []).map(({ genre, count }) => (
             <button
               key={genre}
               onClick={() => setSelectedGenre(genre)}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors pointer-coarse:min-h-11 ${
                 selectedGenre === genre ? 'bg-green-500 text-black' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
               }`}
             >
-              {genre}
+              {genreLabel(genre, t)} <span className="opacity-60">{count}</span>
             </button>
           ))}
         </div>

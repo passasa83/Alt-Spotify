@@ -18,6 +18,17 @@ export const resolveCoverUrl = (url: string | null | undefined): string => {
   return url;
 };
 
+export interface GenreCount {
+  genre: string;
+  count: number;
+}
+
+/** Genres that have playable tracks, most represented first. */
+export const getGenres = async (): Promise<GenreCount[]> => {
+  const response = await client.get('/tracks/genres');
+  return response.data;
+};
+
 // `playable`: true = only tracks with audio, false = only tracks without.
 export const getTracks = async (
   page = 1,

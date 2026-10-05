@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { SlidersHorizontal, X } from 'lucide-react';
 import type { SearchFilters } from '@/types';
-import { GENRES } from '@/constants/genres';
+import { GENRES, genreLabel } from '@/constants/genres';
 import { useTranslation } from '@/hooks/useTranslation';
 
 const MUSICAL_KEYS = [
@@ -74,7 +74,7 @@ const SearchFiltersPanel = ({ filters, onChange }: Props) => {
               >
                 <option value="">{t('search.all_genres')}</option>
                 {GENRES.map((g) => (
-                  <option key={g} value={g}>{g}</option>
+                  <option key={g} value={g}>{genreLabel(g, t)}</option>
                 ))}
               </select>
             </div>

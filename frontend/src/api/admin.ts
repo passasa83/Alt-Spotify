@@ -287,3 +287,9 @@ export async function recheckCovers(dryRun: boolean): Promise<{ count: number; q
   const response = await client.post('/recheck-covers', null, { params: { dry_run: dryRun } });
   return response.data;
 }
+
+/** Tracks without genre (looked up per artist in the background); `dryRun` only counts. */
+export async function fillGenres(dryRun: boolean): Promise<{ artists: number; tracks: number; running: boolean }> {
+  const response = await client.post('/fill-genres', null, { params: { dry_run: dryRun } });
+  return response.data;
+}

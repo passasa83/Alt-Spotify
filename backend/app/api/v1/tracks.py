@@ -138,6 +138,21 @@ async def list_tracks(
     )
 
 
+@router.get("/genres")
+async def list_genres(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """Genres that have playable tracks, most represented first (search tiles)."""
+    rows = await db.execute(
+        select(Track.genre, func.count(Track.id))
+        .where(Track.genre.is_not(None), has_audio())
+        .group_by(Track.genre)
+        .order_by(func.count(Track.id).desc())
+    )
+    return [{"genre": genre, "count": count} for genre, count in rows.all()]
+
+
 @router.get("/{track_id}")
 async def get_track(
     track_id: uuid.UUID, 

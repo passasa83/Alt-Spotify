@@ -10,7 +10,7 @@ import PlaylistCard from '@/components/PlaylistCard';
 import { getTracks } from '@/api/tracks';
 import { Globe, HardDrive } from 'lucide-react';
 import type { SearchFilters, Track } from '@/types';
-import { GENRES } from '@/constants/genres';
+import { genreLabel, useGenres } from '@/constants/genres';
 import { useTranslation } from '@/hooks/useTranslation';
 
 const GENRE_PAGE_SIZE = 50;
@@ -27,6 +27,7 @@ const SearchPage = () => {
 
   // Clicking a genre tile with no query browses that genre instead of searching.
   const browseGenre = !query ? filters.genre : undefined;
+  const genres = useGenres();
   const [genreTracks, setGenreTracks] = useState<Track[]>([]);
   const [genreLoading, setGenreLoading] = useState(false);
   const [genreError, setGenreError] = useState(false);
@@ -158,7 +159,7 @@ const SearchPage = () => {
       {!query && !isLoading && (
         <div>
           <div className="mb-6 flex flex-wrap items-center gap-4">
-            <h2 className="text-2xl font-bold text-white">{browseGenre ?? t('search.browse_all')}</h2>
+            <h2 className="text-2xl font-bold text-white">{browseGenre ? genreLabel(browseGenre, t) : t('search.browse_all')}</h2>
             {browseGenre && (
               <button
                 onClick={clearGenre}
@@ -185,18 +186,22 @@ const SearchPage = () => {
                 ))}
               </div>
             ) : (
-              <p className="py-16 text-center text-gray-400">{t('search.no_results', { query: browseGenre })}</p>
+              <p className="py-16 text-center text-gray-400">{t('search.no_results', { query: genreLabel(browseGenre, t) })}</p>
             )
+          ) : genres && genres.length === 0 ? (
+            <p className="py-10 text-center text-gray-400">{t('search.no_genres')}</p>
           ) : (
+            // Only genres that have tracks: an empty tile would lead nowhere.
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {GENRES.map((genre) => (
-                <div
+              {(genres ?? []).map(({ genre, count }) => (
+                <button
                   key={genre}
                   onClick={() => handleFiltersChange({ genre })}
-                  className="relative cursor-pointer overflow-hidden rounded-lg bg-gradient-to-br from-purple-600 to-blue-400 p-4 transition-transform hover:scale-105"
+                  className="relative flex min-h-20 flex-col items-start justify-between overflow-hidden rounded-lg bg-gradient-to-br from-purple-600 to-blue-400 p-4 text-left transition-transform hover:scale-105"
                 >
-                  <span className="text-lg font-bold text-white">{genre}</span>
-                </div>
+                  <span className="text-lg font-bold text-white">{genreLabel(genre, t)}</span>
+                  <span className="text-xs text-white/80">{t('artist.track_count', { count })}</span>
+                </button>
               ))}
             </div>
           )}

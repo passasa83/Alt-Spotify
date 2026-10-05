@@ -163,6 +163,12 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
 
             lrc_content = find_lrc_for_audio(file_path)
 
+            # Tag mapped onto the genre list, else the artist's genre (the
+            # "complete genres" admin job looks up artists that have none).
+            from app.services.genre_fill import artist_genre
+            from app.services.genre_service import canonical_genre
+            genre = canonical_genre(metadata.get("genre")) or await artist_genre(db, artist.id, lookup=False)
+
             from app.services.cover_service import fetch_cover
             api_cover = await fetch_cover(title.strip(), (artist_name or "").strip(), album_name)
 
@@ -174,7 +180,7 @@ async def scan_directory_internal(scan_dir: str, db: AsyncSession) -> dict:
                 duration_seconds=duration,
                 file_url=f"local:{file_path}",
                 cover_url=api_cover,
-                genre=metadata.get("genre"),
+                genre=genre,
                 track_gain=metadata.get("replay_gain"),
                 track_peak=metadata.get("track_peak"),
                 lyrics_lrc=lrc_content,
@@ -353,6 +359,26 @@ async def recheck_shared_covers(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A cover re-check is already running")
     background_tasks.add_task(cover_repair.recheck_covers, track_ids, async_session)
     return {"count": len(track_ids), "queued": len(track_ids), "running": True}
+
+
+@router.post("/fill-genres")
+async def fill_genres(
+    background_tasks: BackgroundTasks,
+    dry_run: bool = Query(True, description="Only count the tracks without genre"),
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Give a genre to tracks without one, looked up per artist (background)."""
+    from app.core.database import async_session
+    from app.services import genre_fill
+
+    missing = await genre_fill.missing_genres(db)
+    if dry_run or not missing["tracks"]:
+        return {**missing, "running": genre_fill.is_running()}
+    if genre_fill.is_running():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A genre fill is already running")
+    background_tasks.add_task(genre_fill.fill_missing_genres, async_session)
+    return {**missing, "running": True}
 
 
 _COVER_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp")

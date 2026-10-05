@@ -31,7 +31,15 @@ vi.mock('@/hooks/useSearch', async () => {
 
 vi.mock('@/api/tracks', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/tracks')>();
-  return { ...actual, getTracks: vi.fn() };
+  return {
+    ...actual,
+    getTracks: vi.fn(),
+    // Tiles only for the genres that have tracks.
+    getGenres: vi.fn().mockResolvedValue([
+      { genre: 'Pop', count: 3 },
+      { genre: 'Rock', count: 1 },
+    ]),
+  };
 });
 
 vi.mock('react-router-dom', async () => {
@@ -53,11 +61,14 @@ describe('Search', () => {
     expect(screen.getByPlaceholderText('What do you want to listen to?')).toBeInTheDocument();
   });
 
-  it('renders browse genres section', () => {
+  it('renders browse genres section', async () => {
     render(<MemoryRouter><SearchPage /></MemoryRouter>);
     expect(screen.getByText('Browse all')).toBeInTheDocument();
-    expect(screen.getByText('Pop')).toBeInTheDocument();
+    expect(await screen.findByText('Pop')).toBeInTheDocument();
     expect(screen.getByText('Rock')).toBeInTheDocument();
+    expect(screen.getByText('3 tracks')).toBeInTheDocument();
+    // No tile for a genre without tracks.
+    expect(screen.queryByText('Jazz')).not.toBeInTheDocument();
   });
 
   it('browses a genre when its tile is clicked', async () => {
@@ -80,7 +91,7 @@ describe('Search', () => {
     } as any);
 
     render(<MemoryRouter><SearchPage /></MemoryRouter>);
-    await userEvent.click(screen.getByText('Pop'));
+    await userEvent.click(await screen.findByText('Pop'));
 
     expect(await screen.findByText('Back to all genres')).toBeInTheDocument();
     await waitFor(() => expect(getTracks).toHaveBeenCalledWith(1, 50, { genre: 'Pop', playable: true }));

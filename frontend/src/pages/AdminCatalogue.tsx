@@ -4,6 +4,7 @@ import { getTracks } from '@/api/tracks';
 import { mergeDuplicates } from '@/api/admin';
 import PurgeEmptyTracksButton from '@/components/PurgeEmptyTracksButton';
 import RecheckCoversButton from '@/components/RecheckCoversButton';
+import FillGenresButton from '@/components/FillGenresButton';
 import type { PaginatedResponse, Track } from '@/types';
 import TrackList from '@/components/TrackList';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -100,6 +101,7 @@ const AdminCatalogue = () => {
           {merging ? t('admin.merging') : t('admin.merge_button', { count: mergeable ?? 0 })}
         </button>
         <RecheckCoversButton />
+        <FillGenresButton />
         <PurgeEmptyTracksButton key={purgeKey} onDone={() => fetchTracks(page, filter)} />
         </div>
       </div>
