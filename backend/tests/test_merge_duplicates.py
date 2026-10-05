@@ -185,3 +185,72 @@ async def test_full_merge_keeps_the_most_played_copy_and_moves_references(
     assert (await client.post(ALL_URL, headers=admin_headers)).json()["count"] == 0
     overview = (await client.get("/api/v1/admin/overview", headers=admin_headers)).json()
     assert overview["catalogue"]["mergeable"] == 0
+
+
+def test_normalize_title_drops_upload_noise_but_keeps_versions():
+    from app.services.admin_overview import normalize_title
+
+    assert normalize_title("Linkin Park - Numb (Official Video)", "Linkin Park") == "numb"
+    assert normalize_title("Caméléon [Clip officiel]", "GIMS") == "cameleon"
+    assert normalize_title("My Immortal (Remastered 2023)", "Evanescence") == "my immortal"
+    # A live recording is another version, even when remastered.
+    assert normalize_title("My Immortal (Live At O2 Arena / 2022 / Remastered 2023)", "Evanescence") != "my immortal"
+    assert normalize_title("Bleed (Remix)", "Connor Kauffman") == "bleed remix"
+    assert normalize_title("Est-ce que tu m'aimes ?", "GIMS") == normalize_title("Est-ce que tu m’aimes", "GIMS")
+
+
+async def _band_tracks(db_session, tmp_path, monkeypatch, specs):
+    """specs: (title, duration, relative path) -> tracks with real files."""
+    music = tmp_path / "music"
+    downloads = tmp_path / "downloads"
+    monkeypatch.setenv("MUSIC_SCAN_DIR", str(music))
+    monkeypatch.setenv("MUSIC_DOWNLOAD_DIR", str(downloads))
+    artist = Artist(name="Connor Kauffman")
+    db_session.add(artist)
+    await db_session.flush()
+    tracks = []
+    for title, duration, rel in specs:
+        path = tmp_path / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"audio")
+        tracks.append(Track(title=title, artist_id=artist.id, duration_seconds=duration, file_url=f"local:{path}"))
+    db_session.add_all(tracks)
+    await db_session.flush()
+    return tracks
+
+
+async def test_full_merge_catches_the_duplicates_seen_on_production(
+    client: AsyncClient, admin_headers, db_session, tmp_path, monkeypatch
+):
+    tracks = await _band_tracks(db_session, tmp_path, monkeypatch, [
+        # Same song on an album and as a single: different file names.
+        ("Bleed", 145, "music/Connor Kauffman discography/Never Worth Saving/02 - Connor Kauffman - Bleed.flac"),
+        ("Bleed", 145, "music/Connor Kauffman discography/Bleed/01 - Connor Kauffman - Bleed.flac"),
+        # Downloaded again from YouTube: a few seconds longer, noisy title.
+        ("Cradles", 209, "music/data/Cradles.flac"),
+        ("Connor Kauffman - Cradles (Official Video)", 218, "downloads/Cradles.mp3"),
+        # Other recordings of one title: kept apart.
+        ("Hostage", 145, "music/a/Hostage.flac"),
+        ("Hostage (Live)", 146, "music/b/Hostage (Live).flac"),
+        ("Remember", 130, "music/c/Remember.flac"),
+        ("Remember", 160, "music/d/Remember.flac"),
+        # Generic titles from two albums: not the same song.
+        ("Intro", 84, "music/e/Intro.flac"),
+        ("Intro", 90, "music/f/Intro.flac"),
+    ])
+    preview = (await client.post(ALL_URL, headers=admin_headers)).json()
+    assert preview["count"] == 2
+
+    cradles_flac, cradles_youtube = tracks[2], tracks[3]
+    keep_id, drop_id = cradles_flac.id, cradles_youtube.id
+    data = (await client.post(f"{ALL_URL}?dry_run=false", headers=admin_headers)).json()
+    assert data["merged"] == 2
+
+    db_session.expire_all()
+    left = (await db_session.execute(select(Track))).scalars().all()
+    assert sorted(t.title for t in left) == sorted(
+        ["Bleed", "Cradles", "Hostage", "Hostage (Live)", "Remember", "Remember", "Intro", "Intro"]
+    )
+    ids = {u(t.id) for t in left}
+    # The lossless copy from the music folder wins over the YouTube download.
+    assert u(keep_id) in ids and u(drop_id) not in ids

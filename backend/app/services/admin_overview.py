@@ -3,6 +3,8 @@ music folders, backing services, configuration and the warnings they raise."""
 
 import asyncio
 import os
+import re
+import unicodedata
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -345,29 +347,104 @@ def _relative_key(path: str, roots: list[str]) -> str:
     return "/".join(normalized.split("/")[-3:]).lower()
 
 
-def _content_keys(track: Track, path: str) -> list[tuple]:
-    """Keys that identify the same song saved under more than one file."""
-    title = (track.title or "").strip().lower()
-    if not title:
-        return []
-    artist = str(track.artist_id)
-    keys: list[tuple] = [(title, artist, os.path.basename(path).lower())]
-    duration = int(track.duration_seconds or 0)
-    if duration > 0:
-        keys.append((title, artist, duration))
-    return keys
+# Bracketed parts that only describe the upload, not the recording:
+# "(Official Video)", "[Lyrics]", "(Remastered 2011)".
+_BRACKETS = re.compile(r"[\(\[]([^\)\]]*)[\)\]]")
+_NOISE_WORD = re.compile(r"\b(?:official|officiel|lyrics?|paroles|audio|video|clip|visuali[sz]er|hd|hq|4k|remaster(?:ed)?)\b")
+# ...unless they name another recording: "(Live At O2 Arena / Remastered 2023)"
+# is a live version, not a remaster of the studio one.
+_VERSION_WORD = re.compile(
+    r"\b(?:live|remix|mix|edit|acoustic|acoustique|instrumental|unplugged|demo|version|cover|a ?cappella|extended|session|orchestral)\b"
+)
+_TITLE_NOISE_WORDS = re.compile(r"\b(?:official (?:music )?video|official audio|clip officiel|lyrics? video)\b")
+# One recording in two files differs by a few seconds (silence, encoder, the
+# YouTube copy); a radio edit or another recording differs by more.
+_DURATION_TOLERANCE = 10
+# Titles many different songs share: only exact twins are merged.
+_GENERIC_TITLES = {"intro", "outro", "interlude", "skit", "prelude", "prologue", "epilogue", "bonus", "untitled", "instrumental"}
+_GENERIC_TOLERANCE = 1
+
+
+def _fold(text: str) -> str:
+    # Typographic apostrophes would vanish below instead of separating words.
+    text = text.replace("’", "'").replace("‘", "'")
+    return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii").lower()
+
+
+def _drop_noise_brackets(match: re.Match) -> str:
+    inside = match.group(1)
+    if _NOISE_WORD.search(inside) and not _VERSION_WORD.search(inside):
+        return " "
+    return match.group(0)
+
+
+def normalize_title(title: str, artist_name: str = "") -> str:
+    """Comparable form of a title: no accents, case, punctuation, upload noise
+    ("(Official Video)") nor leading "Artist - ". Versions ("(Live)",
+    "(Remix)") stay part of the title."""
+    text = _BRACKETS.sub(_drop_noise_brackets, _fold(title or ""))
+    text = _TITLE_NOISE_WORDS.sub(" ", text)
+    text = re.sub(r"[^a-z0-9]+", " ", text).strip()
+    artist = re.sub(r"[^a-z0-9]+", " ", _fold(artist_name or "")).strip()
+    if artist and text.startswith(artist + " "):
+        text = text[len(artist) + 1:]
+    return text
+
+
+def _same_duration_clusters(tracks: list[Track], tolerance: int = _DURATION_TOLERANCE) -> list[list[Track]]:
+    """Split one title's tracks into groups of compatible durations (each
+    within ``tolerance`` seconds of the shortest of its group)."""
+    known = sorted((t for t in tracks if t.duration_seconds), key=lambda t: t.duration_seconds)
+    unknown = [t for t in tracks if not t.duration_seconds]
+    clusters: list[list[Track]] = []
+    for t in known:
+        base = clusters[-1][0].duration_seconds if clusters else None
+        if base is not None and t.duration_seconds - base <= tolerance:
+            clusters[-1].append(t)
+        else:
+            clusters.append([t])
+    # No duration to compare: assume the same song as the main version.
+    if unknown:
+        if clusters:
+            max(clusters, key=len).extend(unknown)
+        else:
+            clusters.append(unknown)
+    return clusters
+
+
+def _keep_rank(t: Track, exists: dict, paths: dict) -> tuple:
+    """Sort key of the copy to keep: playable, lossless, from the music folders
+    (not a YouTube download), already in HLS, in an album, most played."""
+    path = paths[t.id].lower()
+    return (
+        not exists[t.id],
+        not path.endswith(".flac"),
+        "/app/downloads/" in path.replace("\\", "/"),
+        not t.hls_path,
+        t.album_id is None,
+        -(t.play_count or 0),
+        str(t.id),
+    )
 
 
 def _find_duplicate_pairs(
-    rows: list[Track], exists: dict, paths: dict, roots: list[str], include_alive: bool
+    rows: list[Track],
+    exists: dict,
+    paths: dict,
+    roots: list[str],
+    include_alive: bool,
+    artist_names: dict | None = None,
 ) -> tuple[list[tuple[Track, Track]], int]:
     """Pairs to merge, and the missing tracks left without any live twin.
 
     Two kinds of duplicates:
     1. the same file scanned from two roots, where one copy's file is gone;
-    2. the same song stored twice with both files still there (same artist,
-       title and duration), only when ``include_alive`` is set.
+    2. the same song stored twice with both files still there: same artist,
+       same title once normalized, durations within a few seconds (only when
+       ``include_alive`` is set). Typically a song both on an album and as a
+       single, or in the music folder and downloaded again from YouTube.
     """
+    artist_names = artist_names or {}
     pairs: list[tuple[Track, Track]] = []
     claimed: set = set()
 
@@ -392,20 +469,23 @@ def _find_duplicate_pairs(
         for t in rows:
             if t.id in claimed:
                 continue
-            for key in _content_keys(t, paths[t.id]):
-                groups.setdefault(key, []).append(t)
-        for group in groups.values():
-            free = [t for t in group if t.id not in claimed]
-            if len(free) < 2:
+            title = normalize_title(t.title, artist_names.get(str(t.artist_id), ""))
+            if title:
+                groups.setdefault((str(t.artist_id), title), []).append(t)
+        for (_artist, title), group in groups.items():
+            if len(group) < 2:
                 continue
-            # Keep a file that can actually be played, then the most played one.
-            survivor = min(free, key=lambda t: (not exists[t.id], -(t.play_count or 0), str(t.id)))
-            if not exists[survivor.id]:
-                continue
-            for t in free:
-                if t.id != survivor.id:
-                    pairs.append((t, survivor))
-            claimed.update(t.id for t in free)
+            tolerance = _GENERIC_TOLERANCE if title in _GENERIC_TITLES else _DURATION_TOLERANCE
+            for cluster in _same_duration_clusters(group, tolerance):
+                if len(cluster) < 2:
+                    continue
+                survivor = min(cluster, key=lambda t: _keep_rank(t, exists, paths))
+                if not exists[survivor.id]:
+                    continue
+                for t in cluster:
+                    if t.id != survivor.id:
+                        pairs.append((t, survivor))
+                claimed.update(t.id for t in cluster)
 
     dup_ids = {dup.id for dup, _target in pairs}
     unresolved = sum(1 for t in orphaned if t.id not in dup_ids)
@@ -426,7 +506,17 @@ async def _merge_duplicates(db: AsyncSession, dry_run: bool = True, include_aliv
     paths = {t.id: t.file_url[len(LOCAL_PREFIX):] for t in rows}
     exists = await asyncio.to_thread(lambda: {tid: os.path.isfile(p) for tid, p in paths.items()})
 
-    pairs, unresolved = _find_duplicate_pairs(rows, exists, paths, roots, include_alive)
+    artist_names: dict = {}
+    if include_alive:
+        from app.models.artist import Artist
+
+        artist_names = {
+            str(artist_id): name
+            for artist_id, name in (
+                await db.execute(select(Artist.id, Artist.name).where(Artist.id.in_({t.artist_id for t in rows})))
+            ).all()
+        }
+    pairs, unresolved = _find_duplicate_pairs(rows, exists, paths, roots, include_alive, artist_names)
 
     result = {
         "count": len(pairs),
