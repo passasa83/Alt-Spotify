@@ -10,7 +10,6 @@ import ipaddress
 import os
 from functools import lru_cache
 
-
 # Where reverse proxies live: Docker networks, the host, the LAN. Explicit list:
 # ipaddress' is_private also covers documentation and other reserved ranges.
 _PRIVATE_NETWORKS = tuple(

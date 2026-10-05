@@ -11,13 +11,13 @@ from mutagen import File as MutagenFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.utils.local_files import is_inside, music_roots
 from app.core.database import get_db
 from app.models.album import Album
 from app.models.artist import Artist
 from app.models.track import Track
 from app.models.user import User
 from app.utils.deps import get_current_user_from_header_or_query, require_admin
+from app.utils.local_files import is_inside, music_roots
 
 logger = structlog.get_logger("app")
 

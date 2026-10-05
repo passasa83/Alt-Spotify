@@ -18,11 +18,11 @@ from app.models.track import Track
 from app.models.user import User
 from app.schemas.common import PaginatedResponse
 from app.schemas.track import TrackCreate, TrackResponse, TrackUpdate
-from app.utils.playable import has_audio
 from app.services.offline import generate_download_url
 from app.utils.deps import get_current_user, get_current_user_stream, require_admin
-from app.utils.track_cleanup import delete_tracks
+from app.utils.playable import has_audio
 from app.utils.track_access import get_track_for_user
+from app.utils.track_cleanup import delete_tracks
 from app.utils.track_serializer import serialize_track
 
 logger = structlog.get_logger("app")

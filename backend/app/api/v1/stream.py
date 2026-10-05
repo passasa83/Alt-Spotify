@@ -2,8 +2,8 @@ import asyncio
 import os
 import re
 import uuid
-from urllib.parse import quote
 from collections.abc import Callable, Iterator
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response, StreamingResponse
