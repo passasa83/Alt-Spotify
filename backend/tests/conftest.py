@@ -144,7 +144,7 @@ async def client(
 
     # Code that opens its own session (push notifications...) must hit the
     # test database, not a Postgres server that isn't running.
-    with patch("app.core.minio.get_minio_client") as mock_minio,             patch.object(celery_client, "send_task", return_value=MagicMock(id="test-task-id")), patch("app.core.tasks._broker_reachable", return_value=True),             patch("app.core.database.async_session", _shared_session):
+    with patch("app.core.minio.get_minio_client") as mock_minio,             patch.object(celery_client, "send_task", return_value=MagicMock(id="test-task-id")), patch("app.core.tasks._broker_reachable", return_value=True), patch("app.services.artist_import.match_artist", AsyncMock(return_value=None)),             patch("app.core.database.async_session", _shared_session):
         mock_client = MagicMock()
         mock_client.bucket_exists.return_value = True
         mock_client.presigned_get_object.return_value = "http://minio/test"

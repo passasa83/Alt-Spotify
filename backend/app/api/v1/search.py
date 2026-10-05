@@ -135,6 +135,12 @@ async def search(
     _user: User = Depends(get_current_user),
 ):
     types = [t.strip() for t in type.split(",")]
+    # Searching an artist's exact name queues their whole discography.
+    artist_import = None
+    if source != "tidal" and page == 1 and "artists" in types:
+        from app.services.artist_import import request_import
+
+        artist_import = await request_import(q, _user)
     offset = (page - 1) * page_size
     results: dict = {}
     like_pattern = f"%{q}%"
@@ -440,7 +446,20 @@ async def search(
         from app.schemas.podcast import PodcastResponse
         results["podcasts"] = [PodcastResponse.model_validate(p) for p in result.scalars().all()]
 
+    if artist_import:
+        results["artist_import"] = artist_import
     return results
+
+
+@router.get("/artist-import/{deezer_artist_id}")
+async def artist_import_status(deezer_artist_id: int, _user: User = Depends(get_current_user)):
+    """Progress of a discography download started by a search."""
+    from app.services.artist_import import get_status
+
+    status_data = await get_status(deezer_artist_id)
+    if status_data is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No import for this artist")
+    return {**status_data, "deezer_id": deezer_artist_id}
 
 
 @router.get("/jiosaavn")

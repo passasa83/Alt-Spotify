@@ -86,11 +86,24 @@ export interface TokenResponse {
   token_type: string;
 }
 
+/** Discography download started by searching an artist's name. */
+export interface ArtistImport {
+  artist: string;
+  deezer_id: number;
+  state: 'preparing' | 'downloading' | 'finished' | 'quota';
+  total?: number;
+  done?: number;
+  failed?: number;
+  already?: number;
+  limit?: number;
+}
+
 export interface SearchResults {
   tracks: Track[];
   artists: Artist[];
   albums: Album[];
   playlists: Playlist[];
+  artist_import?: ArtistImport;
 }
 
 export interface SearchFilters {

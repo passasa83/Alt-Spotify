@@ -92,9 +92,15 @@ async def lifespan(app: FastAPI):
     await init_db()
     # Kept on app.state so the task isn't garbage-collected mid-run.
     app.state.startup_task = asyncio.create_task(_run_background_startup_tasks())
+    # Downloads the discographies queued by searches (app/services/artist_import.py).
+    from app.core.database import async_session
+    from app.services.artist_import import run_worker
+
+    app.state.artist_import_task = asyncio.create_task(run_worker(async_session))
     logger.info("application_started", project=settings.PROJECT_NAME)
     yield
     logger.info("application_shutting_down")
+    app.state.artist_import_task.cancel()
     await close_redis()
     logger.info("application_stopped")
 

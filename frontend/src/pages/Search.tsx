@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useSearch } from '@/hooks/useSearch';
 import SearchBar from '@/components/SearchBar';
 import SearchFiltersPanel from '@/components/SearchFiltersPanel';
+import ArtistImportBanner from '@/components/ArtistImportBanner';
 import TrackCard from '@/components/TrackCard';
 import ArtistCard from '@/components/ArtistCard';
 import AlbumCard from '@/components/AlbumCard';
@@ -207,6 +208,8 @@ const SearchPage = () => {
           )}
         </div>
       )}
+
+      {query && results.artist_import && <ArtistImportBanner initial={results.artist_import} />}
 
       {query && !isLoading && hasResults && (
         <div className="space-y-8">
