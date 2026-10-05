@@ -17,7 +17,14 @@ from app.models.playlist import Playlist
 from app.models.track import Track
 from app.models.user import User, UserRole
 from app.schemas.user import UserResponse
-from app.services.admin_overview import get_overview, merge_missing_duplicates, purge_unplayable_tracks
+from app.services.admin_overview import (
+    get_overview,
+    merge_missing_duplicates,
+    purge_unplayable_tracks,
+)
+from app.services.admin_overview import (
+    merge_duplicates as merge_all_duplicates,
+)
 from app.utils.deps import require_admin
 from app.utils.storage import get_storage_used
 
@@ -158,6 +165,17 @@ async def merge_missing(
 ):
     """Merge tracks whose file is missing into the identical track that still exists."""
     return await merge_missing_duplicates(db, dry_run=dry_run)
+
+
+@router.post("/catalogue/merge-duplicates")
+async def merge_duplicates(
+    dry_run: bool = Query(True, description="Only count what would be merged"),
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Merge every duplicate pair of local tracks: dead copies of a file and the
+    same song stored twice while both files still exist."""
+    return await merge_all_duplicates(db, dry_run=dry_run)
 
 
 @router.get("/overview")

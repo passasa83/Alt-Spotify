@@ -22,7 +22,13 @@ export const resolveCoverUrl = (url: string | null | undefined): string => {
 export const getTracks = async (
   page = 1,
   pageSize = 20,
-  opts: { playable?: boolean; artistId?: string; sort?: 'created_at' | 'play_count' | 'title'; order?: 'asc' | 'desc' } = {},
+  opts: {
+    playable?: boolean;
+    artistId?: string;
+    genre?: string;
+    sort?: 'created_at' | 'play_count' | 'title';
+    order?: 'asc' | 'desc';
+  } = {},
 ): Promise<PaginatedResponse<Track>> => {
   const response = await client.get('/tracks', {
     params: {
@@ -30,6 +36,7 @@ export const getTracks = async (
       page_size: pageSize,
       playable: opts.playable,
       artist_id: opts.artistId,
+      genre: opts.genre,
       sort: opts.sort,
       order: opts.order,
     },

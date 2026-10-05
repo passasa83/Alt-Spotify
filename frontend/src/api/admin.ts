@@ -237,6 +237,12 @@ export async function mergeMissingDuplicates(dryRun: boolean): Promise<MergeDupl
   return response.data;
 }
 
+/** Every duplicate pair of local tracks, both files present or not. `dryRun` only counts. */
+export async function mergeDuplicates(dryRun: boolean): Promise<MergeDuplicatesResult> {
+  const response = await client.post('/admin/catalogue/merge-duplicates', null, { params: { dry_run: dryRun } });
+  return response.data;
+}
+
 /** Queue HLS transcoding for every track with a source file but no HLS yet. */
 export async function transcodeMissing(): Promise<{ queued: number; already_queued: number }> {
   const response = await client.post('/upload/transcode-missing');

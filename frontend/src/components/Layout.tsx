@@ -39,7 +39,7 @@ const Layout = () => {
       <SkipToContent />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <Sidebar />
-        <main id="main-content" className="flex-1 overflow-y-auto bg-gray-900" role="main">
+        <main id="main-content" className="relative flex-1 overflow-y-auto bg-gray-900" role="main">
           <TopBar />
           <div className="p-4 md:p-6" aria-live="polite">
             <Outlet />

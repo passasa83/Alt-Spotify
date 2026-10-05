@@ -50,6 +50,22 @@ async def test_only_admins_see_and_handle_reports(client: AsyncClient, auth_head
     assert (await client.get("/api/v1/admin/bug-reports", headers=auth_headers)).status_code == 403
     response = await client.patch(f"/api/v1/admin/bug-reports/{report_id}", headers=auth_headers, json={"status": "resolved"})
     assert response.status_code == 403
+    assert (await client.delete(f"/api/v1/admin/bug-reports/{report_id}", headers=auth_headers)).status_code == 403
+
+
+async def test_admin_deletes_a_report(client: AsyncClient, auth_headers, admin_headers):
+    report_id = (await _report(client, auth_headers)).json()["id"]
+
+    response = await client.delete(f"/api/v1/admin/bug-reports/{report_id}", headers=admin_headers)
+    assert response.status_code == 200
+    assert response.json() == {"deleted": True}
+
+    listing = (await client.get("/api/v1/admin/bug-reports", headers=admin_headers)).json()
+    assert listing["total"] == 0
+    assert listing["counts"]["new"] == 0
+
+    # Gone for good: a second delete reports 404 instead of crashing.
+    assert (await client.delete(f"/api/v1/admin/bug-reports/{report_id}", headers=admin_headers)).status_code == 404
 
 
 async def test_report_requires_login_and_a_description(client: AsyncClient, auth_headers):

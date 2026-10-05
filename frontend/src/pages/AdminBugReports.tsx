@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Bug, RefreshCw } from 'lucide-react';
+import { Bug, RefreshCw, Trash2 } from 'lucide-react';
 import {
+  deleteBugReport,
   getBugReports,
   updateBugReport,
   type BugReport,
@@ -20,11 +21,20 @@ const STATUS_STYLE: Record<BugStatus, string> = {
   wont_fix: 'bg-gray-500/20 text-gray-300',
 };
 
-const ReportCard = ({ report, onChange }: { report: BugReport; onChange: (r: BugReport, statusChanged: boolean) => void }) => {
+const ReportCard = ({
+  report,
+  onChange,
+  onDelete,
+}: {
+  report: BugReport;
+  onChange: (r: BugReport, statusChanged: boolean) => void;
+  onDelete: (r: BugReport) => void;
+}) => {
   const { t, locale } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
   const [note, setNote] = useState(report.admin_note ?? '');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const save = async (body: { status?: BugStatus; admin_note?: string }) => {
     setSaving(true);
@@ -34,6 +44,19 @@ const ReportCard = ({ report, onChange }: { report: BugReport; onChange: (r: Bug
       addToast(t('admin.bugs.save_error'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(t('admin.bugs.delete_confirm'))) return;
+    setDeleting(true);
+    try {
+      await deleteBugReport(report.id);
+      onDelete(report);
+    } catch {
+      addToast(t('admin.bugs.delete_error'));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -53,6 +76,16 @@ const ReportCard = ({ report, onChange }: { report: BugReport; onChange: (r: Bug
           {report.reporter?.pseudo ?? t('admin.bugs.deleted_user')} · {formatRelative(report.created_at, locale)}
         </span>
         {report.page_url && <span className="break-all font-mono text-gray-500">{report.page_url}</span>}
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleting || saving}
+          aria-label={t('admin.bugs.delete')}
+          title={t('admin.bugs.delete')}
+          className="ml-auto flex min-h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-gray-800 hover:text-red-400 disabled:opacity-40"
+        >
+          <Trash2 size={16} aria-hidden="true" />
+        </button>
       </div>
 
       <p className="whitespace-pre-wrap break-words text-sm text-white">{report.description}</p>
@@ -155,6 +188,19 @@ const AdminBugReports = () => {
     setData((d) => d && { ...d, items: d.items.map((r) => (r.id === updated.id ? updated : r)) });
   };
 
+  // Same idea: a deletion changes the tab counters, so patch them in place.
+  const remove = (report: BugReport) => {
+    setData(
+      (d) =>
+        d && {
+          ...d,
+          total: d.total - 1,
+          items: d.items.filter((r) => r.id !== report.id),
+          counts: { ...d.counts, [report.status]: Math.max(0, d.counts[report.status] - 1) },
+        },
+    );
+  };
+
   const total = data ? Object.values(data.counts).reduce((a, b) => a + b, 0) : 0;
   const tabs: { key: BugStatus | 'all'; count: number }[] = [
     ...STATUSES.map((s) => ({ key: s, count: data?.counts[s] ?? 0 })),
@@ -209,7 +255,7 @@ const AdminBugReports = () => {
       {data && data.items.length > 0 && (
         <ul className="space-y-3">
           {data.items.map((report) => (
-            <ReportCard key={report.id} report={report} onChange={replace} />
+            <ReportCard key={report.id} report={report} onChange={replace} onDelete={remove} />
           ))}
         </ul>
       )}

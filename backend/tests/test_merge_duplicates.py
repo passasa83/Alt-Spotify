@@ -12,6 +12,7 @@ from app.models.playlist_track import PlaylistTrack
 from app.models.track import Track
 
 URL = "/api/v1/admin/catalogue/merge-missing-duplicates"
+ALL_URL = "/api/v1/admin/catalogue/merge-duplicates"
 
 
 def u(value):
@@ -104,3 +105,83 @@ async def test_merge_moves_everything_to_the_live_copy(
 
 async def test_merge_requires_admin(client: AsyncClient, auth_headers):
     assert (await client.post(URL, headers=auth_headers)).status_code == 403
+    assert (await client.post(ALL_URL, headers=auth_headers)).status_code == 403
+
+
+async def _seed_two_live_copies(db_session, tmp_path, monkeypatch, test_user):
+    """The same song twice with both files still on disk (two music folders)."""
+    music = tmp_path / "music"
+    downloads = tmp_path / "downloads"
+    (music / "Album").mkdir(parents=True)
+    (downloads / "Album").mkdir(parents=True)
+    keep_file = music / "Album" / "01 - Song.flac"
+    keep_file.write_bytes(b"fLaC")
+    other_file = downloads / "Album" / "01 - Song.flac"
+    other_file.write_bytes(b"fLaC")
+    monkeypatch.setenv("MUSIC_SCAN_DIR", str(music))
+    monkeypatch.setenv("MUSIC_DOWNLOAD_DIR", str(downloads))
+
+    artist = Artist(name="Band")
+    db_session.add(artist)
+    await db_session.flush()
+    keep = Track(title="Song", artist_id=artist.id, duration_seconds=100, file_url=f"local:{keep_file}", play_count=9)
+    extra = Track(title="Song", artist_id=artist.id, duration_seconds=100, file_url=f"local:{other_file}", play_count=1)
+    db_session.add_all([keep, extra])
+    await db_session.flush()
+
+    playlist = Playlist(title="Uses the copy", owner_id=test_user.id)
+    db_session.add(playlist)
+    await db_session.flush()
+    db_session.add_all([
+        PlaylistTrack(playlist_id=playlist.id, track_id=extra.id, position=1),
+        Favorite(user_id=test_user.id, entity_id=extra.id, entity_type="track"),
+        ListeningHistory(user_id=test_user.id, track_id=extra.id),
+    ])
+    await db_session.flush()
+    return keep, extra, playlist
+
+
+async def test_same_song_twice_is_only_caught_by_the_full_merge(
+    client: AsyncClient, admin_headers, db_session, tmp_path, monkeypatch, test_user
+):
+    keep, extra, _playlist = await _seed_two_live_copies(db_session, tmp_path, monkeypatch, test_user)
+
+    # The missing-file endpoint ignores pairs where both files exist.
+    assert (await client.post(URL, headers=admin_headers)).json()["count"] == 0
+
+    data = (await client.post(ALL_URL, headers=admin_headers)).json()
+    assert data["count"] == 1
+    assert data["merged"] == 0
+    assert data["unresolved"] == 0
+    assert data["examples"][0]["from"].endswith("01 - Song.flac")
+
+
+async def test_full_merge_keeps_the_most_played_copy_and_moves_references(
+    client: AsyncClient, admin_headers, db_session, tmp_path, monkeypatch, test_user
+):
+    keep, extra, playlist = await _seed_two_live_copies(db_session, tmp_path, monkeypatch, test_user)
+    keep_id, extra_id, playlist_id = keep.id, extra.id, playlist.id
+
+    data = (await client.post(f"{ALL_URL}?dry_run=false", headers=admin_headers)).json()
+    assert data["merged"] == 1
+
+    assert (await db_session.execute(select(Track).where(Track.id == extra_id))).scalar_one_or_none() is None
+    db_session.expire_all()
+    merged = (await db_session.execute(select(Track).where(Track.id == keep_id))).scalar_one()
+    assert merged.play_count == 10
+    # The surviving copy keeps its own file: nothing is deleted on disk.
+    assert merged.file_url == f"local:{tmp_path / 'music' / 'Album' / '01 - Song.flac'}"
+    assert (tmp_path / "downloads" / "Album" / "01 - Song.flac").exists()
+
+    rows = (await db_session.execute(select(PlaylistTrack))).scalars().all()
+    assert [(u(r.playlist_id), u(r.track_id)) for r in rows] == [(u(playlist_id), u(keep_id))]
+
+    fav = (await db_session.execute(select(Favorite))).scalars().all()
+    assert [u(f.entity_id) for f in fav] == [u(keep_id)]
+    hist = (await db_session.execute(select(ListeningHistory))).scalars().all()
+    assert [u(h.track_id) for h in hist] == [u(keep_id)]
+
+    # Nothing left to merge, and the health check never saw a missing file.
+    assert (await client.post(ALL_URL, headers=admin_headers)).json()["count"] == 0
+    overview = (await client.get("/api/v1/admin/overview", headers=admin_headers)).json()
+    assert overview["catalogue"]["mergeable"] == 0

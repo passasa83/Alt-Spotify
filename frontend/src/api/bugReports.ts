@@ -44,3 +44,8 @@ export async function updateBugReport(id: string, body: { status?: BugStatus; ad
   const response = await client.patch(`/admin/bug-reports/${id}`, body);
   return response.data;
 }
+
+export async function deleteBugReport(id: string): Promise<{ deleted: boolean }> {
+  const response = await client.delete(`/admin/bug-reports/${id}`);
+  return response.data;
+}

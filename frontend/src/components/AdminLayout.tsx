@@ -116,7 +116,7 @@ const AdminLayout = () => {
           </NavLink>
         </div>
       </aside>
-      <main id="main-content" className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8" role="main">
+      <main id="main-content" className="relative min-h-0 flex-1 overflow-y-auto p-4 md:p-8" role="main">
         <Outlet />
       </main>
     </div>

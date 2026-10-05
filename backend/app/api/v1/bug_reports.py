@@ -149,3 +149,18 @@ async def update_bug_report(
     await db.refresh(report)
     reporter = (await db.execute(select(User).where(User.id == report.user_id))).scalar_one_or_none() if report.user_id else None
     return _serialize(report, reporter)
+
+
+@router.delete("/admin/bug-reports/{report_id}")
+async def delete_bug_report(
+    report_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    report = (await db.execute(select(BugReport).where(BugReport.id == report_id))).scalar_one_or_none()
+    if not report:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bug report not found")
+    await db.delete(report)
+    await db.flush()
+    logger.info("bug_report_deleted", report_id=str(report_id), admin_id=str(admin.id))
+    return {"deleted": True}

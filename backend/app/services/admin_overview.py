@@ -345,15 +345,74 @@ def _relative_key(path: str, roots: list[str]) -> str:
     return "/".join(normalized.split("/")[-3:]).lower()
 
 
-async def merge_missing_duplicates(db: AsyncSession, dry_run: bool = True) -> dict:
-    """Merge tracks whose local file is gone into the copy that still exists.
+def _content_keys(track: Track, path: str) -> list[tuple]:
+    """Keys that identify the same song saved under more than one file."""
+    title = (track.title or "").strip().lower()
+    if not title:
+        return []
+    artist = str(track.artist_id)
+    keys: list[tuple] = [(title, artist, os.path.basename(path).lower())]
+    duration = int(track.duration_seconds or 0)
+    if duration > 0:
+        keys.append((title, artist, duration))
+    return keys
 
-    The same library was once scanned from two roots (/music and
-    /app/downloads): one copy of each track now points to a missing file.
-    Everything users attached to the dead copy (playlists, favorites,
-    history, jams, play count, lyrics, cover) moves to the live one, then the
-    dead copy is deleted. ``dry_run`` only counts.
+
+def _find_duplicate_pairs(
+    rows: list[Track], exists: dict, paths: dict, roots: list[str], include_alive: bool
+) -> tuple[list[tuple[Track, Track]], int]:
+    """Pairs to merge, and the missing tracks left without any live twin.
+
+    Two kinds of duplicates:
+    1. the same file scanned from two roots, where one copy's file is gone;
+    2. the same song stored twice with both files still there (same artist,
+       title and duration), only when ``include_alive`` is set.
     """
+    pairs: list[tuple[Track, Track]] = []
+    claimed: set = set()
+
+    live_by_key: dict[str, Track] = {}
+    for t in rows:
+        if exists[t.id]:
+            live_by_key.setdefault(_relative_key(paths[t.id], roots), t)
+
+    orphaned: list[Track] = []
+    for t in rows:
+        if exists[t.id]:
+            continue
+        target = live_by_key.get(_relative_key(paths[t.id], roots))
+        if target is None:
+            orphaned.append(t)
+        else:
+            pairs.append((t, target))
+            claimed.update((t.id, target.id))
+
+    if include_alive:
+        groups: dict[tuple, list[Track]] = {}
+        for t in rows:
+            if t.id in claimed:
+                continue
+            for key in _content_keys(t, paths[t.id]):
+                groups.setdefault(key, []).append(t)
+        for group in groups.values():
+            free = [t for t in group if t.id not in claimed]
+            if len(free) < 2:
+                continue
+            # Keep a file that can actually be played, then the most played one.
+            survivor = min(free, key=lambda t: (not exists[t.id], -(t.play_count or 0), str(t.id)))
+            if not exists[survivor.id]:
+                continue
+            for t in free:
+                if t.id != survivor.id:
+                    pairs.append((t, survivor))
+            claimed.update(t.id for t in free)
+
+    dup_ids = {dup.id for dup, _target in pairs}
+    unresolved = sum(1 for t in orphaned if t.id not in dup_ids)
+    return pairs, unresolved
+
+
+async def _merge_duplicates(db: AsyncSession, dry_run: bool = True, include_alive: bool = False) -> dict:
     from sqlalchemy import delete, update
 
     from app.models.favorite import Favorite
@@ -367,21 +426,7 @@ async def merge_missing_duplicates(db: AsyncSession, dry_run: bool = True) -> di
     paths = {t.id: t.file_url[len(LOCAL_PREFIX):] for t in rows}
     exists = await asyncio.to_thread(lambda: {tid: os.path.isfile(p) for tid, p in paths.items()})
 
-    live_by_key: dict[str, Track] = {}
-    for t in rows:
-        if exists[t.id]:
-            live_by_key.setdefault(_relative_key(paths[t.id], roots), t)
-
-    pairs: list[tuple[Track, Track]] = []
-    unresolved = 0
-    for t in rows:
-        if exists[t.id]:
-            continue
-        target = live_by_key.get(_relative_key(paths[t.id], roots))
-        if target is None:
-            unresolved += 1
-        else:
-            pairs.append((t, target))
+    pairs, unresolved = _find_duplicate_pairs(rows, exists, paths, roots, include_alive)
 
     result = {
         "count": len(pairs),
@@ -439,3 +484,25 @@ async def merge_missing_duplicates(db: AsyncSession, dry_run: bool = True) -> di
 
     await db.flush()
     return result
+
+
+async def merge_missing_duplicates(db: AsyncSession, dry_run: bool = True) -> dict:
+    """Merge tracks whose local file is gone into the copy that still exists.
+
+    The same library was once scanned from two roots (/music and
+    /app/downloads): one copy of each track now points to a missing file.
+    Everything users attached to the dead copy (playlists, favorites,
+    history, jams, play count, lyrics, cover) moves to the live one, then the
+    dead copy is deleted. ``dry_run`` only counts.
+    """
+    return await _merge_duplicates(db, dry_run=dry_run, include_alive=False)
+
+
+async def merge_duplicates(db: AsyncSession, dry_run: bool = True) -> dict:
+    """Every duplicate pair of local tracks: dead copies of a file, and the
+    same song stored twice while both files still exist.
+
+    Only database rows are merged, never files on disk: the surviving track
+    keeps its file and the scanner skips the other one on the next run.
+    """
+    return await _merge_duplicates(db, dry_run=dry_run, include_alive=True)

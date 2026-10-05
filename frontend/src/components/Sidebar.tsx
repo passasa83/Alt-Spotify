@@ -26,7 +26,7 @@ const Sidebar = () => {
   return (
     <>
     <aside className="hidden w-64 flex-shrink-0 flex-col overflow-y-auto bg-black p-2 md:flex lg:w-72" role="navigation" aria-label={t('nav.library')}>
-      <div className="mb-2 rounded-lg bg-gray-900 p-4">
+      <div className="mb-2 shrink-0 rounded-lg bg-gray-900 p-4">
         <NavLink to="/" className="mb-4 flex items-center gap-2 text-white" aria-label={`Alt Spotify – ${t('nav.home')}`}>
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500">
             <span className="text-sm font-bold text-black">S</span>
@@ -87,7 +87,9 @@ const Sidebar = () => {
         </nav>
       </div>
 
-      <div className="flex-1 rounded-lg bg-gray-900 p-2">
+      {/* Shrinks to the space left by the nav and scrolls on its own, so the
+          sidebar itself never grows a second page scrollbar. */}
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-gray-900 p-2">
         <div className="mb-2 flex items-center justify-between px-2">
           <span className="text-sm font-semibold text-gray-400">{t('nav.playlists')}</span>
           <button

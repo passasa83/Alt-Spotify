@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Merge } from 'lucide-react';
 import { getTracks } from '@/api/tracks';
-import { mergeMissingDuplicates } from '@/api/admin';
+import { mergeDuplicates } from '@/api/admin';
 import PurgeEmptyTracksButton from '@/components/PurgeEmptyTracksButton';
 import RecheckCoversButton from '@/components/RecheckCoversButton';
 import type { PaginatedResponse, Track } from '@/types';
@@ -51,7 +51,7 @@ const AdminCatalogue = () => {
 
   const refreshMergeable = useCallback(async () => {
     try {
-      setMergeable((await mergeMissingDuplicates(true)).count);
+      setMergeable((await mergeDuplicates(true)).count);
     } catch {
       setMergeable(null);
     }
@@ -65,7 +65,7 @@ const AdminCatalogue = () => {
     if (!mergeable || !confirm(t('admin.merge_confirm', { count: mergeable }))) return;
     setMerging(true);
     try {
-      const { merged } = await mergeMissingDuplicates(false);
+      const { merged } = await mergeDuplicates(false);
       addToast(t('admin.merge_done', { count: merged }));
       await Promise.all([fetchTracks(page, filter), refreshMergeable()]);
       setPurgeKey((k) => k + 1);
