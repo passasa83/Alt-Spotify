@@ -1,4 +1,5 @@
 import { usePlayerStore, type RepeatMode } from '@/stores/playerStore';
+import { useJamStore } from '@/stores/jamStore';
 import type { Track } from '@/types';
 import { resolveCoverUrl, getTrackStreamUrl, playTrack } from '@/api/tracks';
 import { getMe } from '@/api/users';
@@ -424,6 +425,18 @@ const Player = () => {
       }
     }
   }, [isPlaying]);
+
+  // Jam session: broadcast every local track change so the other participants
+  // follow. Tracks applied *from* the jam carry lastSyncedTrackId and are not
+  // re-broadcast (no echo loop with the relayed copy).
+  const jamTrackId = currentTrack?.id;
+  useEffect(() => {
+    if (!jamTrackId || !currentTrack) return;
+    const jam = useJamStore.getState();
+    if (!jam.ws || jam.ws.readyState !== WebSocket.OPEN) return;
+    if (jam.lastSyncedTrackId === jamTrackId) return;
+    jam.sendTrackChange(currentTrack, usePlayerStore.getState().queue);
+  }, [jamTrackId]);
 
   // A restart (repeat one) is a new listen; closing the tab ends the current one.
   useEffect(() => {
