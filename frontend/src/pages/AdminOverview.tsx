@@ -28,6 +28,8 @@ import type { TranslationKey } from '@/i18n/en';
 import { formatRelative } from '@/utils/formatTime';
 import TranscodeProgress from '@/components/TranscodeProgress';
 import PurgeEmptyTracksButton from '@/components/PurgeEmptyTracksButton';
+import PurgeMissingButton from '@/components/PurgeMissingButton';
+import RedownloadMissingButton from '@/components/RedownloadMissingButton';
 
 const STATUS: Record<CheckStatus, { icon: typeof Info; text: string; badge: string; ring: string }> = {
   ok: { icon: CheckCircle2, text: 'text-green-400', badge: 'bg-green-500/15 text-green-300', ring: 'ring-gray-800' },
@@ -141,8 +143,14 @@ const AdminOverview = () => {
               {t('admin.merge_button', { count: c.mergeable })} →
             </Link>
           )}
-          <div className="mt-3">
+          <div className="mt-3 space-y-3">
             <PurgeEmptyTracksButton onDone={load} />
+            {!!c.missing_files && (
+              <div className="flex flex-wrap items-center gap-3">
+                <RedownloadMissingButton />
+                <PurgeMissingButton onDone={load} />
+              </div>
+            )}
           </div>
           {c.missing_examples.length > 0 && (
             <details className="mt-3 text-xs">

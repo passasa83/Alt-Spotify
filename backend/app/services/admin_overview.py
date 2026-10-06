@@ -331,6 +331,65 @@ async def purge_unplayable_tracks(
     return result
 
 
+async def missing_track_ids(db: AsyncSession, unplayable_only: bool = False) -> list:
+    """Tracks whose local file is gone from disk.
+
+    The very files the health check reports as ``missing_files``; the stat()
+    call blocks, so it runs off the event loop. ``unplayable_only`` keeps the
+    ones without an HLS copy: those still play, deleting them would drop
+    working music.
+    """
+    query = select(Track.id, Track.file_url, Track.hls_path).where(Track.file_url.startswith(LOCAL_PREFIX))
+    if unplayable_only:
+        query = query.where(Track.hls_path.is_(None))
+    rows = (await db.execute(query)).all()
+    pairs = [(track_id, url[len(LOCAL_PREFIX):]) for track_id, url, _ in rows]
+    return await asyncio.to_thread(lambda: [tid for tid, path in pairs if not os.path.isfile(path)])
+
+
+async def purge_missing_tracks(
+    db: AsyncSession, dry_run: bool = True, include_used: bool = False, include_orphans: bool = False
+) -> dict:
+    """Tracks whose audio file disappeared from disk.
+
+    Only the ones without an HLS copy go (the others are still playable);
+    the rest follows the rules of ``purge_unplayable_tracks``: by default only
+    those nothing points to, ``include_used`` also removes the ones sitting in
+    playlists, favorites, history or jams (their file is gone for good),
+    ``include_orphans`` then the albums and artists left without any track.
+    """
+    from sqlalchemy import exists
+
+    from app.models.favorite import Favorite
+    from app.models.jam import JamSession
+    from app.models.playlist_track import PlaylistTrack
+    from app.utils.track_cleanup import delete_orphan_catalogue, delete_tracks, orphan_catalogue
+
+    ids = await missing_track_ids(db, unplayable_only=True)
+    selected: list = []
+    if ids:
+        conditions = [Track.id.in_(ids)]
+        if not include_used:
+            conditions += [
+                ~exists().where(PlaylistTrack.track_id == Track.id),
+                ~exists().where(ListeningHistory.track_id == Track.id),
+                ~exists().where(Favorite.entity_type == "track", Favorite.entity_id == Track.id),
+                ~exists().where(JamSession.current_track_id == Track.id),
+            ]
+        selected = list((await db.execute(select(Track.id).where(*conditions))).scalars().all())
+    result = {"count": len(selected), "deleted": 0 if dry_run else len(selected)}
+    if not dry_run and selected:
+        await delete_tracks(db, selected)
+    if include_orphans:
+        # Albums/artists left without any track would only open empty pages.
+        if dry_run:
+            albums, artists = (len(x) for x in await orphan_catalogue(db, ignoring_tracks=selected))
+        else:
+            albums, artists = await delete_orphan_catalogue(db)
+        result.update(orphan_albums=albums, orphan_artists=artists)
+    return result
+
+
 _KNOWN_ROOTS = ("/music", "/app/downloads")
 
 
