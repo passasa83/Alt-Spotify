@@ -17,13 +17,14 @@ export const getArtist = async (id: string): Promise<Artist> => {
 };
 
 // `playable`: hide albums none of whose tracks has audio.
+// `sort`: "popular" ranks by the total plays of the album's tracks.
 export const getArtistAlbums = async (
   id: string,
   page = 1,
   pageSize = 20,
-  opts: { playable?: boolean } = {},
+  opts: { playable?: boolean; sort?: 'release_date' | 'popular' } = {},
 ): Promise<PaginatedResponse<Album>> => {
-  const response = await client.get(`/artists/${id}/albums`, { params: { page, page_size: pageSize, playable: opts.playable } });
+  const response = await client.get(`/artists/${id}/albums`, { params: { page, page_size: pageSize, playable: opts.playable, sort: opts.sort } });
   return response.data;
 };
 

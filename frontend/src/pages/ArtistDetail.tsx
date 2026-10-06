@@ -12,6 +12,8 @@ import { useTranslation } from '@/hooks/useTranslation';
 // The API caps a page at 100: enough for a "popular" queue.
 const MAX_TRACKS = 100;
 const POPULAR_SHOWN = 10;
+// The best known albums first, the rest behind the "show more" button.
+const POPULAR_ALBUMS_SHOWN = 5;
 
 // Fisher-Yates: sorting with a random comparator is biased.
 const shuffled = <T,>(items: T[]): T[] => {
@@ -31,6 +33,7 @@ const ArtistDetail = () => {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [trackCount, setTrackCount] = useState(0);
   const [showAll, setShowAll] = useState(false);
+  const [showAllAlbums, setShowAllAlbums] = useState(false);
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | 'all'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const { setPlaylistAsQueue } = usePlayerStore();
@@ -40,13 +43,15 @@ const ArtistDetail = () => {
       if (!id) return;
       setIsLoading(true);
       setShowAll(false);
+      setShowAllAlbums(false);
       setSelectedAlbumId('all');
       try {
         // All the artist's playable tracks, not just its first album's:
         // many tracks have no album, and albums can be empty.
         const [artistData, albumsData, tracksData] = await Promise.all([
           getArtist(id),
-          getArtistAlbums(id, 1, 50, { playable: true }),
+          // The most listened to albums first.
+          getArtistAlbums(id, 1, 50, { playable: true, sort: 'popular' }),
           getTracks(1, MAX_TRACKS, { artistId: id, playable: true, sort: 'play_count', order: 'desc' }),
         ]);
         setArtist(artistData);
@@ -180,10 +185,18 @@ const ArtistDetail = () => {
         <section className="mb-8">
           <h2 className="mb-4 text-xl font-bold text-white">{t('artist.discography')}</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {albums.map((album) => (
+            {(showAllAlbums ? albums : albums.slice(0, POPULAR_ALBUMS_SHOWN)).map((album) => (
               <AlbumCard key={album.id} album={{ ...album, artist: album.artist ?? artist }} />
             ))}
           </div>
+          {albums.length > POPULAR_ALBUMS_SHOWN && (
+            <button
+              onClick={() => setShowAllAlbums(!showAllAlbums)}
+              className="mt-3 px-2 py-2 text-sm font-semibold text-gray-400 hover:text-white"
+            >
+              {showAllAlbums ? t('artist.show_less') : t('artist.show_more')}
+            </button>
+          )}
         </section>
       )}
     </div>

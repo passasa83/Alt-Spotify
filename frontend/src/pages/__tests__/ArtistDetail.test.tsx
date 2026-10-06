@@ -96,4 +96,22 @@ describe('ArtistDetail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Play' }));
     expect(setPlaylistAsQueue).toHaveBeenCalledWith([albumTracks[1]], 0);
   });
+
+  it('asks for the most played albums and shows only the first ones', async () => {
+    vi.mocked(getArtistAlbums).mockResolvedValue({
+      items: Array.from({ length: 7 }, (_, n) => ({ id: `al${n}`, title: `Album ${n}`, artist_id: 'a1', created_at: '2024-01-01' })),
+      total: 7, page: 1, page_size: 50, pages: 1,
+    } as any);
+    const { container } = renderPage();
+
+    expect(await screen.findAllByText('Album 0')).not.toHaveLength(0);
+    expect(getArtistAlbums).toHaveBeenCalledWith('a1', 1, 50, { playable: true, sort: 'popular' });
+    // Only the albums section is cut: the filter chips keep all seven.
+    expect(container.querySelectorAll('a[href^="/album/"]')).toHaveLength(5);
+
+    // The tracks section has its own "show more": the albums one is second.
+    fireEvent.click(screen.getAllByText('Show more')[1]);
+    expect(container.querySelectorAll('a[href^="/album/"]')).toHaveLength(7);
+    expect(screen.getByText('Show less')).toBeInTheDocument();
+  });
 });

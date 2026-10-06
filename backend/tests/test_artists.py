@@ -136,3 +136,29 @@ async def test_artist_albums_playable_hides_empty_albums(client: AsyncClient, ad
     playable = (await client.get(f"/api/v1/artists/{artist_id}/albums?playable=true", headers=admin_headers)).json()
     assert [a["title"] for a in playable["items"]] == ["Band LP"]
     assert playable["total"] == 1
+
+
+async def test_artist_albums_by_popularity(client: AsyncClient, admin_headers):
+    """sort=popular puts the most played albums first, whatever their date."""
+    artist_id = (await client.post("/api/v1/artists", headers=admin_headers, json={"name": "Band"})).json()["id"]
+
+    async def album_with_plays(title: str, plays: int):
+        album_id = (await client.post("/api/v1/albums", headers=admin_headers, json={"title": title, "artist_id": artist_id})).json()["id"]
+        track_id = (
+            await client.post(
+                "/api/v1/tracks",
+                headers=admin_headers,
+                json={"title": f"{title} song", "artist_id": artist_id, "album_id": album_id, "duration_seconds": 60, "file_url": "audio/x.mp3"},
+            )
+        ).json()["id"]
+        for _ in range(plays):
+            await client.post(f"/api/v1/tracks/{track_id}/play", headers=admin_headers, json={"duration_listened_seconds": 30})
+
+    await album_with_plays("Old Big", 4)
+    await album_with_plays("New Small", 1)
+
+    newest = (await client.get(f"/api/v1/artists/{artist_id}/albums", headers=admin_headers)).json()
+    assert [a["title"] for a in newest["items"]] == ["New Small", "Old Big"]
+
+    popular = (await client.get(f"/api/v1/artists/{artist_id}/albums?sort=popular", headers=admin_headers)).json()
+    assert [a["title"] for a in popular["items"]] == ["Old Big", "New Small"]
