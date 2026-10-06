@@ -588,7 +588,7 @@ const Player = () => {
       )}
       <div className="relative flex h-16 items-center justify-between gap-2 bg-gray-900 px-3 border-t border-gray-800 md:h-20 md:px-4">
       {/* Mobile: thin progress line along the top edge (seeking is in the full-screen view) */}
-      <div className="absolute inset-x-0 top-0 h-0.5 bg-gray-700 md:hidden" aria-hidden="true">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gray-700 md:hidden" aria-hidden="true">
         <div className="h-full bg-green-500" style={{ width: `${progressPercent}%` }} />
       </div>
       <div className="flex min-w-0 flex-1 items-center gap-3 md:w-1/4 md:flex-none lg:w-1/4">
@@ -692,7 +692,8 @@ const Player = () => {
             aria-valuemin={0}
             aria-valuemax={duration || 0}
             aria-valuenow={progress}
-            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-gray-600 accent-green-500 focus-visible:outline-2 focus-visible:outline-green-500"
+            style={{ background: `linear-gradient(to right, #1db954 ${progressPercent}%, #4b5563 ${progressPercent}%)` }}
+            className="slider-progress w-full flex-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-green-500"
           />
           <span className="w-10 text-xs text-gray-400">{formatTime(duration)}</span>
         </div>
@@ -721,7 +722,8 @@ const Player = () => {
                 value={volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
                 aria-label={t('player.volume')}
-                className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-gray-600 accent-green-500 focus-visible:outline-2 focus-visible:outline-green-500 xl:w-24"
+                style={{ background: `linear-gradient(to right, #1db954 ${Math.round(volume * 100)}%, #4b5563 ${Math.round(volume * 100)}%)` }}
+                className="slider-progress w-20 cursor-pointer xl:w-24"
               />
             </>
           ) : undefined
@@ -755,7 +757,8 @@ const Player = () => {
               aria-valuemin={0}
               aria-valuemax={12}
               aria-valuenow={crossfadeDuration}
-              className="h-1 w-full cursor-pointer appearance-none rounded-full bg-gray-600 accent-green-500 focus-visible:outline-2 focus-visible:outline-green-500"
+              style={{ background: `linear-gradient(to right, #1db954 ${(crossfadeDuration / 12) * 100}%, #4b5563 ${(crossfadeDuration / 12) * 100}%)` }}
+              className="slider-progress w-full cursor-pointer"
             />
           </div>
 

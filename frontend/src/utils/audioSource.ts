@@ -8,8 +8,11 @@ import type { Track } from '@/types';
 const hlsInstances = new WeakMap<HTMLAudioElement, Hls>();
 
 // Read the token on every request so a token refreshed mid-track is picked up.
+// The media token is preferred: it lives 6 h and is renewed in the background,
+// while the 30 min access token can expire mid-track (XHRs don't go through
+// the axios interceptor that would refresh it).
 const setAuthHeader = (xhr: XMLHttpRequest) => {
-  const token = localStorage.getItem('access_token');
+  const token = localStorage.getItem('media_token') ?? localStorage.getItem('access_token');
   if (token) {
     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
   }

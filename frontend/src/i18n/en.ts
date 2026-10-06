@@ -647,6 +647,9 @@ const en = {
   'artist.show_more': 'Show more',
   'artist.show_less': 'Show less',
   'artist.no_tracks': 'No playable track for this artist yet.',
+  'artist.all_albums': 'All',
+  'artist.filter_album': 'Filter by album',
+  'artist.no_tracks_in_album': 'No tracks in this album.',
   'artist.play': 'Play',
   'artist.shuffle': 'Shuffle play',
 

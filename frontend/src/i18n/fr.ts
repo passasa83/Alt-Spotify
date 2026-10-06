@@ -647,6 +647,9 @@ const fr = {
   'artist.show_more': 'Afficher plus',
   'artist.show_less': 'Afficher moins',
   'artist.no_tracks': 'Aucun titre jouable pour cet artiste pour l\'instant.',
+  'artist.all_albums': 'Tout',
+  'artist.filter_album': 'Filtrer par album',
+  'artist.no_tracks_in_album': 'Aucun titre dans cet album.',
   'artist.play': 'Lecture',
   'artist.shuffle': 'Lecture aléatoire',
 

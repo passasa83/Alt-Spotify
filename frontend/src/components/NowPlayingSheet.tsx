@@ -174,7 +174,8 @@ const NowPlayingSheet = ({ onClose, onNavigate, progress, duration, onSeek, isLi
           onChange={(e) => onSeek(parseFloat(e.target.value))}
           aria-label={t('player.seek')}
           aria-valuetext={`${formatTime(progress)} / ${formatTime(duration)}`}
-          className="h-6 w-full cursor-pointer accent-green-500"
+          style={{ background: `linear-gradient(to right, #1db954 ${duration > 0 ? Math.min(100, (progress / duration) * 100) : 0}%, #4b5563 ${duration > 0 ? Math.min(100, (progress / duration) * 100) : 0}%)` }}
+          className="slider-progress h-6 w-full cursor-pointer"
         />
         <div className="flex justify-between text-xs tabular-nums text-gray-400">
           <span>{formatTime(progress)}</span>
