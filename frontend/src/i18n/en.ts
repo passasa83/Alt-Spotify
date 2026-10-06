@@ -527,6 +527,8 @@ const en = {
   'jam.queue_empty': 'Queue is empty',
   'jam.host': 'Host',
   'jam.type_message': 'Type a message...',
+  'jam.resume_live': 'Resume live',
+  'jam.catching_up': 'Syncing...',
 
   // Stats
   'stats.top_tracks': 'Top Tracks',

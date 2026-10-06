@@ -54,12 +54,18 @@ const MAX_CONSECUTIVE_ERRORS = 3;
 
 // A play() blocked by the browser's autoplay policy must not leave the UI on
 // "playing"; an AbortError (source changed mid-load) is expected and harmless.
+// The block is surfaced in the store so the UI can offer a tap-to-resume CTA.
 const safePlay = (audio: HTMLAudioElement) => {
-  audio.play().catch((err: unknown) => {
-    if ((err as DOMException)?.name === 'NotAllowedError') {
-      usePlayerStore.getState().pause();
-    }
-  });
+  audio
+    .play()
+    .then(() => usePlayerStore.getState().setPlayBlocked(false))
+    .catch((err: unknown) => {
+      if ((err as DOMException)?.name === 'NotAllowedError') {
+        const store = usePlayerStore.getState();
+        store.pause();
+        store.setPlayBlocked(true);
+      }
+    });
 };
 
 // <audio> doesn't expose the HTTP status: ask the stream endpoint directly.
@@ -97,6 +103,8 @@ const Player = () => {
     playbackRate,
     useHls,
     restartTick,
+    seekTick,
+    seekTarget,
     togglePlay,
     next,
     prev,
@@ -123,6 +131,8 @@ const Player = () => {
   const consecutiveErrorsRef = useRef(0);
   const authRetriedTrackIdRef = useRef<string | null>(null);
   const rateLimitRetriesRef = useRef<{ trackId: string | null; count: number }>({ trackId: null, count: 0 });
+  // Last position_update broadcast to the jam (throttled: timeupdate fires ~4 Hz).
+  const jamPosSentRef = useRef(0);
   // Seconds really listened to the current track (seeks excluded), sent
   // with the play once the listen ends.
   const listenRef = useRef<{ trackId: string | null; seconds: number; lastTime: number | null }>({
@@ -311,6 +321,7 @@ const Player = () => {
     audio.addEventListener('playing', () => {
       if (audio !== audioRef.current) return;
       consecutiveErrorsRef.current = 0;
+      usePlayerStore.getState().setPlayBlocked(false);
     });
 
     audio.addEventListener('timeupdate', () => {
@@ -330,6 +341,15 @@ const Player = () => {
           const step = audio.currentTime - (listen.lastTime ?? audio.currentTime);
           if (step > 0 && step < 2) listen.seconds += step / (audio.playbackRate || 1);
           listen.lastTime = audio.currentTime;
+        }
+        // Jam: throttled live position so late joiners can catch up mid-song.
+        const jam = useJamStore.getState();
+        if (jam.ws && jam.ws.readyState === WebSocket.OPEN) {
+          const nowMs = Date.now();
+          if (nowMs - jamPosSentRef.current > 5000) {
+            jamPosSentRef.current = nowMs;
+            jam.sendPosition(playing.id, audio.currentTime * 1000);
+          }
         }
       }
       const remaining = audio.duration - audio.currentTime;
@@ -437,6 +457,22 @@ const Player = () => {
     if (jam.lastSyncedTrackId === jamTrackId) return;
     jam.sendTrackChange(currentTrack, usePlayerStore.getState().queue);
   }, [jamTrackId]);
+
+  // Jam session: pause / resume follows too (the receiver only applies actual
+  // transitions, so this converges instead of looping).
+  useEffect(() => {
+    if (!jamTrackId || !currentTrack) return;
+    const jam = useJamStore.getState();
+    if (!jam.ws || jam.ws.readyState !== WebSocket.OPEN) return;
+    jam.sendPlaybackState(isPlaying, jamTrackId);
+  }, [isPlaying, jamTrackId]);
+
+  // Programmatic seek (jam catch-up): applied to the element. Setting
+  // currentTime before the metadata loads sticks once it does.
+  useEffect(() => {
+    if (seekTick === 0 || !audioRef.current) return;
+    audioRef.current.currentTime = seekTarget ?? 0;
+  }, [seekTick, seekTarget]);
 
   // A restart (repeat one) is a new listen; closing the tab ends the current one.
   useEffect(() => {

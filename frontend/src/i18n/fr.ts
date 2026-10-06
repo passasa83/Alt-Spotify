@@ -527,6 +527,8 @@ const fr = {
   'jam.queue_empty': 'La file d\'attente est vide',
   'jam.host': 'Hôte',
   'jam.type_message': 'Tapez un message...',
+  'jam.resume_live': 'Reprendre le direct',
+  'jam.catching_up': 'Synchronisation...',
 
   // Stats
   'stats.top_tracks': 'Titres populaires',

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { JamSession, JamParticipant, Track } from '@/types';
-import { createJamSession, joinJamSession, leaveJamSession, getJamSession, connectJamWebSocket } from '@/api/jam';
+import { createJamSession, joinJamSession, leaveJamSession, getJamSession, connectJamWebSocket, getJamNowPlaying } from '@/api/jam';
+import { getTrack } from '@/api/tracks';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -18,10 +19,14 @@ interface JamState {
   leaveSession: () => Promise<void>;
   loadSession: (sessionId: string) => Promise<void>;
   sendTrackChange: (track: Track, queue?: Track[]) => void;
+  sendPosition: (trackId: string, positionMs: number) => void;
+  sendPlaybackState: (isPlaying: boolean, trackId?: string) => void;
   sendVoteSkip: (trackId: string) => void;
   sendChat: (message: string) => void;
   connectWebSocket: (sessionId: string) => void;
   disconnectWebSocket: () => void;
+  /** Guest joining mid-song: jump to the live track and position. */
+  syncToLive: () => Promise<void>;
 }
 
 export const useJamStore = create<JamState>((set, get) => ({
@@ -69,6 +74,44 @@ export const useJamStore = create<JamState>((set, get) => ({
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'vote_skip', data: { track_id: trackId } }));
     }
+  },
+
+  sendPosition: (trackId: string, positionMs: number) => {
+    const { ws } = get();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'position_update', data: { track_id: trackId, position_ms: Math.max(0, Math.floor(positionMs)) } }));
+    }
+  },
+
+  sendPlaybackState: (isPlaying: boolean, trackId?: string) => {
+    const { ws } = get();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'playback_state', data: { is_playing: isPlaying, track_id: trackId } }));
+    }
+  },
+
+  syncToLive: async () => {
+    const { currentSession } = get();
+    if (!currentSession) return;
+    const live = await getJamNowPlaying(currentSession.id).catch(() => null);
+    if (!live?.track_id) return;
+    const player = usePlayerStore.getState();
+    // The stored position is from updated_at: move it forward while playing.
+    const elapsed = live.is_playing ? Math.max(0, Date.now() / 1000 - live.updated_at) : 0;
+    const position = Math.max(0, live.position_ms / 1000 + elapsed);
+    if (player.currentTrack?.id === live.track_id) {
+      // Same track, drifted behind (or ahead): re-align past 3 s of drift.
+      if (Math.abs(player.progress - position) > 3) player.seekTo(position);
+      if (!live.is_playing && player.isPlaying) player.pause();
+      else if (live.is_playing && !player.isPlaying) player.play();
+      return;
+    }
+    const track = await getTrack(live.track_id).catch(() => null);
+    if (!track) return;
+    set({ lastSyncedTrackId: live.track_id });
+    player.setPlaylistAsQueue([track], 0);
+    player.seekTo(position);
+    if (!live.is_playing) player.pause();
   },
 
   sendChat: (message: string) => {
@@ -132,6 +175,17 @@ export const useJamStore = create<JamState>((set, get) => ({
         case 'vote_update':
           set({ messages: [...state.messages, message] });
           break;
+        case 'playback_state': {
+          // Pause / resume follows the jam; guard on actual change so the
+          // applied state is not re-broadcast in a loop.
+          const playing = message.data?.is_playing;
+          if (typeof playing !== 'boolean') break;
+          const player = usePlayerStore.getState();
+          if (!player.currentTrack) break;
+          if (playing && !player.isPlaying) player.play();
+          else if (!playing && player.isPlaying) player.pause();
+          break;
+        }
         case 'participant_joined': {
           // The join broadcast carries a bare user_id (no participant object).
           const joined = message.data?.participant as JamParticipant | undefined;

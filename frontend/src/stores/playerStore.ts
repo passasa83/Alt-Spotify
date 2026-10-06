@@ -49,8 +49,14 @@ interface PlayerState {
   replayGainEnabled: boolean;
   playbackRate: number;
   restartTick: number;
-  offlineTracks: Map<string, Blob>;
-  deviceId: string;
+  /** Programmatic seek request (jam catch-up): consumed by the Player. */
+  seekTarget: number | null;
+  seekTick: number;
+  seekTo: (time: number) => void;
+  /** A play() blocked by the browser autoplay policy: show a resume CTA. */
+  playBlocked: boolean;
+  setPlayBlocked: (blocked: boolean) => void;
+  offlineTracks: Map<string, Blob>;  deviceId: string;
   connectedDevices: Device[];
   setTrack: (track: Track) => void;
   play: () => void;
@@ -104,6 +110,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   replayGainEnabled: true,
   playbackRate: 1,
   restartTick: 0,
+  seekTarget: null,
+  seekTick: 0,
+  playBlocked: false,
   offlineTracks: new Map(),
   deviceId: generateDeviceId(),
   connectedDevices: [],
@@ -164,6 +173,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   play: () => set({ isPlaying: true }),
   pause: () => set({ isPlaying: false }),
+
+  seekTo: (time: number) => set((s) => ({ progress: Math.max(0, time), seekTarget: Math.max(0, time), seekTick: s.seekTick + 1 })),
+  setPlayBlocked: (blocked: boolean) => set({ playBlocked: blocked }),
 
   togglePlay: () => {
     const { isPlaying } = get();

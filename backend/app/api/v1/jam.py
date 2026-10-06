@@ -1,6 +1,7 @@
 import json
 import secrets
 import string
+import time
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, status
@@ -17,6 +18,25 @@ from app.utils.deps import get_current_user
 from app.utils.ws import relay_channel
 
 router = APIRouter(prefix="/jam", tags=["jam"])
+
+# Ephemeral live playback state (current track + position) for guests who join
+# mid-song. Positions move constantly: Redis, not Postgres (written on every
+# throttled position_update from the players, read once per join).
+_LIVE_TTL_SECONDS = 24 * 3600
+
+
+def _live_key(session_id: uuid.UUID) -> str:
+    return f"jam:live:{session_id}"
+
+
+async def _write_live(session_id: uuid.UUID, **fields: str) -> None:
+    """Best-effort live state write: never break the relay on failure."""
+    try:
+        r = await get_redis()
+        await r.hset(_live_key(session_id), mapping={**fields, "updated_at": str(time.time())})
+        await r.expire(_live_key(session_id), _LIVE_TTL_SECONDS)
+    except Exception:
+        pass
 
 
 def generate_session_code() -> str:
@@ -209,6 +229,49 @@ async def leave_session(
     return {"message": "Left session"}
 
 
+@router.get("/now-playing/{session_id}")
+async def get_now_playing(
+    session_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Live playback state for guests joining mid-song (track + position).
+
+    Only participants may read it. Positions go stale: the caller adds the
+    elapsed time since ``updated_at`` when ``is_playing`` is true.
+    """
+    member = await db.execute(
+        select(JamParticipant.id).where(
+            JamParticipant.session_id == session_id,
+            JamParticipant.user_id == current_user.id,
+        )
+    )
+    if member.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    try:
+        r = await get_redis()
+        live = await r.hgetall(_live_key(session_id))
+    except Exception:
+        live = {}
+    if not live or not live.get("track_id"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No live playback")
+    try:
+        position_ms = max(0, int(live.get("position_ms") or 0))
+    except (TypeError, ValueError):
+        position_ms = 0
+    try:
+        updated_at = float(live.get("updated_at") or 0)
+    except (TypeError, ValueError):
+        updated_at = 0.0
+    return {
+        "track_id": live["track_id"],
+        "position_ms": position_ms,
+        "is_playing": str(live.get("is_playing", "1")).lower() in ("1", "true"),
+        "updated_at": updated_at,
+    }
+
+
 @router.get("/{session_id}")
 async def get_session(
     session_id: uuid.UUID,
@@ -251,6 +314,23 @@ async def _handle_client_message(r, session_id: uuid.UUID, user_id: str, data: d
         if msg_type == "track_changed":
             # Skip votes only apply to the track that was playing.
             await r.delete(f"jam:votes:{session_id}")
+            # Persist what is playing (Postgres) and where it started (Redis)
+            # so guests joining mid-song can catch up.
+            track_id = ((data.get("data") or {}).get("track") or {}).get("id")
+            if track_id:
+                try:
+                    async with async_session() as db_session:
+                        db_session_result = await db_session.execute(
+                            select(JamSession).where(JamSession.id == session_id)
+                        )
+                        db_session_obj = db_session_result.scalar_one_or_none()
+                        if db_session_obj is not None:
+                            db_session_obj.current_track_id = uuid.UUID(str(track_id))
+                            db_session_obj.position_ms = 0
+                            await db_session.flush()
+                except (ValueError, AttributeError):
+                    pass
+                await _write_live(session_id, track_id=str(track_id), position_ms="0", is_playing="1")
         await r.publish(channel, json.dumps({**data, "user_id": user_id}))
 
     elif msg_type == "vote_skip":
@@ -272,6 +352,24 @@ async def _handle_client_message(r, session_id: uuid.UUID, user_id: str, data: d
             await r.publish(channel, json.dumps({"type": "vote_update", "votes": vote_count, "threshold": threshold}))
 
     elif msg_type in ("position_update", "playback_state", "chat"):
+        if msg_type == "position_update":
+            position = data.get("data", {}).get("position_ms", 0)
+            try:
+                position = max(0, int(position))
+            except (TypeError, ValueError):
+                position = 0
+            fields = {"position_ms": str(position)}
+            track_id = data.get("data", {}).get("track_id")
+            if track_id:
+                fields["track_id"] = str(track_id)
+            await _write_live(session_id, **fields)
+        elif msg_type == "playback_state":
+            playing = data.get("data", {}).get("is_playing")
+            fields = {"is_playing": "1" if playing else "0"}
+            track_id = data.get("data", {}).get("track_id")
+            if track_id:
+                fields["track_id"] = str(track_id)
+            await _write_live(session_id, **fields)
         await r.publish(channel, json.dumps({**data, "user_id": user_id}))
 
 

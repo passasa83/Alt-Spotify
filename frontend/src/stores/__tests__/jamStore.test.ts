@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useJamStore } from '../jamStore';
 import { usePlayerStore } from '../playerStore';
 import { useAuthStore } from '../authStore';
-import { connectJamWebSocket } from '@/api/jam';
+import { connectJamWebSocket, getJamNowPlaying } from '@/api/jam';
+import { getTrack } from '@/api/tracks';
 
 vi.mock('@/api/jam', () => ({
   createJamSession: vi.fn(),
@@ -10,6 +11,11 @@ vi.mock('@/api/jam', () => ({
   leaveJamSession: vi.fn(),
   getJamSession: vi.fn(),
   connectJamWebSocket: vi.fn(),
+  getJamNowPlaying: vi.fn(),
+}));
+
+vi.mock('@/api/tracks', () => ({
+  getTrack: vi.fn(),
 }));
 
 const track = (id: string, title: string) => ({
@@ -102,5 +108,44 @@ describe('jamStore track sync', () => {
     expect(() =>
       socket.onmessage!({ data: JSON.stringify({ type: 'participant_joined', user_id: 'newcomer' }) }),
     ).not.toThrow();
+  });
+
+  it('syncToLive jumps to the live track and position', async () => {
+    vi.mocked(getJamNowPlaying).mockResolvedValue({
+      track_id: 'live1', position_ms: 60000, is_playing: true, updated_at: Date.now() / 1000,
+    });
+    vi.mocked(getTrack).mockResolvedValue(track('live1', 'Live Song') as never);
+    useJamStore.setState({ currentSession: { id: 'session-1' } as never });
+
+    await useJamStore.getState().syncToLive();
+
+    expect(usePlayerStore.getState().currentTrack?.id).toBe('live1');
+    expect(usePlayerStore.getState().isPlaying).toBe(true);
+    expect(usePlayerStore.getState().progress).toBeGreaterThanOrEqual(60);
+    expect(useJamStore.getState().lastSyncedTrackId).toBe('live1');
+  });
+
+  it('syncToLive does nothing when nothing plays', async () => {
+    vi.mocked(getJamNowPlaying).mockResolvedValue(null);
+    useJamStore.setState({ currentSession: { id: 'session-1' } as never });
+
+    await useJamStore.getState().syncToLive();
+
+    expect(usePlayerStore.getState().currentTrack).toBeNull();
+  });
+
+  it('applies remote pause and resume', () => {
+    const socket = makeSocket();
+    useJamStore.getState().connectWebSocket('session-1');
+    usePlayerStore.setState({
+      currentTrack: track('t1', 'Song') as never,
+      isPlaying: true,
+    });
+
+    socket.onmessage!({ data: JSON.stringify({ type: 'playback_state', user_id: 'other', data: { is_playing: false } }) });
+    expect(usePlayerStore.getState().isPlaying).toBe(false);
+
+    socket.onmessage!({ data: JSON.stringify({ type: 'playback_state', user_id: 'other', data: { is_playing: true } }) });
+    expect(usePlayerStore.getState().isPlaying).toBe(true);
   });
 });
