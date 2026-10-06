@@ -381,6 +381,26 @@ async def fill_genres(
     return {**missing, "running": True}
 
 
+@router.post("/fill-albums")
+async def fill_albums(
+    background_tasks: BackgroundTasks,
+    dry_run: bool = Query(True, description="Only count the tracks without album"),
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Give an album to tracks without one, looked up on Deezer (background)."""
+    from app.core.database import async_session
+    from app.services import album_fill
+
+    missing = await album_fill.missing_albums(db)
+    if dry_run or not missing["tracks"]:
+        return {**missing, "running": album_fill.is_running()}
+    if album_fill.is_running():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An album fill is already running")
+    background_tasks.add_task(album_fill.fill_missing_albums, async_session)
+    return {**missing, "running": True}
+
+
 _COVER_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp")
 
 

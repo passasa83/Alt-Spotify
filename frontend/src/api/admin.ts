@@ -293,3 +293,9 @@ export async function fillGenres(dryRun: boolean): Promise<{ artists: number; tr
   const response = await client.post('/fill-genres', null, { params: { dry_run: dryRun } });
   return response.data;
 }
+
+/** Tracks without album (looked up on Deezer in the background); `dryRun` only counts. */
+export async function fillAlbums(dryRun: boolean): Promise<{ artists: number; tracks: number; running: boolean }> {
+  const response = await client.post('/fill-albums', null, { params: { dry_run: dryRun } });
+  return response.data;
+}

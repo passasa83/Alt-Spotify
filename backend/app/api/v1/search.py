@@ -588,7 +588,11 @@ async def download_deezer_track(
     db.add(track)
     await db.flush()
     await db.refresh(track)
-    
+
+    if not track.album_id:
+        from app.services.album_lookup import assign_album
+        await assign_album(db, track, artist_name)
+
     return {
         "track_id": str(track.id),
         "title": title,
