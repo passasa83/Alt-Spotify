@@ -36,6 +36,7 @@ export const useJamStore = create<JamState>((set, get) => ({
   isConnected: false,
   votes: [],
   ws: null,
+  lastSyncedTrackId: null,
 
   createSession: async () => {
     const session = await createJamSession();
