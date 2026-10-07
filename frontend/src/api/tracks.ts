@@ -55,11 +55,6 @@ export const getTracks = async (
   return response.data;
 };
 
-export const getLocalTracks = async (page = 1, pageSize = 50): Promise<PaginatedResponse<Track>> => {
-  const response = await client.get('/tracks', { params: { page, page_size: pageSize, local_only: true, sort: 'created_at', order: 'desc' } });
-  return response.data;
-};
-
 export const getTrack = async (id: string): Promise<Track> => {
   const response = await client.get(`/tracks/${id}`);
   return response.data;

@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { Repeat, Repeat1, Shuffle, X } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import { resolveCoverUrl } from '@/api/tracks';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -55,10 +55,41 @@ export const QueueContent = () => {
   const { t } = useTranslation();
   const currentTrack = usePlayerStore((s) => s.currentTrack);
   const queue = usePlayerStore((s) => s.queue);
-  const { next, removeFromQueue, clearQueue } = usePlayerStore.getState();
+  const shuffle = usePlayerStore((s) => s.shuffle);
+  const repeat = usePlayerStore((s) => s.repeat);
+  const { next, removeFromQueue, clearQueue, toggleShuffle, toggleRepeat } = usePlayerStore.getState();
+  const RepeatIcon = repeat === 'one' ? Repeat1 : Repeat;
+  const modeHint = [
+    shuffle ? t('player.queue_shuffle_on') : null,
+    repeat === 'all' ? t('player.queue_repeat_all') : null,
+    repeat === 'one' ? t('player.queue_repeat_one') : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <>
+      <div className="mb-2 flex items-center gap-1 px-2">
+        <button
+          onClick={toggleShuffle}
+          aria-pressed={shuffle}
+          aria-label={t('player.shuffle')}
+          title={t('player.shuffle')}
+          className={`rounded p-1.5 ${shuffle ? 'text-green-400' : 'text-gray-400 hover:text-white'}`}
+        >
+          <Shuffle size={16} />
+        </button>
+        <button
+          onClick={toggleRepeat}
+          aria-pressed={repeat !== 'off'}
+          aria-label={repeat === 'one' ? t('player.repeat_one') : t('player.repeat')}
+          title={repeat === 'one' ? t('player.repeat_one') : t('player.repeat')}
+          className={`rounded p-1.5 ${repeat !== 'off' ? 'text-green-400' : 'text-gray-400 hover:text-white'}`}
+        >
+          <RepeatIcon size={16} />
+        </button>
+        {modeHint && <span className="ml-1 text-xs text-gray-500">{modeHint}</span>}
+      </div>
       {currentTrack && (
         <>
           <p className="px-2 pb-1 text-xs uppercase tracking-wider text-gray-500">{t('player.now_playing')}</p>

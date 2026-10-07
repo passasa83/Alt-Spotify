@@ -322,6 +322,11 @@ const ImportPlaylistModal = ({ isOpen, onClose, onImported }: Props) => {
                     {deezerResult.unmatched} {t('import.deezer_unmatched')}
                   </p>
                 )}
+                {deezerResult.queued_for_download > 0 && (
+                  <p className="text-sm text-blue-300 mt-1">
+                    {deezerResult.queued_for_download} {t('import.deezer_queued')}
+                  </p>
+                )}
                 <button
                   onClick={handleClose}
                   className="mt-3 rounded-full bg-blue-500 px-6 py-2 text-sm font-bold text-black hover:bg-blue-400"

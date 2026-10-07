@@ -142,6 +142,9 @@ const en = {
   'player.queue_empty': 'Nothing queued yet: similar tracks will follow.',
   'player.clear_queue': 'Clear',
   'player.remove_from_queue': 'Remove from queue',
+  'player.queue_shuffle_on': 'Shuffle on: the order below is the play order',
+  'player.queue_repeat_all': 'Repeat on: the queue will start over',
+  'player.queue_repeat_one': 'Repeat on: the current track will restart',
   'player.error_not_found': 'Audio file not found: {title}',
   'player.error_playback': 'Cannot play {title}',
   'player.error_stopped': 'Playback stopped: several tracks in a row could not be played.',
@@ -153,14 +156,6 @@ const en = {
   'history.to': 'To',
   'history.genre_filter': 'Filter by genre...',
   'history.empty': 'No listening history',
-
-  // Local Music
-  'local.title': 'My Music',
-  'local.track': 'track',
-  'local.tracks': 'tracks',
-  'local.empty': 'No local music found',
-  'local.empty_hint': 'Add music files to your scan directory to see them here',
-  'local.load_more': 'Load more',
 
   // Smart Playlists
   'smart.create_title': 'Create Smart Playlist',
@@ -709,11 +704,12 @@ const en = {
   'import.spotify_success': 'Playlist imported successfully!',
   'import.spotify_tracks_matched': 'tracks matched',
   'import.spotify_unmatched': 'tracks not found in local catalog',
-  'import.deezer_help': 'Paste a Deezer playlist URL to import it into your library.',
+  'import.deezer_help': 'Paste a Deezer playlist URL to import it into your library. Missing tracks are added to the playlist and downloaded in the background.',
   'import.import_deezer': 'Import from Deezer',
   'import.deezer_success': 'Playlist imported successfully!',
   'import.deezer_tracks_matched': 'tracks matched',
   'import.deezer_unmatched': 'tracks not found in local catalog',
+  'import.deezer_queued': 'missing tracks queued for download in the background',
   'import.spotify_not_configured': 'Spotify not configured',
   'import.spotify_not_configured_help': 'Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in your .env file. Get credentials at https://developer.spotify.com/dashboard',
 

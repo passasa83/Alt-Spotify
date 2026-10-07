@@ -178,9 +178,10 @@ const Player = () => {
   }, [currentId, hasLyrics, setLyrics]);
 
   const getNextTrack = useCallback(() => {
-    const { queue, shuffle: sh } = usePlayerStore.getState();
-    if (queue.length === 0) return null;
-    return sh ? queue[Math.floor(Math.random() * queue.length)] : queue[0];
+    // The queue order is the play order (shuffle reorders the queue itself
+    // in the store), so the preloaded track is the one that will play.
+    const { queue } = usePlayerStore.getState();
+    return queue.length === 0 ? null : queue[0];
   }, []);
 
   const startCrossfadeTransition = useCallback((fadeSeconds: number) => {
@@ -721,7 +722,7 @@ const Player = () => {
                 value={volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
                 aria-label={t('player.volume')}
-                className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-gray-600 accent-green-500 focus-visible:outline-2 focus-visible:outline-green-500 xl:w-24"
+                className="mr-2 h-1 w-20 cursor-pointer appearance-none rounded-full bg-gray-600 accent-green-500 focus-visible:outline-2 focus-visible:outline-green-500 xl:w-24"
               />
             </>
           ) : undefined

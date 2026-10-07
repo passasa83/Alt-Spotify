@@ -96,6 +96,7 @@ export interface DeezerImportResult {
   unmatched: number;
   unmatched_tracks: { title: string; artist: string; album: string }[];
   total_deezer_tracks: number;
+  queued_for_download: number;
 }
 
 export const importPlaylistFromDeezer = async (url: string): Promise<DeezerImportResult> => {

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Search, Library, Compass, HardDrive, Shield } from 'lucide-react';
+import { Home, Search, Library, Compass, Shield } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -12,9 +12,7 @@ const MobileNav = () => {
     { to: '/browse', label: t('browse.title'), icon: Compass },
     { to: '/search', label: t('nav.search'), icon: Search },
     { to: '/library', label: t('nav.playlists'), icon: Library },
-    isAdmin
-      ? { to: '/admin', label: t('admin.overview'), icon: Shield }
-      : { to: '/local', label: t('local.title'), icon: HardDrive },
+    ...(isAdmin ? [{ to: '/admin', label: t('admin.overview'), icon: Shield }] : []),
   ];
 
   return (

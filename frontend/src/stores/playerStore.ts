@@ -28,6 +28,17 @@ const reportNoAudio = () => useToastStore.getState().addToast(t('player.no_audio
 const autoQueued = new Set<string>();
 let autoplayRequest: Promise<void> | null = null;
 
+// Shuffle reorders the queue itself (Fisher-Yates) so the queue panel shows
+// the real play order and the preloaded track is the one that will play.
+function shuffled<T>(tracks: T[]): T[] {
+  const copy = [...tracks];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 interface PlayerState {
   currentTrack: Track | null;
   queue: Track[];
@@ -187,13 +198,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         return;
       }
     }
-    const { queue, currentTrack, history, shuffle } = get();
+    const { queue, currentTrack, history } = get();
     const queued = preferred && queue.find((t) => t.id === preferred.id);
-    const nextTrack = queued
-      ? queued
-      : shuffle
-        ? queue[Math.floor(Math.random() * queue.length)]
-        : queue[0]!;
+    // The queue order is the play order: enabling shuffle shuffles the queue
+    // itself (see toggleShuffle), so the panel, the preload and the track
+    // that actually plays next always agree.
+    const nextTrack = queued ? queued : queue[0]!;
     const newQueue = queue.filter((t) => t.id !== nextTrack.id);
     autoQueued.delete(nextTrack.id);
     if (currentTrack) {
@@ -249,7 +259,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }
     // The clicked track, or the next playable one if it has no audio.
     const trackToPlay = tracks.slice(startIndex).find(hasAudio) ?? playable[0]!;
-    const queueTracks = playable.slice(playable.indexOf(trackToPlay) + 1);
+    const rest = playable.slice(playable.indexOf(trackToPlay) + 1);
+    const queueTracks = get().shuffle ? shuffled(rest) : rest;
     autoQueued.clear();
     queueTracks.forEach((t) => autoQueued.add(t.id));
     set({
@@ -264,18 +275,20 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   refillQueue: () => {
-    const { queue, currentTrack, context, repeat, queuePlayed, history } = get();
+    const { queue, currentTrack, context, repeat, queuePlayed, history, shuffle } = get();
     if (queue.length > 0 || !currentTrack) return Promise.resolve();
+    const inPlayOrder = (tracks: Track[]) => (shuffle ? shuffled(tracks) : tracks);
 
     if (context && context.length > 1) {
       // Level 1 of the loop button: replay the playlist from the top.
       if (repeat !== 'all') return Promise.resolve();
       // The tracks after this one, then from the top.
       const i = context.findIndex((t) => t.id === currentTrack.id);
-      const refill =
+      const ordered =
         i === -1
           ? context.filter((t) => t.id !== currentTrack.id)
           : [...context.slice(i + 1), ...context.slice(0, i)];
+      const refill = inPlayOrder(ordered);
       refill.forEach((t) => autoQueued.add(t.id));
       set({ queue: refill });
       return Promise.resolve();
@@ -283,7 +296,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     if (repeat === 'all') {
       // Same level, without a playlist: replay what this queue already played.
-      const refill = queuePlayed.filter((t) => t.id !== currentTrack.id);
+      const refill = inPlayOrder(queuePlayed.filter((t) => t.id !== currentTrack.id));
       if (refill.length > 0) set({ queue: refill, queuePlayed: [] });
       return Promise.resolve();
     }
@@ -297,8 +310,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           const state = get();
           if (state.currentTrack?.id !== seedId || state.context || state.queue.length > 0) return;
           const playable = tracks.filter(hasAudio);
-          playable.forEach((t) => autoQueued.add(t.id));
-          set({ queue: playable });
+          const queued = state.shuffle ? shuffled(playable) : playable;
+          queued.forEach((t) => autoQueued.add(t.id));
+          set({ queue: queued });
         })
         .catch(() => {})
         .finally(() => {
@@ -309,8 +323,31 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   toggleShuffle: () => {
-    const { shuffle } = get();
-    set({ shuffle: !shuffle });
+    const { shuffle, queue, context, currentTrack } = get();
+    if (!shuffle) {
+      // Turning on: shuffle what the player queued, keeping the user's own
+      // picks (at the front) in order so "play next" stays predictable.
+      const firstAuto = queue.findIndex((t) => autoQueued.has(t.id));
+      const at = firstAuto === -1 ? queue.length : firstAuto;
+      set({ shuffle: true, queue: [...queue.slice(0, at), ...shuffled(queue.slice(at))] });
+      return;
+    }
+    // Turning off with a playlist context: back to the playlist order.
+    if (context && currentTrack) {
+      const userTracks = queue.filter((t) => !autoQueued.has(t.id));
+      const userIds = new Set(userTracks.map((t) => t.id));
+      const i = context.findIndex((t) => t.id === currentTrack.id);
+      const after =
+        i === -1
+          ? context.filter((t) => t.id !== currentTrack.id)
+          : [...context.slice(i + 1), ...context.slice(0, i)];
+      const rest = after.filter((t) => t.id !== currentTrack.id && !userIds.has(t.id));
+      autoQueued.clear();
+      rest.forEach((t) => autoQueued.add(t.id));
+      set({ shuffle: false, queue: [...userTracks, ...rest] });
+      return;
+    }
+    set({ shuffle: false });
   },
 
   toggleRepeat: () => {
@@ -319,6 +356,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const nextMode = modes[(modes.indexOf(repeat) + 1) % modes.length]!;
     // Leaving the queue loop forgets what it had played.
     set({ repeat: nextMode, ...(nextMode === 'all' ? {} : { queuePlayed: [] }) });
+    // Turning the loop on with an empty queue: refill right away so the
+    // queue panel immediately shows what will play next.
+    if (nextMode === 'all') void get().refillQueue();
   },
 
   restartCurrent: () => {

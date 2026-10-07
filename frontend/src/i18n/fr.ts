@@ -142,6 +142,9 @@ const fr = {
   'player.queue_empty': 'File vide : des titres similaires suivront.',
   'player.clear_queue': 'Vider',
   'player.remove_from_queue': 'Retirer de la file',
+  'player.queue_shuffle_on': 'Mélange activé : l\'ordre ci-dessous est l\'ordre de lecture',
+  'player.queue_repeat_all': 'Boucle activée : la file recommencera au début',
+  'player.queue_repeat_one': 'Boucle activée : le titre en cours recommencera',
   'player.error_not_found': 'Fichier audio introuvable : {title}',
   'player.error_playback': 'Impossible de lire {title}',
   'player.error_stopped': 'Lecture arrêtée : plusieurs titres d\'affilée sont illisibles.',
@@ -153,14 +156,6 @@ const fr = {
   'history.to': 'Au',
   'history.genre_filter': 'Filtrer par genre...',
   'history.empty': 'Aucun historique d\'écoute',
-
-  // Local Music
-  'local.title': 'Ma musique',
-  'local.track': 'titre',
-  'local.tracks': 'titres',
-  'local.empty': 'Aucune musique locale trouvée',
-  'local.empty_hint': 'Ajoutez des fichiers musicaux à votre répertoire de scan pour les voir ici',
-  'local.load_more': 'Charger plus',
 
   // Smart Playlists
   'smart.create_title': 'Créer une playlist intelligente',
@@ -709,11 +704,12 @@ const fr = {
   'import.spotify_success': 'Playlist importée avec succès !',
   'import.spotify_tracks_matched': 'titres correspondants trouvés',
   'import.spotify_unmatched': 'titres non trouvés dans le catalogue local',
-  'import.deezer_help': 'Collez l\'URL d\'une playlist Deezer pour l\'importer dans votre bibliothèque.',
+  'import.deezer_help': 'Collez l\'URL d\'une playlist Deezer pour l\'importer dans votre bibliothèque. Les titres introuvables sont ajoutés à la playlist et téléchargés en arrière-plan.',
   'import.import_deezer': 'Importer depuis Deezer',
   'import.deezer_success': 'Playlist importée avec succès !',
   'import.deezer_tracks_matched': 'titres correspondants trouvés',
   'import.deezer_unmatched': 'titres non trouvés dans le catalogue local',
+  'import.deezer_queued': 'titres introuvables mis en téléchargement en arrière-plan',
   'import.spotify_not_configured': 'Spotify non configuré',
   'import.spotify_not_configured_help': 'Définissez SPOTIFY_CLIENT_ID et SPOTIFY_CLIENT_SECRET dans le fichier .env. Obtenez vos identifiants sur https://developer.spotify.com/dashboard',
 

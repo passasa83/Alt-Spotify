@@ -188,6 +188,66 @@ describe('playerStore', () => {
     expect(usePlayerStore.getState().shuffle).toBe(false);
   });
 
+  it('enabling shuffle reorders the queue but keeps user picks first', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const tracks = ['1', '2', '3', '4', '5', '6'].map((id) => createTrack(id));
+      usePlayerStore.getState().setPlaylistAsQueue(tracks, 0);
+      usePlayerStore.getState().addToQueue(createTrack('mine'));
+
+      usePlayerStore.getState().toggleShuffle();
+
+      const { queue, shuffle } = usePlayerStore.getState();
+      expect(shuffle).toBe(true);
+      // The user's pick stays ahead, in order...
+      expect(queue[0]?.id).toBe('mine');
+      // ...and the rest is the same set, actually reordered.
+      expect(queue.map((t) => t.id).sort()).toEqual(['2', '3', '4', '5', '6', 'mine']);
+      expect(queue.map((t) => t.id)).not.toEqual(['mine', '2', '3', '4', '5', '6']);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it('next follows the (shuffled) queue order', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const tracks = ['1', '2', '3', '4'].map((id) => createTrack(id));
+      usePlayerStore.getState().setPlaylistAsQueue(tracks, 0);
+      usePlayerStore.getState().toggleShuffle();
+
+      const first = usePlayerStore.getState().queue[0]!;
+      usePlayerStore.getState().next();
+
+      expect(usePlayerStore.getState().currentTrack).toEqual(first);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it('toggling shuffle off restores the playlist order', () => {
+    const tracks = ['1', '2', '3', '4'].map((id) => createTrack(id));
+    usePlayerStore.getState().setPlaylistAsQueue(tracks, 0);
+    usePlayerStore.getState().toggleShuffle();
+    usePlayerStore.getState().toggleShuffle();
+
+    const state = usePlayerStore.getState();
+    expect(state.shuffle).toBe(false);
+    expect(state.queue.map((t) => t.id)).toEqual(['2', '3', '4']);
+  });
+
+  it('toggling repeat to all refills an empty queue from the playlist', () => {
+    const tracks = ['1', '2'].map((id) => createTrack(id));
+    usePlayerStore.getState().setPlaylistAsQueue(tracks, 1);
+
+    usePlayerStore.getState().toggleRepeat(); // off -> all
+
+    const state = usePlayerStore.getState();
+    expect(state.repeat).toBe('all');
+    expect(state.queue.map((t) => t.id)).toEqual(['1']);
+    expect(mockAutoplay).not.toHaveBeenCalled();
+  });
+
   it('toggleRepeat cycles modes off -> all -> one -> off', () => {
     expect(usePlayerStore.getState().repeat).toBe('off');
     usePlayerStore.getState().toggleRepeat();

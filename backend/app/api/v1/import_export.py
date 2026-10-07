@@ -3,6 +3,7 @@ import io
 import json
 import uuid
 
+import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -16,14 +17,22 @@ from app.models.playlist import Playlist
 from app.models.playlist_track import PlaylistTrack
 from app.models.track import Track
 from app.models.user import User
+from app.services.artist_import import TRACK_QUEUE
 from app.services.deezer import extract_playlist_id as extract_deezer_id
 from app.services.deezer import fetch_deezer_playlist
 from app.services.spotify import extract_playlist_id as extract_spotify_id
 from app.services.spotify import fetch_spotify_playlist
 from app.services.spotify import is_configured as spotify_configured
+from app.utils.artist import ensure_artist
 from app.utils.deps import get_current_user
 
+logger = structlog.get_logger("app")
+
 router = APIRouter(prefix="/playlists/import-export", tags=["import-export"])
+
+# Missing Deezer tracks queued for download per import: enough to fill a
+# playlist without hammering YouTube (the worker pauses between downloads).
+MAX_DEEZER_AUTO_DOWNLOADS = 50
 
 
 @router.get("/status")
@@ -324,12 +333,33 @@ async def import_from_deezer(
     await db.flush()
 
     rows = [
-        {"title": t["title"], "artist": t["artist"], "album": t["album"]}
+        {"title": t["title"], "artist": t["artist"], "album": t["album"], "duration": t.get("duration", 0)}
         for t in deezer_data["tracks"]
     ]
     matched_tracks, unmatched_rows = await _match_tracks(rows, db)
 
-    for i, track in enumerate(matched_tracks):
+    # Missing tracks are not just skipped: stub rows are created, added to
+    # the playlist and queued for download (YouTube, background worker), so
+    # the playlist fills up on its own after the import.
+    missing_rows = [rows[u["row"] - 1] for u in unmatched_rows if 0 < u["row"] <= len(rows)]
+    missing_rows = [
+        r for r in missing_rows
+        if (r.get("title") or "").strip() and (r.get("artist") or "").strip()
+    ]
+    download_tracks: list[Track] = []
+    for entry in missing_rows[:MAX_DEEZER_AUTO_DOWNLOADS]:
+        artist_id = await ensure_artist(db, entry["artist"].strip(), None)
+        stub = Track(
+            title=entry["title"].strip(),
+            artist_id=artist_id,
+            duration_seconds=entry.get("duration") or 0,
+        )
+        db.add(stub)
+        download_tracks.append(stub)
+    await db.flush()
+
+    all_tracks = [*matched_tracks, *download_tracks]
+    for i, track in enumerate(all_tracks):
         pt = PlaylistTrack(
             playlist_id=playlist.id,
             track_id=track.id,
@@ -341,6 +371,23 @@ async def import_from_deezer(
     await db.flush()
     await db.refresh(playlist)
 
+    queued_for_download = 0
+    if download_tracks:
+        try:
+            from app.core.redis import get_redis
+
+            redis = await get_redis()
+            for stub in download_tracks:
+                await redis.rpush(
+                    TRACK_QUEUE,
+                    json.dumps({"track_id": str(stub.id), "deezer_id": f"playlist:{playlist.id}"}),
+                )
+            queued_for_download = len(download_tracks)
+        except Exception as e:  # noqa: BLE001
+            # Redis down: the stubs stay in the playlist and can be
+            # downloaded later; the import itself still succeeded.
+            logger.warning("deezer_import_queue_failed", error=str(e))
+
     return {
         "playlist_id": str(playlist.id),
         "title": playlist.title,
@@ -348,4 +395,5 @@ async def import_from_deezer(
         "unmatched": len(unmatched_rows),
         "unmatched_tracks": unmatched_rows[:20],
         "total_deezer_tracks": deezer_data["track_count"],
+        "queued_for_download": queued_for_download,
     }
