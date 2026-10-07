@@ -226,11 +226,13 @@ export async function purgeUnplayableTracks(dryRun: boolean, includeUsed = false
 
 /**
  * Tracks whose audio file disappeared. Only the ones without an HLS copy go
- * (the rest still play); same `includeUsed` / `includeOrphans` rules as above.
+ * (the rest still play); `includeHls` also removes those, e.g. when fetching
+ * the originals again is not an option. Same `includeUsed` / `includeOrphans`
+ * rules as above.
  */
-export async function purgeMissingTracks(dryRun: boolean, includeUsed = false, includeOrphans = false): Promise<PurgeResult> {
+export async function purgeMissingTracks(dryRun: boolean, includeUsed = false, includeOrphans = false, includeHls = false): Promise<PurgeResult> {
   const response = await client.post('/admin/catalogue/purge-missing', null, {
-    params: { dry_run: dryRun, include_used: includeUsed, include_orphans: includeOrphans },
+    params: { dry_run: dryRun, include_used: includeUsed, include_orphans: includeOrphans, include_hls: includeHls },
   });
   return response.data;
 }

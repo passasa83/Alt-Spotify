@@ -81,6 +81,28 @@ async def test_purge_missing_keeps_used_tracks_and_the_ones_with_hls(
     assert (await client.post("/api/v1/admin/catalogue/purge-missing", headers=admin_headers)).json()["count"] == 0
 
 
+async def test_purge_missing_can_include_tracks_with_an_hls_copy(
+    client: AsyncClient, admin_headers, auth_headers, db_session, test_user, tmp_path
+):
+    await _seed(db_session, test_user, tmp_path)
+
+    # By default "Streamed" is spared: its HLS copy still plays it.
+    default = (await client.post("/api/v1/admin/catalogue/purge-missing", headers=admin_headers)).json()
+    assert default["count"] == 1
+
+    with_hls = (
+        await client.post("/api/v1/admin/catalogue/purge-missing?include_hls=true", headers=admin_headers)
+    ).json()
+    assert with_hls["count"] == 2  # "Gone" and "Streamed" ("Saved" is in a playlist)
+
+    url = "/api/v1/admin/catalogue/purge-missing?include_used=true&include_hls=true&dry_run=false"
+    done = (await client.post(url, headers=admin_headers)).json()
+    assert done["deleted"] == 3
+
+    titles = {t["title"] for t in (await client.get("/api/v1/tracks", headers=auth_headers)).json()["items"]}
+    assert titles == {"Present"}
+
+
 async def test_redownload_missing_fetches_the_files_again(
     client: AsyncClient, admin_headers, db_session, test_user, tmp_path
 ):

@@ -348,15 +348,21 @@ async def missing_track_ids(db: AsyncSession, unplayable_only: bool = False) -> 
 
 
 async def purge_missing_tracks(
-    db: AsyncSession, dry_run: bool = True, include_used: bool = False, include_orphans: bool = False
+    db: AsyncSession,
+    dry_run: bool = True,
+    include_used: bool = False,
+    include_orphans: bool = False,
+    include_hls: bool = False,
 ) -> dict:
     """Tracks whose audio file disappeared from disk.
 
-    Only the ones without an HLS copy go (the others are still playable);
-    the rest follows the rules of ``purge_unplayable_tracks``: by default only
-    those nothing points to, ``include_used`` also removes the ones sitting in
-    playlists, favorites, history or jams (their file is gone for good),
-    ``include_orphans`` then the albums and artists left without any track.
+    By default only the ones without an HLS copy go (the others are still
+    playable); ``include_hls`` also removes those, e.g. when re-downloading
+    the originals is not an option. The rest follows the rules of
+    ``purge_unplayable_tracks``: by default only those nothing points to,
+    ``include_used`` also removes the ones sitting in playlists, favorites,
+    history or jams (their file is gone for good), ``include_orphans`` then
+    the albums and artists left without any track.
     """
     from sqlalchemy import exists
 
@@ -365,7 +371,7 @@ async def purge_missing_tracks(
     from app.models.playlist_track import PlaylistTrack
     from app.utils.track_cleanup import delete_orphan_catalogue, delete_tracks, orphan_catalogue
 
-    ids = await missing_track_ids(db, unplayable_only=True)
+    ids = await missing_track_ids(db, unplayable_only=not include_hls)
     selected: list = []
     if ids:
         conditions = [Track.id.in_(ids)]

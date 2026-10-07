@@ -174,11 +174,14 @@ async def purge_missing(
     dry_run: bool = Query(True, description="Only count what would be deleted"),
     include_used: bool = Query(False, description="Also remove those in playlists, favorites or history"),
     include_orphans: bool = Query(False, description="Then remove albums and artists left without any track"),
+    include_hls: bool = Query(False, description="Also remove tracks that still play through an HLS copy"),
     _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete tracks whose file is gone (only those without an HLS copy: the rest still play)."""
-    return await purge_missing_tracks(db, dry_run=dry_run, include_used=include_used, include_orphans=include_orphans)
+    """Delete tracks whose file is gone (by default only those without an HLS copy: the rest still play)."""
+    return await purge_missing_tracks(
+        db, dry_run=dry_run, include_used=include_used, include_orphans=include_orphans, include_hls=include_hls
+    )
 
 
 @router.post("/catalogue/redownload-missing")

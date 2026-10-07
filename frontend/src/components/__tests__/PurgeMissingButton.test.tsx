@@ -29,7 +29,7 @@ describe('PurgeMissingButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(onDone).toHaveBeenCalled());
-    expect(mocked).toHaveBeenCalledWith(false, true, true);
+    expect(mocked).toHaveBeenCalledWith(false, true, true, false);
     // Nothing left to delete: the button steps aside, the health check speaks.
     await waitFor(() => expect(screen.queryByRole('button')).not.toBeInTheDocument());
   });
@@ -39,6 +39,26 @@ describe('PurgeMissingButton', () => {
     render(<PurgeMissingButton />);
     await waitFor(() => expect(mocked).toHaveBeenCalled());
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('proposes the HLS-backed tracks when nothing unplayable is left', async () => {
+    mocked
+      .mockResolvedValueOnce({ count: 0, deleted: 0 })
+      .mockResolvedValueOnce({ count: 5, deleted: 0, orphan_albums: 0, orphan_artists: 1 })
+      .mockResolvedValueOnce({ count: 5, deleted: 5, orphan_albums: 0, orphan_artists: 1 })
+      .mockResolvedValue({ count: 0, deleted: 0 });
+    const onDone = vi.fn();
+    render(<PurgeMissingButton onDone={onDone} />);
+
+    // First preview (unplayable only) is empty: the HLS variant takes over.
+    fireEvent.click(await screen.findByRole('button', { name: /Delete the 5 tracks whose original file is gone/ }));
+    expect(mocked).toHaveBeenLastCalledWith(true, true, true, true);
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('still play through HLS');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(mocked).toHaveBeenCalledWith(false, true, true, true);
+    await waitFor(() => expect(screen.queryByRole('button')).not.toBeInTheDocument());
   });
 
   it('can be cancelled without deleting anything', async () => {
