@@ -25,3 +25,20 @@ export const connectJamWebSocket = (sessionId: string): WebSocket => {
   const token = localStorage.getItem('access_token');
   return new WebSocket(`${protocol}//${window.location.host}/api/v1/jam/${sessionId}/ws?token=${token}`);
 };
+
+export interface JamLiveState {
+  track_id: string;
+  position_ms: number;
+  is_playing: boolean;
+  updated_at: number;
+}
+
+/** Where the jam currently is (track + position), for guests joining mid-song. Null when nothing plays. */
+export const getJamNowPlaying = async (sessionId: string): Promise<JamLiveState | null> => {
+  try {
+    const response = await client.get(`/jam/now-playing/${sessionId}`);
+    return response.data;
+  } catch {
+    return null;
+  }
+};

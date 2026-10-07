@@ -57,7 +57,11 @@ const NowPlayingSheet = ({ onClose, onNavigate, progress, duration, onSeek, isLi
   const shuffle = usePlayerStore((s) => s.shuffle);
   const repeat = usePlayerStore((s) => s.repeat);
   const lyrics = usePlayerStore((s) => s.lyrics);
+  const queueHead = usePlayerStore((s) => s.queue[0]);
   const { togglePlay, next, prev, toggleShuffle, toggleRepeat } = usePlayerStore.getState();
+  // Skip to the track the queue shows first (the Player preloads the same
+  // one), instead of letting next() pick another at random when shuffled.
+  const skipNext = () => next(queueHead ?? undefined);
   const [view, setView] = useState<View>('cover');
   const [dragY, setDragY] = useState(0);
   const dragStart = useRef<number | null>(null);
@@ -174,7 +178,8 @@ const NowPlayingSheet = ({ onClose, onNavigate, progress, duration, onSeek, isLi
           onChange={(e) => onSeek(parseFloat(e.target.value))}
           aria-label={t('player.seek')}
           aria-valuetext={`${formatTime(progress)} / ${formatTime(duration)}`}
-          className="h-6 w-full cursor-pointer accent-green-500"
+          style={{ background: `linear-gradient(to right, #1db954 ${duration > 0 ? Math.min(100, (progress / duration) * 100) : 0}%, #4b5563 ${duration > 0 ? Math.min(100, (progress / duration) * 100) : 0}%)` }}
+          className="slider-progress h-6 w-full cursor-pointer"
         />
         <div className="flex justify-between text-xs tabular-nums text-gray-400">
           <span>{formatTime(progress)}</span>
@@ -201,7 +206,7 @@ const NowPlayingSheet = ({ onClose, onNavigate, progress, duration, onSeek, isLi
         >
           {isPlaying ? <Pause size={30} fill="currentColor" /> : <Play size={30} fill="currentColor" className="ml-1" />}
         </button>
-        <button onClick={() => next()} className={`${iconButton} text-white`} aria-label={t('player.next')}>
+        <button onClick={skipNext} className={`${iconButton} text-white`} aria-label={t('player.next')}>
           <SkipForward size={30} fill="currentColor" />
         </button>
         <button

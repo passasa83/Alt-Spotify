@@ -2,22 +2,26 @@ import { Repeat, Repeat1, Shuffle, X } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import { resolveCoverUrl } from '@/api/tracks';
 import { useTranslation } from '@/hooks/useTranslation';
-import { formatTime } from '@/utils/formatTime';
+import { formatDurationHm, formatTime } from '@/utils/formatTime';
 import type { Track } from '@/types';
 
 interface QueuePanelProps {
   onClose: () => void;
 }
 
-const QueueRow = ({ track, active, onPlay, onRemove }: {
+const QueueRow = ({ track, position, active, onPlay, onRemove }: {
   track: Track;
+  position?: number;
   active?: boolean;
   onPlay?: () => void;
   onRemove?: () => void;
 }) => {
   const { t } = useTranslation();
   return (
-    <div className="group flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-gray-700/60">
+    <div className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-700/60">
+      {position !== undefined && (
+        <span className="w-5 flex-shrink-0 text-center text-xs tabular-nums text-gray-500">{position}</span>
+      )}
       <button
         onClick={onPlay}
         disabled={!onPlay}
@@ -35,11 +39,11 @@ const QueueRow = ({ track, active, onPlay, onRemove }: {
           </span>
         </span>
       </button>
-      <span className="text-xs text-gray-500">{formatTime(track.duration_seconds)}</span>
+      <span className="flex-shrink-0 text-xs tabular-nums text-gray-500">{formatTime(track.duration_seconds)}</span>
       {onRemove && (
         <button
           onClick={onRemove}
-          className="p-1 text-gray-500 opacity-0 hover:text-white focus:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+          className="flex-shrink-0 p-1 text-gray-500 opacity-0 hover:text-white focus:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
           aria-label={t('player.remove_from_queue')}
           title={t('player.remove_from_queue')}
         >
@@ -50,6 +54,29 @@ const QueueRow = ({ track, active, onPlay, onRemove }: {
   );
 };
 
+const QueueSection = ({ title, tracks, startIndex, onPlay, onRemove }: {
+  title: string;
+  tracks: Track[];
+  startIndex: number;
+  onPlay: (track: Track) => void;
+  onRemove: (trackId: string) => void;
+}) => (
+  <>
+    <p className="px-2 pb-1 pt-2 text-xs uppercase tracking-wider text-gray-500">
+      {title} ({tracks.length})
+    </p>
+    {tracks.map((track, i) => (
+      <QueueRow
+        key={`${track.id}-${startIndex + i}`}
+        track={track}
+        position={startIndex + i + 1}
+        onPlay={() => onPlay(track)}
+        onRemove={() => onRemove(track.id)}
+      />
+    ))}
+  </>
+);
+
 /** Current track and what comes next; also shown in the mobile "Now playing" screen. */
 export const QueueContent = () => {
   const { t } = useTranslation();
@@ -57,6 +84,8 @@ export const QueueContent = () => {
   const queue = usePlayerStore((s) => s.queue);
   const shuffle = usePlayerStore((s) => s.shuffle);
   const repeat = usePlayerStore((s) => s.repeat);
+  const context = usePlayerStore((s) => s.context);
+  const autoQueuedIds = usePlayerStore((s) => s.autoQueuedIds);
   const { next, removeFromQueue, clearQueue, toggleShuffle, toggleRepeat } = usePlayerStore.getState();
   const RepeatIcon = repeat === 'one' ? Repeat1 : Repeat;
   const modeHint = [
@@ -66,6 +95,13 @@ export const QueueContent = () => {
   ]
     .filter(Boolean)
     .join(' · ');
+
+  const auto = new Set(autoQueuedIds);
+  const contextIds = new Set((context ?? []).map((track) => track.id));
+  const userTracks = queue.filter((track) => !auto.has(track.id));
+  const contextTracks = queue.filter((track) => auto.has(track.id) && contextIds.has(track.id));
+  const similarTracks = queue.filter((track) => auto.has(track.id) && !contextIds.has(track.id));
+  const totalSeconds = queue.reduce((sum, track) => sum + (track.duration_seconds ?? 0), 0);
 
   return (
     <>
@@ -107,19 +143,47 @@ export const QueueContent = () => {
           </button>
         )}
       </div>
+      {queue.length > 0 && totalSeconds > 0 && (
+        <p className="px-2 pb-1 text-xs text-gray-500">
+          {queue.length === 1 ? t('player.one_track') : t('player.many_tracks', { count: queue.length })}
+          {' · '}
+          {formatDurationHm(totalSeconds)}
+        </p>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {queue.length === 0 ? (
           <p className="px-2 py-3 text-sm text-gray-400">{t('player.queue_empty')}</p>
         ) : (
-          queue.map((track) => (
-            <QueueRow
-              key={track.id}
-              track={track}
-              onPlay={() => next(track)}
-              onRemove={() => removeFromQueue(track.id)}
-            />
-          ))
+          <>
+            {userTracks.length > 0 && (
+              <QueueSection
+                title={t('player.your_picks')}
+                tracks={userTracks}
+                startIndex={0}
+                onPlay={(track) => next(track)}
+                onRemove={removeFromQueue}
+              />
+            )}
+            {contextTracks.length > 0 && (
+              <QueueSection
+                title={t('player.rest_of_context')}
+                tracks={contextTracks}
+                startIndex={userTracks.length}
+                onPlay={(track) => next(track)}
+                onRemove={removeFromQueue}
+              />
+            )}
+            {similarTracks.length > 0 && (
+              <QueueSection
+                title={t('player.autoplay')}
+                tracks={similarTracks}
+                startIndex={userTracks.length + contextTracks.length}
+                onPlay={(track) => next(track)}
+                onRemove={removeFromQueue}
+              />
+            )}
+          </>
         )}
       </div>
     </>

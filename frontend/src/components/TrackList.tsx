@@ -152,7 +152,9 @@ const TrackList = ({ tracks, showAlbum = true, showIndex = true, onRefresh, play
                 <span className="hidden md:block" />
               )}
 
-              <span className="hidden truncate text-sm text-gray-400 md:block">{t('playlist.track_added')}</span>
+              <span className="hidden truncate text-sm text-gray-400 md:block">
+                {track.created_at ? new Date(track.created_at).toLocaleDateString() : t('playlist.recently')}
+              </span>
 
               <span className="hidden text-right text-sm text-gray-400 md:block">{formatTime(track.duration_seconds)}</span>
 

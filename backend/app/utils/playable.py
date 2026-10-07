@@ -28,3 +28,8 @@ def album_has_audio():
 def artist_plays():
     """Total plays of an artist's tracks, to rank artists by popularity."""
     return select(func.coalesce(func.sum(Track.play_count), 0)).where(Track.artist_id == Artist.id).scalar_subquery()
+
+
+def album_plays():
+    """Total plays of an album's tracks, to rank albums by popularity."""
+    return select(func.coalesce(func.sum(Track.play_count), 0)).where(Track.album_id == Album.id).scalar_subquery()

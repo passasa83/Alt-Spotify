@@ -1,5 +1,6 @@
-import { Play } from 'lucide-react';
+import { Pause, Play } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useTrackPlayback } from '@/hooks/useTrackPlayback';
 import type { Album, Track } from '@/types';
 import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -14,8 +15,11 @@ interface AlbumCardProps {
 const AlbumCard = ({ album }: AlbumCardProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { setPlaylistAsQueue, currentTrack, isPlaying } = usePlayerStore();
+  const { setPlaylistAsQueue } = usePlayerStore();
+  const { isCurrentAlbum, isPlayingAlbum, playOrToggleAlbum } = useTrackPlayback();
   const [tracks, setTracks] = useState<Track[]>([]);
+  const currentThisAlbum = isCurrentAlbum(album.id);
+  const playingThisAlbum = isPlayingAlbum(album.id);
 
   useEffect(() => {
     getAlbumTracks(album.id).then(setTracks).catch(() => {});
@@ -24,7 +28,7 @@ const AlbumCard = ({ album }: AlbumCardProps) => {
   const handlePlay = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (tracks.length > 0) {
-      setPlaylistAsQueue(tracks, 0);
+      playOrToggleAlbum(album.id, () => setPlaylistAsQueue(tracks, 0));
     }
   };
 
@@ -41,17 +45,13 @@ const AlbumCard = ({ album }: AlbumCardProps) => {
         />
         <button
           onClick={handlePlay}
-          aria-label={`${t('player.play')} ${album.title}`}
-          className={`absolute bottom-2 right-2 flex h-10 w-10 items-center pointer-coarse:h-11 pointer-coarse:w-11 justify-center rounded-full bg-green-500 text-black shadow-xl transition-all ${
-            isPlaying
-              ? 'opacity-100 translate-y-0'
-              : 'opacity-0 [@media(hover:none)]:opacity-100 translate-y-2 [@media(hover:none)]:translate-y-0 group-hover:opacity-100 group-hover:translate-y-0'
-          }`}
+          aria-label={`${playingThisAlbum ? t('player.pause') : t('player.play')} ${album.title}`}
+          className="absolute bottom-2 right-2 flex h-10 w-10 items-center pointer-coarse:h-11 pointer-coarse:w-11 justify-center rounded-full bg-green-500 text-black shadow-xl transition-all opacity-0 [@media(hover:none)]:opacity-100 translate-y-2 [@media(hover:none)]:translate-y-0 group-hover:opacity-100 group-hover:translate-y-0"
         >
-          <Play size={18} fill="currentColor" />
+          {playingThisAlbum ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
         </button>
       </div>
-      <p className="block truncate text-sm font-semibold text-white">{album.title}</p>
+      <p className={`block truncate text-sm ${currentThisAlbum ? 'font-extrabold text-green-500' : 'font-semibold text-white'}`}>{album.title}</p>
       <p className="block truncate text-xs text-gray-400">
         {album.release_date?.slice(0, 4) || album.created_at?.slice(0, 4)} • <span className="hover:underline" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (album.artist_id) navigate(`/artist/${album.artist_id}`); }}>{album.artist?.name || t('player.unknown_artist')}</span>
       </p>

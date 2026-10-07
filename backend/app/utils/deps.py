@@ -59,7 +59,10 @@ async def get_current_user_from_header_or_query(
     request: Request = None,
 ) -> User:
     if token_from_header:
-        return await _resolve_user(token_from_header, db, request)
+        # Media players (HLS.js) send the token in the header: like the query
+        # form, both the access and the restricted media token open these
+        # media-only endpoints — nothing else.
+        return await _resolve_user(token_from_header, db, request, ("access", "media"))
     if not token_from_query:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

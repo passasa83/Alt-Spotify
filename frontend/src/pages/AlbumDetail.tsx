@@ -3,9 +3,10 @@ import { useParams, Link } from 'react-router-dom';
 import { getAlbum, getAlbumTracks } from '@/api/albums';
 import { usePlayerStore } from '@/stores/playerStore';
 import TrackList from '@/components/TrackList';
-import { Play, Heart, MoreHorizontal, Shuffle } from 'lucide-react';
+import { Play, Pause, Heart, MoreHorizontal, Shuffle } from 'lucide-react';
 import type { Album, Track } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useTrackPlayback } from '@/hooks/useTrackPlayback';
 import { resolveCoverUrl } from '@/api/tracks';
 
 const AlbumDetail = () => {
@@ -15,6 +16,7 @@ const AlbumDetail = () => {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { setPlaylistAsQueue } = usePlayerStore();
+  const { isPlayingAlbum, playOrToggleAlbum } = useTrackPlayback();
 
   useEffect(() => {
     const loadAlbum = async () => {
@@ -58,10 +60,11 @@ const AlbumDetail = () => {
     : new Date(album.created_at).getFullYear();
 
   const handlePlayAll = () => {
-    if (tracks.length > 0) {
-      setPlaylistAsQueue(tracks, 0);
+    if (tracks.length > 0 && album) {
+      playOrToggleAlbum(album.id, () => setPlaylistAsQueue(tracks, 0));
     }
   };
+  const playingThisAlbum = album ? isPlayingAlbum(album.id) : false;
 
   return (
     <div className="pb-24">
@@ -89,10 +92,10 @@ const AlbumDetail = () => {
       <div className="mb-6 flex items-center gap-6">
         <button
           onClick={handlePlayAll}
-          aria-label={t('player.play')}
+          aria-label={playingThisAlbum ? t('player.pause') : t('player.play')}
           className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-black transition-transform hover:scale-105"
         >
-          <Play size={24} fill="currentColor" />
+          {playingThisAlbum ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
         </button>
         <button className="text-gray-400 transition-colors hover:text-white">
           <Shuffle size={24} />

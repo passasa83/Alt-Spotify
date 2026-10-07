@@ -13,7 +13,7 @@ from app.schemas.album import AlbumResponse
 from app.schemas.artist import ArtistCreate, ArtistResponse, ArtistUpdate
 from app.schemas.common import PaginatedResponse
 from app.utils.deps import require_admin
-from app.utils.playable import album_has_audio, artist_has_audio, artist_plays
+from app.utils.playable import album_has_audio, album_plays, artist_has_audio, artist_plays
 
 router = APIRouter(prefix="/artists", tags=["artists"])
 
@@ -66,6 +66,7 @@ async def list_artist_albums(
     artist_id: uuid.UUID,
     # True: hide albums none of whose tracks has audio.
     playable: bool = False,
+    sort: Literal["release_date", "popular"] = "release_date",
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -75,12 +76,14 @@ async def list_artist_albums(
         conditions.append(album_has_audio())
     count_query = select(func.count(Album.id)).where(*conditions)
     total = (await db.execute(count_query)).scalar() or 0
+    newest = (Album.release_date.desc().nullslast(), Album.created_at.desc())
+    order = (album_plays().desc(), *newest) if sort == "popular" else newest
     result = await db.execute(
         select(Album)
         .where(*conditions)
         .offset((page - 1) * page_size)
         .limit(page_size)
-        .order_by(Album.release_date.desc().nullslast(), Album.created_at.desc())
+        .order_by(*order)
     )
     items = result.scalars().all()
     return PaginatedResponse(

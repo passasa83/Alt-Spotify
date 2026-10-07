@@ -313,12 +313,19 @@ async def fetch_from_youtube(
         if api_cover:
             track.cover_url = api_cover
 
+    # Downloads carry no album tag: the album comes from the file if it has
+    # one, else from a lookup, or the artist page shows no discography.
+    if not track.album_id:
+        from app.services.album_lookup import assign_album
+        await assign_album(db, track, artist_name, album_title=(download_result.get("metadata") or {}).get("album"))
+
     await db.commit()
 
     return {
         "track_id": str(track.id),
         "file_url": track.file_url,
         "cover_url": track.cover_url,
+        "album_id": str(track.album_id) if track.album_id else None,
         "youtube_url": download_result.get("youtube_url"),
         "youtube_title": download_result.get("youtube_title"),
         "message": "Downloaded and linked successfully",
@@ -359,11 +366,21 @@ async def fetch_from_youtube_url(
     await db.flush()
     await db.refresh(track)
 
+    if not track.album_id:
+        from app.services.album_lookup import assign_album
+        await assign_album(
+            db,
+            track,
+            artist_name or "Unknown",
+            album_title=download_result.get("metadata", {}).get("album"),
+        )
+
     return {
         "track_id": str(track.id),
         "title": track.title,
         "artist": artist_name,
         "file_url": track.file_url,
+        "album_id": str(track.album_id) if track.album_id else None,
         "youtube_url": youtube_url,
         "message": "Downloaded and imported successfully",
     }

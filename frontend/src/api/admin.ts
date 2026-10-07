@@ -224,6 +224,23 @@ export async function purgeUnplayableTracks(dryRun: boolean, includeUsed = false
   return response.data;
 }
 
+/**
+ * Tracks whose audio file disappeared. Only the ones without an HLS copy go
+ * (the rest still play); same `includeUsed` / `includeOrphans` rules as above.
+ */
+export async function purgeMissingTracks(dryRun: boolean, includeUsed = false, includeOrphans = false): Promise<PurgeResult> {
+  const response = await client.post('/admin/catalogue/purge-missing', null, {
+    params: { dry_run: dryRun, include_used: includeUsed, include_orphans: includeOrphans },
+  });
+  return response.data;
+}
+
+/** Tracks whose file is gone, to fetch again in the background; `dryRun` only counts them. */
+export async function redownloadMissing(dryRun: boolean): Promise<{ count: number; queued: number; running: boolean }> {
+  const response = await client.post('/admin/catalogue/redownload-missing', null, { params: { dry_run: dryRun } });
+  return response.data;
+}
+
 export interface MergeDuplicatesResult {
   count: number;
   merged: number;
@@ -291,5 +308,11 @@ export async function recheckCovers(dryRun: boolean): Promise<{ count: number; q
 /** Tracks without genre (looked up per artist in the background); `dryRun` only counts. */
 export async function fillGenres(dryRun: boolean): Promise<{ artists: number; tracks: number; running: boolean }> {
   const response = await client.post('/fill-genres', null, { params: { dry_run: dryRun } });
+  return response.data;
+}
+
+/** Tracks without album (looked up on Deezer in the background); `dryRun` only counts. */
+export async function fillAlbums(dryRun: boolean): Promise<{ artists: number; tracks: number; running: boolean }> {
+  const response = await client.post('/fill-albums', null, { params: { dry_run: dryRun } });
   return response.data;
 }

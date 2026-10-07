@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { usePlayerStore } from '../playerStore';
+import { usePlayerStore, MIN_QUEUE_LENGTH, AUTOPLAY_FETCH_LIMIT } from '../playerStore';
 import { getAutoplayTracks } from '@/api/recommendations';
 import type { Track } from '@/types';
 
@@ -27,6 +27,7 @@ beforeEach(() => {
   usePlayerStore.setState({
     currentTrack: null,
     queue: [],
+    autoQueuedIds: [],
     context: null,
     history: [],
     isPlaying: false,
@@ -225,18 +226,19 @@ describe('playerStore', () => {
     }
   });
 
-  it('toggling shuffle off restores the playlist order', () => {
+  it('toggling shuffle off keeps the current queue order', () => {
     const tracks = ['1', '2', '3', '4'].map((id) => createTrack(id));
     usePlayerStore.getState().setPlaylistAsQueue(tracks, 0);
     usePlayerStore.getState().toggleShuffle();
+    const shuffledOrder = usePlayerStore.getState().queue.map((t) => t.id);
     usePlayerStore.getState().toggleShuffle();
 
     const state = usePlayerStore.getState();
     expect(state.shuffle).toBe(false);
-    expect(state.queue.map((t) => t.id)).toEqual(['2', '3', '4']);
+    expect(state.queue.map((t) => t.id)).toEqual(shuffledOrder);
   });
 
-  it('toggling repeat to all refills an empty queue from the playlist', () => {
+  it('toggling repeat to all tops the empty queue up from the playlist', () => {
     const tracks = ['1', '2'].map((id) => createTrack(id));
     usePlayerStore.getState().setPlaylistAsQueue(tracks, 1);
 
@@ -244,8 +246,11 @@ describe('playerStore', () => {
 
     const state = usePlayerStore.getState();
     expect(state.repeat).toBe('all');
-    expect(state.queue.map((t) => t.id)).toEqual(['1']);
-    expect(mockAutoplay).not.toHaveBeenCalled();
+    // Looped rotation, cycled so the queue never runs dry.
+    // (Starting the playlist already topped up similar tracks: only the
+    // loop refill matters here.)
+    expect(state.queue).toHaveLength(MIN_QUEUE_LENGTH);
+    expect(state.queue[0]?.id).toBe('1');
   });
 
   it('toggleRepeat cycles modes off -> all -> one -> off', () => {
@@ -329,8 +334,10 @@ describe('playerStore', () => {
 
     const state = usePlayerStore.getState();
     expect(state.currentTrack?.id).toBe('3');
-    expect(state.queue.map((t) => t.id)).toEqual(['1', '2']);
-    expect(mockAutoplay).not.toHaveBeenCalled();
+    // The loop cycles the rotation so the queue never runs dry.
+    expect(state.queue.map((t) => t.id)).toEqual(
+      ['1', '2', '3', '1', '2', '3', '1', '2', '3', '1'],
+    );
   });
 
   it('repeat all replays the queue from the top', async () => {
@@ -341,12 +348,14 @@ describe('playerStore', () => {
     usePlayerStore.getState().repeat = 'all';
 
     usePlayerStore.getState().next(); // -> s1
-    usePlayerStore.getState().next(); // -> s2, queue empty
-    usePlayerStore.getState().next(); // -> back to the start of the queue
+    usePlayerStore.getState().next(); // -> s2, queue refilled from what played
 
     const state = usePlayerStore.getState();
-    expect(state.currentTrack?.id).toBe('1');
-    expect(state.queue.map((t) => t.id)).toEqual(['s1']);
+    expect(state.currentTrack?.id).toBe('s2');
+    // The leftover queue is extended with what was played.
+    expect(state.queue.map((t) => t.id)).toEqual(
+      ['1', '1', '1', '1', '1', '1', '1', '1', '1', 's1'],
+    );
   });
 
   it('queues similar tracks after a track played outside a playlist', async () => {
@@ -356,7 +365,7 @@ describe('playerStore', () => {
     usePlayerStore.getState().setTrack(createTrack('1'));
     await flush();
 
-    expect(mockAutoplay).toHaveBeenCalledWith('1', ['1']);
+    expect(mockAutoplay).toHaveBeenCalledWith('1', ['1'], AUTOPLAY_FETCH_LIMIT);
     expect(usePlayerStore.getState().queue).toEqual(similar);
 
     usePlayerStore.getState().next();
@@ -395,6 +404,89 @@ describe('playerStore', () => {
     const state = usePlayerStore.getState();
     expect(state.context).toBeNull();
     expect(state.queue.map((t) => t.id)).toEqual(['mine']);
+  });
+
+  it('tops up similar tracks before the queue runs out, without duplicates', async () => {
+    const first = Array.from({ length: 12 }, (_, i) => createTrack(`s${i + 1}`));
+    const more = ['n1', 'n2', 'n3'].map((id) => createTrack(id));
+    mockAutoplay.mockResolvedValueOnce(first).mockResolvedValueOnce(more);
+
+    usePlayerStore.getState().setTrack(createTrack('1'));
+    await flush();
+    expect(usePlayerStore.getState().queue).toHaveLength(12);
+
+    usePlayerStore.getState().next();
+    usePlayerStore.getState().next();
+    usePlayerStore.getState().next();
+    await flush();
+
+    const state = usePlayerStore.getState();
+    expect(state.queue.map((t) => t.id)).toEqual([
+      's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 's12',
+      'n1', 'n2', 'n3',
+    ]);
+    // The top-up excluded what was already queued.
+    const secondExclude: string[] = mockAutoplay.mock.calls[1]?.[1] ?? [];
+    expect(secondExclude).toEqual(expect.arrayContaining(['s4', 's12']));
+    expect(secondExclude).not.toContain('n1');
+    const ids = state.queue.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('queues similar tracks when a playlist ends without repeat', async () => {
+    const similar = ['s1', 's2', 's3'].map((id) => createTrack(id));
+    mockAutoplay.mockResolvedValue(similar);
+    const tracks = ['1', '2'].map((id) => createTrack(id));
+
+    usePlayerStore.getState().setPlaylistAsQueue(tracks, 1);
+    await flush();
+
+    const state = usePlayerStore.getState();
+    expect(state.currentTrack?.id).toBe('2');
+    expect(state.queue).toEqual(similar);
+
+    usePlayerStore.getState().next();
+    expect(usePlayerStore.getState().currentTrack?.id).toBe('s1');
+  });
+
+  it('loops a short playlist to keep at least 10 tracks queued', () => {
+    const tracks = ['1', '2'].map((id) => createTrack(id));
+    usePlayerStore.getState().setPlaylistAsQueue(tracks, 0);
+    usePlayerStore.getState().repeat = 'all';
+
+    usePlayerStore.getState().next(); // -> 2, the loop takes over
+
+    const state = usePlayerStore.getState();
+    expect(state.currentTrack?.id).toBe('2');
+    expect(state.queue.map((t) => t.id)).toEqual(
+      ['1', '2', '1', '2', '1', '2', '1', '2', '1', '2'],
+    );
+    expect(state.autoQueuedIds).toEqual(['1', '2']);
+  });
+
+  it('next removes a single occurrence when the loop duplicated a track', () => {
+    const tracks = ['1', '2'].map((id) => createTrack(id));
+    usePlayerStore.getState().setPlaylistAsQueue(tracks, 0);
+    usePlayerStore.getState().repeat = 'all';
+
+    usePlayerStore.getState().next(); // -> 2, queue: 1,2 x5
+    usePlayerStore.getState().next(); // -> 1, one copy consumed, loop extends
+
+    const state = usePlayerStore.getState();
+    expect(state.currentTrack?.id).toBe('1');
+    expect(state.queue.map((t) => t.id)).toEqual(
+      ['2', '1', '2', '1', '2', '1', '2', '1', '2', '1'],
+    );
+  });
+
+  it('exposes player-queued ids separately from user picks', () => {
+    const tracks = ['1', '2', '3'].map((id) => createTrack(id));
+    usePlayerStore.getState().setPlaylistAsQueue(tracks, 0);
+    usePlayerStore.getState().addToQueue(createTrack('mine'));
+
+    const state = usePlayerStore.getState();
+    expect(state.queue.map((t) => t.id)).toEqual(['mine', '2', '3']);
+    expect(state.autoQueuedIds).toEqual(['2', '3']);
   });
 });
 

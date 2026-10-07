@@ -28,6 +28,12 @@ const reportNoAudio = () => useToastStore.getState().addToast(t('player.no_audio
 const autoQueued = new Set<string>();
 let autoplayRequest: Promise<void> | null = null;
 
+// The queue panel always shows what comes next: never fewer than this many
+// tracks stay queued (looped playlist → playlist tracks, otherwise similar ones).
+export const MIN_QUEUE_LENGTH = 10;
+// How many similar tracks a single autoplay request pulls (the API caps at 30).
+export const AUTOPLAY_FETCH_LIMIT = 25;
+
 // Shuffle reorders the queue itself (Fisher-Yates) so the queue panel shows
 // the real play order and the preloaded track is the one that will play.
 function shuffled<T>(tracks: T[]): T[] {
@@ -42,6 +48,8 @@ function shuffled<T>(tracks: T[]): T[] {
 interface PlayerState {
   currentTrack: Track | null;
   queue: Track[];
+  /** Ids of the queued tracks the player added by itself (loop, autoplay). */
+  autoQueuedIds: string[];
   // Playlist/album the user is listening from; refills the queue when it runs out.
   context: Track[] | null;
   history: Track[];
@@ -60,8 +68,14 @@ interface PlayerState {
   replayGainEnabled: boolean;
   playbackRate: number;
   restartTick: number;
-  offlineTracks: Map<string, Blob>;
-  deviceId: string;
+  /** Programmatic seek request (jam catch-up): consumed by the Player. */
+  seekTarget: number | null;
+  seekTick: number;
+  seekTo: (time: number) => void;
+  /** A play() blocked by the browser autoplay policy: show a resume CTA. */
+  playBlocked: boolean;
+  setPlayBlocked: (blocked: boolean) => void;
+  offlineTracks: Map<string, Blob>;  deviceId: string;
   connectedDevices: Device[];
   setTrack: (track: Track) => void;
   play: () => void;
@@ -77,7 +91,7 @@ interface PlayerState {
   removeFromQueue: (trackId: string) => void;
   clearQueue: () => void;
   setPlaylistAsQueue: (tracks: Track[], startIndex?: number) => void;
-  // Empty queue: queue the rest of the context, or similar tracks without one.
+  // Below MIN_QUEUE_LENGTH: loop the context, or queue similar tracks without one.
   refillQueue: () => Promise<void>;
   toggleShuffle: () => void;
   toggleRepeat: () => void;
@@ -99,6 +113,7 @@ interface PlayerState {
 export const usePlayerStore = create<PlayerState>((set, get) => ({
   currentTrack: null,
   queue: [],
+  autoQueuedIds: [],
   context: null,
   history: [],
   queuePlayed: [],
@@ -115,6 +130,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   replayGainEnabled: true,
   playbackRate: 1,
   restartTick: 0,
+  seekTarget: null,
+  seekTick: 0,
+  playBlocked: false,
   offlineTracks: new Map(),
   deviceId: generateDeviceId(),
   connectedDevices: [],
@@ -169,12 +187,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     // Played on its own: drop what the previous playlist/autoplay queued.
     const userQueue = queue.filter((t) => !autoQueued.has(t.id) && t.id !== track.id);
     autoQueued.clear();
-    set({ currentTrack: track, queue: userQueue, context: null, queuePlayed: [], isPlaying: true, progress: 0 });
+    set({ currentTrack: track, queue: userQueue, autoQueuedIds: [], context: null, queuePlayed: [], isPlaying: true, progress: 0 });
     void get().refillQueue();
   },
 
   play: () => set({ isPlaying: true }),
   pause: () => set({ isPlaying: false }),
+
+  seekTo: (time: number) => set((s) => ({ progress: Math.max(0, time), seekTarget: Math.max(0, time), seekTick: s.seekTick + 1 })),
+  setPlayBlocked: (blocked: boolean) => set({ playBlocked: blocked }),
 
   togglePlay: () => {
     const { isPlaying } = get();
@@ -198,14 +219,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         return;
       }
     }
-    const { queue, currentTrack, history } = get();
-    const queued = preferred && queue.find((t) => t.id === preferred.id);
-    // The queue order is the play order: enabling shuffle shuffles the queue
-    // itself (see toggleShuffle), so the panel, the preload and the track
-    // that actually plays next always agree.
-    const nextTrack = queued ? queued : queue[0]!;
-    const newQueue = queue.filter((t) => t.id !== nextTrack.id);
-    autoQueued.delete(nextTrack.id);
+    const { queue, currentTrack, history, shuffle } = get();
+    // Remove a single occurrence: looped playlists queue the same track twice.
+    // The Player hands over the preloaded track as `preferred`, so the track
+    // that plays is the one the queue panel shows first.
+    const preferredAt = preferred ? queue.findIndex((t) => t.id === preferred.id) : -1;
+    const at = preferredAt !== -1
+      ? preferredAt
+      : shuffle
+        ? Math.floor(Math.random() * queue.length)
+        : 0;
+    const nextTrack = queue[at]!;
+    const newQueue = [...queue.slice(0, at), ...queue.slice(at + 1)];
+    // A looped playlist queues the same track several times: only forget the
+    // id once its last copy left the queue.
+    if (!newQueue.some((t) => t.id === nextTrack.id)) autoQueued.delete(nextTrack.id);
     if (currentTrack) {
       set({ history: [currentTrack, ...history].slice(0, 50) });
       // Remember what left the queue so "repeat all" can play it again.
@@ -213,7 +241,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         set({ queuePlayed: [...get().queuePlayed, currentTrack] });
       }
     }
-    set({ currentTrack: nextTrack, queue: newQueue, isPlaying: true, progress: 0 });
+    set({ currentTrack: nextTrack, queue: newQueue, autoQueuedIds: [...autoQueued], isPlaying: true, progress: 0 });
     // Top up right away so the Player can preload what follows.
     void get().refillQueue();
   },
@@ -242,10 +270,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   removeFromQueue: (trackId) => {
     const { queue } = get();
-    set({ queue: queue.filter((t) => t.id !== trackId) });
+    autoQueued.delete(trackId);
+    set({ queue: queue.filter((t) => t.id !== trackId), autoQueuedIds: [...autoQueued] });
   },
 
-  clearQueue: () => set({ queue: [] }),
+  clearQueue: () => {
+    autoQueued.clear();
+    set({ queue: [], autoQueuedIds: [] });
+  },
 
   setPlaylistAsQueue: (tracks, startIndex = 0) => {
     const playable = tracks.filter(hasAudio);
@@ -266,6 +298,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     set({
       currentTrack: trackToPlay,
       queue: queueTracks,
+      autoQueuedIds: queueTracks.map((t) => t.id),
       context: playable,
       queuePlayed: [],
       isPlaying: true,
@@ -276,43 +309,79 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   refillQueue: () => {
     const { queue, currentTrack, context, repeat, queuePlayed, history, shuffle } = get();
-    if (queue.length > 0 || !currentTrack) return Promise.resolve();
-    const inPlayOrder = (tracks: Track[]) => (shuffle ? shuffled(tracks) : tracks);
+    if (!currentTrack || queue.length >= MIN_QUEUE_LENGTH) return Promise.resolve();
 
-    if (context && context.length > 1) {
-      // Level 1 of the loop button: replay the playlist from the top.
-      if (repeat !== 'all') return Promise.resolve();
-      // The tracks after this one, then from the top.
+    if (context && context.length > 0 && repeat === 'all') {
+      // Looped playlist: extend the queue with the playlist rotation, cycled
+      // so that at least MIN_QUEUE_LENGTH tracks stay queued. User picks stay
+      // ahead and the rotation continues after the tail of the queue.
       const i = context.findIndex((t) => t.id === currentTrack.id);
-      const ordered =
+      const fullLoop =
         i === -1
           ? context.filter((t) => t.id !== currentTrack.id)
-          : [...context.slice(i + 1), ...context.slice(0, i)];
-      const refill = inPlayOrder(ordered);
-      refill.forEach((t) => autoQueued.add(t.id));
-      set({ queue: refill });
+          : [...context.slice(i + 1), ...context.slice(0, i), currentTrack];
+      const anchorId = queue.length > 0 ? queue[queue.length - 1]!.id : currentTrack.id;
+      const ai = fullLoop.findIndex((t) => t.id === anchorId);
+      const rotation = ai === -1 ? [...fullLoop] : [...fullLoop.slice(ai + 1), ...fullLoop.slice(0, ai + 1)];
+      // Shuffled: the loop rotation itself is shuffled so the panel keeps
+      // showing the real play order.
+      const fill = shuffle ? shuffled(rotation) : rotation;
+      const refill = [...queue];
+      for (let loop = 0; loop < MIN_QUEUE_LENGTH && refill.length < MIN_QUEUE_LENGTH; loop++) {
+        for (const t of fill) {
+          if (refill.length >= MIN_QUEUE_LENGTH) break;
+          refill.push(t);
+          autoQueued.add(t.id);
+        }
+        if (fill.length === 0) break;
+      }
+      set({ queue: refill, autoQueuedIds: [...autoQueued] });
       return Promise.resolve();
     }
 
-    if (repeat === 'all') {
+    if (!context && repeat === 'all') {
       // Same level, without a playlist: replay what this queue already played.
-      const refill = inPlayOrder(queuePlayed.filter((t) => t.id !== currentTrack.id));
-      if (refill.length > 0) set({ queue: refill, queuePlayed: [] });
+      const played = queuePlayed.filter((t) => t.id !== currentTrack.id);
+      if (played.length === 0 && queue.length === 0) return Promise.resolve();
+      const replay = shuffle ? shuffled(played) : played;
+      const refill = [...queue];
+      for (let loop = 0; loop < MIN_QUEUE_LENGTH && refill.length < MIN_QUEUE_LENGTH; loop++) {
+        for (const t of replay) {
+          if (refill.length >= MIN_QUEUE_LENGTH) break;
+          refill.push(t);
+          autoQueued.add(t.id);
+        }
+        if (replay.length === 0) break;
+      }
+      set({ queue: refill, queuePlayed: [], autoQueuedIds: [...autoQueued] });
       return Promise.resolve();
     }
 
+    // Anything else (single track, playlist not looped, drained playlist):
+    // similar tracks keep the queue at MIN_QUEUE_LENGTH and beyond.
     // "Repeat one" restarts the track, so autoplay only serves manual skips.
     if (!autoplayRequest) {
       const seedId = currentTrack.id;
-      const exclude = [seedId, ...history.map((t) => t.id)];
-      autoplayRequest = getAutoplayTracks(seedId, exclude)
+      const seedContext = context;
+      const seedRepeat = repeat;
+      const exclude = [seedId, ...history.map((t) => t.id), ...queue.map((t) => t.id)];
+      autoplayRequest = getAutoplayTracks(seedId, exclude, AUTOPLAY_FETCH_LIMIT)
         .then((tracks) => {
           const state = get();
-          if (state.currentTrack?.id !== seedId || state.context || state.queue.length > 0) return;
-          const playable = tracks.filter(hasAudio);
-          const queued = state.shuffle ? shuffled(playable) : playable;
+          if (
+            state.currentTrack?.id !== seedId ||
+            state.context !== seedContext ||
+            state.repeat !== seedRepeat ||
+            (state.context && state.repeat === 'all')
+          )
+            return;
+          const fresh = tracks
+            .filter(hasAudio)
+            .filter((t) => t.id !== seedId && !state.queue.some((q) => q.id === t.id));
+          if (fresh.length === 0) return;
+          const queued = state.shuffle ? shuffled(fresh) : fresh;
           queued.forEach((t) => autoQueued.add(t.id));
-          set({ queue: queued });
+          set({ queue: [...state.queue, ...queued], autoQueuedIds: [...autoQueued] });
         })
         .catch(() => {})
         .finally(() => {
@@ -323,30 +392,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   toggleShuffle: () => {
-    const { shuffle, queue, context, currentTrack } = get();
+    const { shuffle, queue } = get();
     if (!shuffle) {
       // Turning on: shuffle what the player queued, keeping the user's own
       // picks (at the front) in order so "play next" stays predictable.
+      // Membership is unchanged, so the autoQueuedIds mirror stays valid.
       const firstAuto = queue.findIndex((t) => autoQueued.has(t.id));
       const at = firstAuto === -1 ? queue.length : firstAuto;
       set({ shuffle: true, queue: [...queue.slice(0, at), ...shuffled(queue.slice(at))] });
       return;
     }
-    // Turning off with a playlist context: back to the playlist order.
-    if (context && currentTrack) {
-      const userTracks = queue.filter((t) => !autoQueued.has(t.id));
-      const userIds = new Set(userTracks.map((t) => t.id));
-      const i = context.findIndex((t) => t.id === currentTrack.id);
-      const after =
-        i === -1
-          ? context.filter((t) => t.id !== currentTrack.id)
-          : [...context.slice(i + 1), ...context.slice(0, i)];
-      const rest = after.filter((t) => t.id !== currentTrack.id && !userIds.has(t.id));
-      autoQueued.clear();
-      rest.forEach((t) => autoQueued.add(t.id));
-      set({ shuffle: false, queue: [...userTracks, ...rest] });
-      return;
-    }
+    // Turning off keeps the current order: with the queue topped up
+    // (loop rotations, autoplay), the original order cannot be rebuilt.
     set({ shuffle: false });
   },
 

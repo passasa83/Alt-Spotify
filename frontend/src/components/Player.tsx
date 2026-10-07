@@ -1,4 +1,5 @@
 import { usePlayerStore, type RepeatMode } from '@/stores/playerStore';
+import { useJamStore } from '@/stores/jamStore';
 import type { Track } from '@/types';
 import { resolveCoverUrl, getTrackStreamUrl, playTrack } from '@/api/tracks';
 import { getMe } from '@/api/users';
@@ -53,12 +54,18 @@ const MAX_CONSECUTIVE_ERRORS = 3;
 
 // A play() blocked by the browser's autoplay policy must not leave the UI on
 // "playing"; an AbortError (source changed mid-load) is expected and harmless.
+// The block is surfaced in the store so the UI can offer a tap-to-resume CTA.
 const safePlay = (audio: HTMLAudioElement) => {
-  audio.play().catch((err: unknown) => {
-    if ((err as DOMException)?.name === 'NotAllowedError') {
-      usePlayerStore.getState().pause();
-    }
-  });
+  audio
+    .play()
+    .then(() => usePlayerStore.getState().setPlayBlocked(false))
+    .catch((err: unknown) => {
+      if ((err as DOMException)?.name === 'NotAllowedError') {
+        const store = usePlayerStore.getState();
+        store.pause();
+        store.setPlayBlocked(true);
+      }
+    });
 };
 
 // <audio> doesn't expose the HTTP status: ask the stream endpoint directly.
@@ -96,8 +103,9 @@ const Player = () => {
     playbackRate,
     useHls,
     restartTick,
+    seekTick,
+    seekTarget,
     togglePlay,
-    next,
     prev,
     setVolume,
     seek,
@@ -122,6 +130,8 @@ const Player = () => {
   const consecutiveErrorsRef = useRef(0);
   const authRetriedTrackIdRef = useRef<string | null>(null);
   const rateLimitRetriesRef = useRef<{ trackId: string | null; count: number }>({ trackId: null, count: 0 });
+  // Last position_update broadcast to the jam (throttled: timeupdate fires ~4 Hz).
+  const jamPosSentRef = useRef(0);
   // Seconds really listened to the current track (seeks excluded), sent
   // with the play once the listen ends.
   const listenRef = useRef<{ trackId: string | null; seconds: number; lastTime: number | null }>({
@@ -178,10 +188,18 @@ const Player = () => {
   }, [currentId, hasLyrics, setLyrics]);
 
   const getNextTrack = useCallback(() => {
-    // The queue order is the play order (shuffle reorders the queue itself
-    // in the store), so the preloaded track is the one that will play.
+    // Preload target: the head of the queue. It is handed to the store as the
+    // preferred track on advance, so the track that plays is the one the
+    // queue panel shows first (even shuffled, where next() would pick at
+    // random without a preferred track).
     const { queue } = usePlayerStore.getState();
     return queue.length === 0 ? null : queue[0];
+  }, []);
+
+  // Advance to the preloaded track when there is one: the buffered element
+  // and the store stay on the same track.
+  const advanceToPreloaded = useCallback(() => {
+    usePlayerStore.getState().next(nextTrackRef.current ?? undefined);
   }, []);
 
   const startCrossfadeTransition = useCallback((fadeSeconds: number) => {
@@ -311,6 +329,7 @@ const Player = () => {
     audio.addEventListener('playing', () => {
       if (audio !== audioRef.current) return;
       consecutiveErrorsRef.current = 0;
+      usePlayerStore.getState().setPlayBlocked(false);
     });
 
     audio.addEventListener('timeupdate', () => {
@@ -330,6 +349,15 @@ const Player = () => {
           const step = audio.currentTime - (listen.lastTime ?? audio.currentTime);
           if (step > 0 && step < 2) listen.seconds += step / (audio.playbackRate || 1);
           listen.lastTime = audio.currentTime;
+        }
+        // Jam: throttled live position so late joiners can catch up mid-song.
+        const jam = useJamStore.getState();
+        if (jam.ws && jam.ws.readyState === WebSocket.OPEN) {
+          const nowMs = Date.now();
+          if (nowMs - jamPosSentRef.current > 5000) {
+            jamPosSentRef.current = nowMs;
+            jam.sendPosition(playing.id, audio.currentTime * 1000);
+          }
         }
       }
       const remaining = audio.duration - audio.currentTime;
@@ -363,7 +391,7 @@ const Player = () => {
         startCrossfadeTransition(0.05);
         return;
       }
-      store.next();
+      usePlayerStore.getState().next(nextTrackRef.current ?? undefined);
     });
 
     return audio;
@@ -425,6 +453,34 @@ const Player = () => {
       }
     }
   }, [isPlaying]);
+
+  // Jam session: broadcast every local track change so the other participants
+  // follow. Tracks applied *from* the jam carry lastSyncedTrackId and are not
+  // re-broadcast (no echo loop with the relayed copy).
+  const jamTrackId = currentTrack?.id;
+  useEffect(() => {
+    if (!jamTrackId || !currentTrack) return;
+    const jam = useJamStore.getState();
+    if (!jam.ws || jam.ws.readyState !== WebSocket.OPEN) return;
+    if (jam.lastSyncedTrackId === jamTrackId) return;
+    jam.sendTrackChange(currentTrack, usePlayerStore.getState().queue);
+  }, [jamTrackId]);
+
+  // Jam session: pause / resume follows too (the receiver only applies actual
+  // transitions, so this converges instead of looping).
+  useEffect(() => {
+    if (!jamTrackId || !currentTrack) return;
+    const jam = useJamStore.getState();
+    if (!jam.ws || jam.ws.readyState !== WebSocket.OPEN) return;
+    jam.sendPlaybackState(isPlaying, jamTrackId);
+  }, [isPlaying, jamTrackId]);
+
+  // Programmatic seek (jam catch-up): applied to the element. Setting
+  // currentTime before the metadata loads sticks once it does.
+  useEffect(() => {
+    if (seekTick === 0 || !audioRef.current) return;
+    audioRef.current.currentTime = seekTarget ?? 0;
+  }, [seekTick, seekTarget]);
 
   // A restart (repeat one) is a new listen; closing the tab ends the current one.
   useEffect(() => {
@@ -589,7 +645,7 @@ const Player = () => {
       )}
       <div className="relative flex h-16 items-center justify-between gap-2 bg-gray-900 px-3 border-t border-gray-800 md:h-20 md:px-4">
       {/* Mobile: thin progress line along the top edge (seeking is in the full-screen view) */}
-      <div className="absolute inset-x-0 top-0 h-0.5 bg-gray-700 md:hidden" aria-hidden="true">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gray-700 md:hidden" aria-hidden="true">
         <div className="h-full bg-green-500" style={{ width: `${progressPercent}%` }} />
       </div>
       <div className="flex min-w-0 flex-1 items-center gap-3 md:w-1/4 md:flex-none lg:w-1/4">
@@ -667,7 +723,7 @@ const Player = () => {
           >
             {isPlaying ? <Pause size={isDesktop ? 16 : 20} fill="currentColor" /> : <Play size={isDesktop ? 16 : 20} fill="currentColor" />}
           </button>
-          <button onClick={() => next()} className="hidden p-1 text-gray-400 hover:text-white md:block" aria-label={t('player.next')}>
+          <button onClick={advanceToPreloaded} className="hidden p-1 text-gray-400 hover:text-white md:block" aria-label={t('player.next')}>
             <SkipForward size={20} fill="currentColor" />
           </button>
           <button
@@ -693,7 +749,8 @@ const Player = () => {
             aria-valuemin={0}
             aria-valuemax={duration || 0}
             aria-valuenow={progress}
-            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-gray-600 accent-green-500 focus-visible:outline-2 focus-visible:outline-green-500"
+            style={{ background: `linear-gradient(to right, #1db954 ${progressPercent}%, #4b5563 ${progressPercent}%)` }}
+            className="slider-progress w-full flex-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-green-500"
           />
           <span className="w-10 text-xs text-gray-400">{formatTime(duration)}</span>
         </div>
@@ -722,7 +779,8 @@ const Player = () => {
                 value={volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
                 aria-label={t('player.volume')}
-                className="mr-2 h-1 w-20 cursor-pointer appearance-none rounded-full bg-gray-600 accent-green-500 focus-visible:outline-2 focus-visible:outline-green-500 xl:w-24"
+                style={{ background: `linear-gradient(to right, #1db954 ${Math.round(volume * 100)}%, #4b5563 ${Math.round(volume * 100)}%)` }}
+                className="slider-progress mr-2 w-20 cursor-pointer xl:w-24"
               />
             </>
           ) : undefined
@@ -756,7 +814,8 @@ const Player = () => {
               aria-valuemin={0}
               aria-valuemax={12}
               aria-valuenow={crossfadeDuration}
-              className="h-1 w-full cursor-pointer appearance-none rounded-full bg-gray-600 accent-green-500 focus-visible:outline-2 focus-visible:outline-green-500"
+              style={{ background: `linear-gradient(to right, #1db954 ${(crossfadeDuration / 12) * 100}%, #4b5563 ${(crossfadeDuration / 12) * 100}%)` }}
+              className="slider-progress w-full cursor-pointer"
             />
           </div>
 

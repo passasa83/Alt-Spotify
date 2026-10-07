@@ -88,9 +88,12 @@ export const getTrackStreamUrl = (trackId: string): string => {
 };
 
 // No token in the URL: HLS.js authenticates each request with a header, and
-// relative playlist/segment URLs would drop the query string anyway.
+// relative playlist/segment URLs would drop the query string anyway — but the
+// master playlist URL itself must carry the token for native HLS players
+// (iOS, Android, Safari), which fetch it without our Authorization header.
+// The backend passes that token on to variant playlists and segments.
 export const getHlsStreamUrl = (trackId: string): string => {
-  return `/api/v1/stream/${trackId}/master.m3u8`;
+  return withToken(`/api/v1/stream/${trackId}/master.m3u8`);
 };
 
 export const uploadTrack = async (file: File, metadata: Record<string, any>): Promise<UploadResult> => {

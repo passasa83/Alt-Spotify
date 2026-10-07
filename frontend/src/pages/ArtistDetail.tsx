@@ -12,6 +12,8 @@ import { useTranslation } from '@/hooks/useTranslation';
 // The API caps a page at 100: enough for a "popular" queue.
 const MAX_TRACKS = 100;
 const POPULAR_SHOWN = 10;
+// The best known albums first, the rest behind the "show more" button.
+const POPULAR_ALBUMS_SHOWN = 5;
 
 // Fisher-Yates: sorting with a random comparator is biased.
 const shuffled = <T,>(items: T[]): T[] => {
@@ -31,6 +33,8 @@ const ArtistDetail = () => {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [trackCount, setTrackCount] = useState(0);
   const [showAll, setShowAll] = useState(false);
+  const [showAllAlbums, setShowAllAlbums] = useState(false);
+  const [selectedAlbumId, setSelectedAlbumId] = useState<string | 'all'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const { setPlaylistAsQueue } = usePlayerStore();
 
@@ -39,12 +43,15 @@ const ArtistDetail = () => {
       if (!id) return;
       setIsLoading(true);
       setShowAll(false);
+      setShowAllAlbums(false);
+      setSelectedAlbumId('all');
       try {
         // All the artist's playable tracks, not just its first album's:
         // many tracks have no album, and albums can be empty.
         const [artistData, albumsData, tracksData] = await Promise.all([
           getArtist(id),
-          getArtistAlbums(id, 1, 50, { playable: true }),
+          // The most listened to albums first.
+          getArtistAlbums(id, 1, 50, { playable: true, sort: 'popular' }),
           getTracks(1, MAX_TRACKS, { artistId: id, playable: true, sort: 'play_count', order: 'desc' }),
         ]);
         setArtist(artistData);
@@ -76,6 +83,9 @@ const ArtistDetail = () => {
     );
   }
 
+  // "Popular" can be narrowed to a single album picked from the chips below.
+  const visibleTracks = selectedAlbumId === 'all' ? tracks : tracks.filter((tr) => tr.album_id === selectedAlbumId);
+
   return (
     <div className="pb-24">
       <div className="relative mb-6">
@@ -95,8 +105,8 @@ const ArtistDetail = () => {
 
       <div className="mb-6 flex items-center gap-6">
         <button
-          onClick={() => setPlaylistAsQueue(tracks, 0)}
-          disabled={tracks.length === 0}
+          onClick={() => setPlaylistAsQueue(visibleTracks, 0)}
+          disabled={visibleTracks.length === 0}
           aria-label={t('artist.play')}
           title={t('artist.play')}
           className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-black transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
@@ -104,8 +114,8 @@ const ArtistDetail = () => {
           <Play size={24} fill="currentColor" />
         </button>
         <button
-          onClick={() => setPlaylistAsQueue(shuffled(tracks), 0)}
-          disabled={tracks.length === 0}
+          onClick={() => setPlaylistAsQueue(shuffled(visibleTracks), 0)}
+          disabled={visibleTracks.length === 0}
           aria-label={t('artist.shuffle')}
           title={t('artist.shuffle')}
           className="flex h-11 w-11 items-center justify-center text-gray-400 transition-colors hover:text-white disabled:opacity-40"
@@ -126,10 +136,36 @@ const ArtistDetail = () => {
 
       <section className="mb-8">
         <h2 className="mb-4 text-xl font-bold text-white">{t('artist.popular')}</h2>
-        {tracks.length > 0 ? (
+        {albums.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={t('artist.filter_album')}>
+            <button
+              onClick={() => { setSelectedAlbumId('all'); setShowAll(false); }}
+              aria-pressed={selectedAlbumId === 'all'}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                selectedAlbumId === 'all' ? 'bg-green-500 text-black' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white'
+              }`}
+            >
+              {t('artist.all_albums')}
+            </button>
+            {albums.map((album) => (
+              <button
+                key={album.id}
+                onClick={() => { setSelectedAlbumId(album.id); setShowAll(false); }}
+                aria-pressed={selectedAlbumId === album.id}
+                title={album.title}
+                className={`max-w-48 truncate rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                  selectedAlbumId === album.id ? 'bg-green-500 text-black' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white'
+                }`}
+              >
+                {album.title}
+              </button>
+            ))}
+          </div>
+        )}
+        {visibleTracks.length > 0 ? (
           <>
-            <TrackList tracks={showAll ? tracks : tracks.slice(0, POPULAR_SHOWN)} playlistTracks={tracks} />
-            {tracks.length > POPULAR_SHOWN && (
+            <TrackList tracks={showAll ? visibleTracks : visibleTracks.slice(0, POPULAR_SHOWN)} playlistTracks={visibleTracks} />
+            {visibleTracks.length > POPULAR_SHOWN && (
               <button
                 onClick={() => setShowAll(!showAll)}
                 className="mt-3 px-2 py-2 text-sm font-semibold text-gray-400 hover:text-white"
@@ -139,7 +175,9 @@ const ArtistDetail = () => {
             )}
           </>
         ) : (
-          <p className="text-sm text-gray-400">{t('artist.no_tracks')}</p>
+          <p className="text-sm text-gray-400">
+            {selectedAlbumId === 'all' ? t('artist.no_tracks') : t('artist.no_tracks_in_album')}
+          </p>
         )}
       </section>
 
@@ -147,10 +185,18 @@ const ArtistDetail = () => {
         <section className="mb-8">
           <h2 className="mb-4 text-xl font-bold text-white">{t('artist.discography')}</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {albums.map((album) => (
+            {(showAllAlbums ? albums : albums.slice(0, POPULAR_ALBUMS_SHOWN)).map((album) => (
               <AlbumCard key={album.id} album={{ ...album, artist: album.artist ?? artist }} />
             ))}
           </div>
+          {albums.length > POPULAR_ALBUMS_SHOWN && (
+            <button
+              onClick={() => setShowAllAlbums(!showAllAlbums)}
+              className="mt-3 px-2 py-2 text-sm font-semibold text-gray-400 hover:text-white"
+            >
+              {showAllAlbums ? t('artist.show_less') : t('artist.show_more')}
+            </button>
+          )}
         </section>
       )}
     </div>

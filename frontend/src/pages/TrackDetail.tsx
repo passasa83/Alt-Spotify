@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getTrack, resolveCoverUrl } from '@/api/tracks';
+import { getAlbum, getAlbumTracks } from '@/api/albums';
 import { getParsedLyrics } from '@/api/lyrics';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { Play, Pause, Heart } from 'lucide-react';
-import type { Track, LyricsLine } from '@/types';
+import type { Album, Track, LyricsLine } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
+import TrackList from '@/components/TrackList';
 
 const TrackDetail = () => {
   const { t } = useTranslation();
@@ -14,6 +16,9 @@ const TrackDetail = () => {
   const [track, setTrackData] = useState<Track | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lyrics, setLyrics] = useState<LyricsLine[]>([]);
+  const [album, setAlbum] = useState<Album | null>(null);
+  const [albumTracks, setAlbumTracks] = useState<Track[]>([]);
+  const [albumLoading, setAlbumLoading] = useState(false);
   const { setTrack, currentTrack, isPlaying, togglePlay, progress } = usePlayerStore();
   const { addToFavorites, removeFromFavorites, isFavorite } = useLibraryStore();
   const liked = isFavorite(String(id));
@@ -21,6 +26,8 @@ const TrackDetail = () => {
   useEffect(() => {
     const loadTrack = async () => {
       if (!id) return;
+      setAlbum(null);
+      setAlbumTracks([]);
       try {
         const data = await getTrack(id);
         setTrackData(data);
@@ -28,10 +35,21 @@ const TrackDetail = () => {
           const parsed = await getParsedLyrics(id);
           setLyrics(parsed);
         }
+        if (data.album_id) {
+          // The page is usable without this: load the album beside it.
+          setAlbumLoading(true);
+          const [albumData, tracksData] = await Promise.all([
+            data.album ? Promise.resolve(data.album) : getAlbum(data.album_id).catch(() => null),
+            getAlbumTracks(data.album_id).catch(() => []),
+          ]);
+          setAlbum(albumData);
+          setAlbumTracks(tracksData);
+        }
       } catch {
         console.error('Failed to load track');
       } finally {
         setIsLoading(false);
+        setAlbumLoading(false);
       }
     };
     loadTrack();
@@ -121,6 +139,37 @@ const TrackDetail = () => {
           <Heart size={24} fill={liked ? 'currentColor' : 'none'} className={liked ? 'text-green-500' : ''} />
         </button>
       </div>
+
+      {track.album_id && (
+        <section className="mt-8 rounded-lg bg-gray-900 p-6">
+          <div className="mb-4 flex items-center gap-4">
+            <img
+              src={resolveCoverUrl(album?.cover_url || track.cover_url || track.album?.cover_url)}
+              alt={album?.title || track.album?.title || ''}
+              className="h-16 w-16 flex-shrink-0 rounded object-cover"
+            />
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-gray-400">{t('album.album')}</p>
+              <Link
+                to={`/album/${track.album_id}`}
+                className="block truncate text-lg font-bold text-white hover:underline"
+              >
+                {album?.title || track.album?.title || t('player.unknown_album')}
+              </Link>
+              {!albumLoading && (
+                <p className="text-sm text-gray-400">{t('artist.track_count', { count: albumTracks.length })}</p>
+              )}
+            </div>
+          </div>
+          {albumLoading ? (
+            <div className="flex h-24 items-center justify-center">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-green-500"></div>
+            </div>
+          ) : (
+            <TrackList tracks={albumTracks} showIndex={false} showAlbum={false} playlistTracks={albumTracks} />
+          )}
+        </section>
+      )}
 
       {(track.bpm || track.key || track.mood || track.genre) && (
         <div className="mb-4 flex flex-wrap gap-4 text-sm text-gray-400">

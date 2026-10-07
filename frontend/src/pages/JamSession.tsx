@@ -35,15 +35,19 @@ const JamSession = () => {
     disconnectWebSocket,
   } = useJamStore();
   const { currentTrack } = usePlayerStore();
+  const playBlocked = usePlayerStore((s) => s.playBlocked);
   const [chatInput, setChatInput] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isCatchingUp, setIsCatchingUp] = useState(false);
 
   useEffect(() => {
     if (sessionId) {
       loadSession(sessionId).then(() => {
         connectWebSocket(sessionId);
+        // Guest joining mid-song: jump to the live track and position.
+        void useJamStore.getState().syncToLive();
       });
     }
     return () => {
@@ -97,6 +101,18 @@ const JamSession = () => {
       navigator.clipboard.writeText(currentSession.code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // Autoplay blocked (no prior interaction): a tap resumes, re-synced to the
+  // live position so the guest does not restart minutes behind.
+  const handleResumeLive = async () => {
+    setIsCatchingUp(true);
+    try {
+      await useJamStore.getState().syncToLive();
+      usePlayerStore.getState().play();
+    } finally {
+      setIsCatchingUp(false);
     }
   };
 
@@ -188,6 +204,15 @@ const JamSession = () => {
                 <SkipForward size={16} />
               </button>
             </div>
+            {playBlocked && (
+              <button
+                onClick={handleResumeLive}
+                disabled={isCatchingUp}
+                className="mt-3 w-full animate-pulse rounded-full bg-green-500 px-4 py-2.5 text-sm font-bold text-black hover:bg-green-400 disabled:opacity-50"
+              >
+                {isCatchingUp ? t('jam.catching_up') : t('jam.resume_live')}
+              </button>
+            )}
           </div>
         )}
 

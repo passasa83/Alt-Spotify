@@ -113,6 +113,10 @@ async def import_from_jiosaavn(song_data: dict, db) -> uuid.UUID | None:
         db.add(track)
         await db.flush()
 
+        if not track.album_id:
+            from app.services.album_lookup import assign_album
+            await assign_album(db, track, artist_name.split(",")[0].strip(), album_title=song_data.get("album"))
+
         logger.info(
             "jiosaavn_imported",
             track_id=str(track_id),

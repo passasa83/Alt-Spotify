@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ArtistDetail from '../ArtistDetail';
 import { getTracks } from '@/api/tracks';
+import { getArtistAlbums } from '@/api/artists';
 import { usePlayerStore } from '@/stores/playerStore';
 
 const tracks = Array.from({ length: 12 }, (_, n) => ({
@@ -68,5 +69,49 @@ describe('ArtistDetail', () => {
 
     expect(await screen.findByText('No playable track for this artist yet.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
+  });
+
+  it('filters popular tracks by album from the chips', async () => {
+    const albumTracks = [
+      { id: 't1', title: 'Album One Song', artist_id: 'a1', album_id: 'al1', duration_seconds: 180, play_count: 5, created_at: '2024-01-01' },
+      { id: 't2', title: 'Album Two Song', artist_id: 'a1', album_id: 'al2', duration_seconds: 180, play_count: 4, created_at: '2024-01-02' },
+    ];
+    vi.mocked(getTracks).mockResolvedValue({ items: albumTracks, total: 2, page: 1, page_size: 100, pages: 1 } as any);
+    vi.mocked(getArtistAlbums).mockResolvedValue({
+      items: [
+        { id: 'al1', title: 'First Album', artist_id: 'a1', created_at: '2024-01-01' },
+        { id: 'al2', title: 'Second Album', artist_id: 'a1', created_at: '2024-01-02' },
+      ],
+      total: 2, page: 1, page_size: 50, pages: 1,
+    } as any);
+    renderPage();
+
+    expect(await screen.findByText('Album One Song')).toBeInTheDocument();
+    expect(screen.getByText('Album Two Song')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Second Album' }));
+    expect(screen.queryByText('Album One Song')).not.toBeInTheDocument();
+    expect(screen.getByText('Album Two Song')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+    expect(setPlaylistAsQueue).toHaveBeenCalledWith([albumTracks[1]], 0);
+  });
+
+  it('asks for the most played albums and shows only the first ones', async () => {
+    vi.mocked(getArtistAlbums).mockResolvedValue({
+      items: Array.from({ length: 7 }, (_, n) => ({ id: `al${n}`, title: `Album ${n}`, artist_id: 'a1', created_at: '2024-01-01' })),
+      total: 7, page: 1, page_size: 50, pages: 1,
+    } as any);
+    const { container } = renderPage();
+
+    expect(await screen.findAllByText('Album 0')).not.toHaveLength(0);
+    expect(getArtistAlbums).toHaveBeenCalledWith('a1', 1, 50, { playable: true, sort: 'popular' });
+    // Only the albums section is cut: the filter chips keep all seven.
+    expect(container.querySelectorAll('a[href^="/album/"]')).toHaveLength(5);
+
+    // The tracks section has its own "show more": the albums one is second.
+    fireEvent.click(screen.getAllByText('Show more')[1]);
+    expect(container.querySelectorAll('a[href^="/album/"]')).toHaveLength(7);
+    expect(screen.getByText('Show less')).toBeInTheDocument();
   });
 });

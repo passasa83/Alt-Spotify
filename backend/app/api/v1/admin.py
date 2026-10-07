@@ -1,7 +1,7 @@
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +20,8 @@ from app.schemas.user import UserResponse
 from app.services.admin_overview import (
     get_overview,
     merge_missing_duplicates,
+    missing_track_ids,
+    purge_missing_tracks,
     purge_unplayable_tracks,
 )
 from app.services.admin_overview import (
@@ -165,6 +167,38 @@ async def merge_missing(
 ):
     """Merge tracks whose file is missing into the identical track that still exists."""
     return await merge_missing_duplicates(db, dry_run=dry_run)
+
+
+@router.post("/catalogue/purge-missing")
+async def purge_missing(
+    dry_run: bool = Query(True, description="Only count what would be deleted"),
+    include_used: bool = Query(False, description="Also remove those in playlists, favorites or history"),
+    include_orphans: bool = Query(False, description="Then remove albums and artists left without any track"),
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete tracks whose file is gone (only those without an HLS copy: the rest still play)."""
+    return await purge_missing_tracks(db, dry_run=dry_run, include_used=include_used, include_orphans=include_orphans)
+
+
+@router.post("/catalogue/redownload-missing")
+async def redownload_missing(
+    background_tasks: BackgroundTasks,
+    dry_run: bool = Query(True, description="Only count the tracks to fetch again"),
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Download the audio again of the tracks whose file is gone (background)."""
+    from app.core.database import async_session
+    from app.services import redownload
+
+    track_ids = await missing_track_ids(db)
+    if dry_run or not track_ids:
+        return {"count": len(track_ids), "queued": 0, "running": redownload.is_running()}
+    if redownload.is_running():
+        raise HTTPException(status_code=409, detail="A redownload is already running")
+    background_tasks.add_task(redownload.redownload_missing, track_ids, async_session)
+    return {"count": len(track_ids), "queued": len(track_ids), "running": True}
 
 
 @router.post("/catalogue/merge-duplicates")
